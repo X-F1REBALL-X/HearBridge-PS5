@@ -1,0 +1,28 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HearBridge PS5</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0c0b0f;color:#f4efe6;
+font:26px/1.5 "Segoe UI",system-ui,sans-serif;text-align:center}main{max-width:900px;padding:40px}
+h1{font-size:44px;letter-spacing:4px;margin:0 0 24px}h1 b{color:#c8ff3d}p{margin:0 0 18px}.k{color:#9a948a;font-size:20px}
+button{font:inherit;font-weight:800;min-width:260px;min-height:80px;background:#c8ff3d;color:#0c0b0f;border:0;margin-top:20px}</style></head>
+<body><main><h1>Hear<b>Bridge</b> PS5</h1><p id="m">…</p><p class="k" id="h"></p><button id="b">↻</button>
+<p class="k">Developed by X-F1REBALL-X</p></main>
+<script>
+var U='http://127.0.0.1:8090/',T={
+en:['HearBridge is not running.','Load HearBridge-PS5.elf with your ELF loader first, then open this tile again.','Try again'],
+ar:['HearBridge لا يعمل.','حمّل HearBridge-PS5.elf بمحمِّل ELF أولًا، ثم افتح هذه الأيقونة مرة أخرى.','إعادة المحاولة'],
+es:['HearBridge no se está ejecutando.','Carga primero HearBridge-PS5.elf con tu cargador de ELF y vuelve a abrir este icono.','Reintentar'],
+fr:['HearBridge n\'est pas lancé.','Chargez d\'abord HearBridge-PS5.elf avec votre chargeur ELF, puis rouvrez cette vignette.','Réessayer'],
+de:['HearBridge läuft nicht.','Lade zuerst HearBridge-PS5.elf mit deinem ELF-Loader und öffne diese Kachel dann erneut.','Erneut versuchen'],
+pt:['O HearBridge não está em execução.','Carregue primeiro o HearBridge-PS5.elf com o seu carregador de ELF e abra este ícone de novo.','Tentar novamente'],
+ru:['HearBridge не запущен.','Сначала загрузите HearBridge-PS5.elf через ELF-загрузчик, затем снова откройте эту плитку.','Повторить'],
+ja:['HearBridge が起動していません。','先に ELF ローダーで HearBridge-PS5.elf を読み込み、もう一度このアイコンを開いてください。','再試行'],
+zh:['HearBridge 未运行。','请先用 ELF 加载器加载 HearBridge-PS5.elf，然后再次打开此图标。','重试'],
+it:['HearBridge non è in esecuzione.','Carica prima HearBridge-PS5.elf con il tuo loader ELF, poi riapri questa icona.','Riprova'],
+he:['HearBridge לא פועל.','טענו קודם את HearBridge-PS5.elf עם טוען ה-ELF, ואז פתחו שוב את האריח הזה.','נסו שוב']};
+var c=null;try{c=localStorage.getItem('hb_lang')}catch(e){}if(!T[c])c=(navigator.language||'en').slice(0,2);if(!T[c])c='en';
+var L=T[c];if(c=='ar'||c=='he')document.documentElement.dir='rtl';
+function probe(){var x=new XMLHttpRequest();x.open('GET',U+'api/status',true);x.timeout=2500;
+x.onload=function(){if(x.status==200)location.href=U;else fail()};x.onerror=x.ontimeout=fail;x.send()}
+function fail(){document.getElementById('m').textContent=L[0];document.getElementById('h').textContent=L[1];document.getElementById('b').textContent=L[2]}
+document.getElementById('b').onclick=probe;probe();
+</script></body></html>
