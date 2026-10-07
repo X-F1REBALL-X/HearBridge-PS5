@@ -24,9 +24,9 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא לוכד את הש�
 
 ## התקנה והפעלה
 
-1. הורידו את **HearBridge-PS5-1.0.0.elf** מה[גרסה](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.0).
+1. הורידו את **HearBridge-PS5-1.0.1.elf** מה[גרסה](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
 2. שלחו אותו לטוען של הקונסולה, למשל:
-   `socat -u FILE:HearBridge-PS5-1.0.0.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
 3. פתחו **http://&lt;console-ip&gt;:8090** (או את האריח **HearBridge** שנוסף למסך הבית בהפעלה הראשונה).
 
 ## שימוש

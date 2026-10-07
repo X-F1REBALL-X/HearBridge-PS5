@@ -22,9 +22,9 @@ HearBridge PS5 — это payload (ELF) для взломанной PS5. Он з
 
 ## Установка и запуск
 
-1. Скачайте **HearBridge-PS5-1.0.0.elf** со [страницы релиза](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.0).
+1. Скачайте **HearBridge-PS5-1.0.1.elf** со [страницы релиза](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
 2. Отправьте его загрузчику консоли, например:
-   `socat -u FILE:HearBridge-PS5-1.0.0.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
 3. Откройте **http://&lt;console-ip&gt;:8090** (или плитку **HearBridge**, которая добавляется на главный экран при первом запуске).
 
 ## Использование
