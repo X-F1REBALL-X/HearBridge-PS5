@@ -22,9 +22,9 @@ HearBridge PS5 es un payload (ELF) para una PS5 con jailbreak. Captura el audio 
 
 ## Instalación y ejecución
 
-1. Descarga **HearBridge-PS5-1.0.0.elf** desde la [versión](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.0).
+1. Descarga **HearBridge-PS5-1.0.1.elf** desde la [versión](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
 2. Envíalo al cargador de la consola, por ejemplo:
-   `socat -u FILE:HearBridge-PS5-1.0.0.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
 3. Abre **http://&lt;console-ip&gt;:8090** (o el icono **HearBridge** que se añade a la pantalla de inicio la primera vez).
 
 ## Uso

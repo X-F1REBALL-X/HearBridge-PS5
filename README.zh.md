@@ -22,9 +22,9 @@ HearBridge PS5 是用于破解 PS5 的载荷（ELF）。它采集主机的声音
 
 ## 安装与运行
 
-1. 从[发布页](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.0)下载 **HearBridge-PS5-1.0.0.elf**。
+1. 从[发布页](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1)下载 **HearBridge-PS5-1.0.1.elf**。
 2. 将其发送到主机的加载器，例如：
-   `socat -u FILE:HearBridge-PS5-1.0.0.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
 3. 打开 **http://&lt;console-ip&gt;:8090**（或首次运行时添加到主屏幕的 **HearBridge** 图块）。
 
 ## 使用

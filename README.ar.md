@@ -24,9 +24,9 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تلت
 
 ## التثبيت والتشغيل
 
-1. نزّل **HearBridge-PS5-1.0.0.elf** من [الإصدار](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.0).
+1. نزّل **HearBridge-PS5-1.0.1.elf** من [الإصدار](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
 2. أرسله إلى محمّل الجهاز، مثلًا:
-   `socat -u FILE:HearBridge-PS5-1.0.0.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
 3. افتح **http://&lt;console-ip&gt;:8090** (أو مربع **HearBridge** الذي يُضاف إلى الشاشة الرئيسية عند التشغيل الأول).
 
 ## الاستخدام

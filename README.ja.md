@@ -22,9 +22,9 @@ HearBridge PS5 は脱獄済み PS5 用のペイロード（ELF）です。本体
 
 ## インストールと起動
 
-1. [リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.0)から **HearBridge-PS5-1.0.0.elf** をダウンロードします。
+1. [リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1)から **HearBridge-PS5-1.0.1.elf** をダウンロードします。
 2. 本体のローダーに送信します。例:
-   `socat -u FILE:HearBridge-PS5-1.0.0.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
 3. **http://&lt;console-ip&gt;:8090** を開きます（初回起動時にホーム画面に追加される **HearBridge** タイルからも開けます）。
 
 ## 使い方
