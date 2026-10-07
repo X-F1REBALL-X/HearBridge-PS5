@@ -1,0 +1,287 @@
+/* Host tests: HTTP handler, SDP server records, AVRCP absolute volume,
+ * soft limiter and gain file parsing. Prints the status JSON to argv[1]
+ * for an external JSON parse check. */
+#include "ctl.h"
+#include "gain.h"
+#include "http.h"
+#include "avrcp.h"
+#include "sdp_server.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+
+void log_line(const char *fmt, ...) { (void)fmt; }
+
+static int fails;
+#define CHECK(c, what) do { if (c) printf("ok   %s\n", what); \
+    else { printf("FAIL %s\n", what); fails++; } } while (0)
+
+static char out[65536];
+
+static int get(hb_ctl *c, const char *path)
+{
+    char req[256];
+    snprintf(req, sizeof req, "GET %s HTTP/1.1\r\nHost: ps5\r\n\r\n", path);
+    return http_handle(c, req, (int)strlen(req), out, (int)sizeof out);
+}
+
+static const unsigned char *find(const unsigned char *h, int hn, const unsigned char *n, int nn)
+{
+    int i;
+    for (i = 0; i + nn <= hn; i++) if (!memcmp(h + i, n, (size_t)nn)) return h + i;
+    return NULL;
+}
+
+int main(int argc, char **argv)
+{
+    hb_ctl c;
+    int n;
+
+    /* ---- HTTP ---- */
+    ctl_init(&c, "1.0.9");
+    strcpy(c.url, "http://10.0.0.5:8090");
+    strcpy(c.device, "WF-\"1000\"XM6");
+    n = get(&c, "/");
+    CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/html") &&
+          strstr(out, "HearBridge PS5"), "GET / serves the page");
+    n = get(&c, "/api/status");
+    CHECK(n > 0 && strstr(out, "application/json") && strstr(out, "\"gain_pct\":500"),
+          "status JSON, default gain 500%");
+    CHECK(strstr(out, "WF-\\\"1000\\\"XM6") != NULL, "device name JSON-escaped");
+    if (argc > 1) {
+        FILE *f = fopen(argv[1], "w");
+        const char *b = strstr(out, "\r\n\r\n");
+        if (f && b) { fwrite(b + 4, 1, (size_t)(out + n - (b + 4)), f); fclose(f); }
+    }
+    get(&c, "/api/volume?pct=250");
+    CHECK(c.gain_pct == 250 && c.gain_dirty, "volume 250% set + marked for saving");
+    get(&c, "/api/volume?pct=999");
+    CHECK(c.gain_pct == 500, "volume clamped to 500%");
+    n = get(&c, "/api/volume");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "volume without pct -> 400");
+    get(&c, "/api/headset?vol=100");
+    CHECK(c.req_hs_volume == 100 && c.hs_volume == 100, "headset volume request");
+    get(&c, "/api/headset?pct=50");
+    CHECK(c.req_hs_volume == 64, "headset volume by percent");
+    get(&c, "/api/mute?on=1");
+    CHECK(c.muted == 1, "mute on");
+    get(&c, "/api/mute");
+    CHECK(c.muted == 0, "mute toggle");
+    get(&c, "/api/tone?on=1");
+    CHECK(c.tone == 1, "tone on");
+    get(&c, "/api/disconnect");
+    CHECK(c.req_disconnect && c.paused, "disconnect");
+    get(&c, "/api/connect");
+    CHECK(c.req_connect && !c.paused, "connect");
+    get(&c, "/api/stop");
+    CHECK(c.req_stop, "stop");
+    strcpy(c.devices_path, "/nonexistent/devices.json");
+    get(&c, "/api/devices");
+    CHECK(strstr(out, "\"devices\":[]") != NULL, "devices: empty list when no scan yet");
+    {
+        FILE *f = fopen("build/host/devices.json", "w");
+        fputs("{\"version\":1,\"devices\":[{\"index\":0,\"addr\":\"AA:BB:CC:DD:EE:FF\"}]}", f);
+        fclose(f);
+        strcpy(c.devices_path, "build/host/devices.json");
+        strcpy(c.select_path, "build/host/select.txt");
+    }
+    get(&c, "/api/devices");
+    CHECK(strstr(out, "AA:BB:CC:DD:EE:FF") != NULL, "devices: serves devices.json");
+    get(&c, "/api/select?addr=AA:BB:CC:DD:EE:FF");
+    {
+        char line[64] = "";
+        FILE *f = fopen("build/host/select.txt", "r");
+        if (f) { if (!fgets(line, sizeof line, f)) line[0] = 0; fclose(f); }
+        CHECK(!strncmp(out, "HTTP/1.1 200", 12) && !strcmp(line, "AA:BB:CC:DD:EE:FF\n"),
+              "select by address writes select.txt");
+    }
+    get(&c, "/api/select?addr=AA:BB:CC:DD:EE:F;rm");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "select rejects a malformed address");
+    get(&c, "/api/select?index=2");
+    CHECK(!strncmp(out, "HTTP/1.1 200", 12), "select by index");
+    {
+        static const struct { const char *path, *line; } cmds[] = {
+            { "/api/scan", "scan\n" },
+            { "/api/reconnect", "reconnect\n" },
+            { "/api/forget?addr=58:18:62:63:3B:7C", "forget 58:18:62:63:3B:7C\n" },
+        };
+        unsigned i;
+        for (i = 0; i < sizeof cmds / sizeof *cmds; i++) {
+            char line[64] = "", what[96];
+            FILE *f;
+            c.paused = 1;
+            get(&c, cmds[i].path);
+            f = fopen("build/host/select.txt", "r");
+            if (f) { if (!fgets(line, sizeof line, f)) line[0] = 0; fclose(f); }
+            snprintf(what, sizeof what, "%s writes \"%.*s\"", cmds[i].path,
+                     (int)strlen(cmds[i].line) - 1, cmds[i].line);
+            CHECK(!strncmp(out, "HTTP/1.1 200", 12) && !strcmp(line, cmds[i].line), what);
+        }
+        CHECK(c.paused == 1, "forget does not resume a paused session");
+        get(&c, "/api/scan");
+        CHECK(c.paused == 0, "scan resumes from paused");
+    }
+    get(&c, "/api/forget?index=1");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "forget needs an address");
+    get(&c, "/api/forget?addr=58:18:62:63:3B:7C%0Ascan");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "forget rejects trailing junk");
+    {
+        FILE *f = fopen("build/host/saved.json", "w");
+        fputs("{\"devices\":[{\"addr\":\"58:18:62:63:3B:7C\",\"name\":\"WF-1000XM6\",\"kind\":\"headphones\",\"current\":1}]}", f);
+        fclose(f);
+        strcpy(c.saved_path, "build/host/saved.json");
+    }
+    get(&c, "/api/saved");
+    CHECK(strstr(out, "\"current\":1") && strstr(out, "application/json"), "saved: serves saved.json");
+    n = get(&c, "/nope");
+    CHECK(!strncmp(out, "HTTP/1.1 404", 12), "404");
+    n = http_handle(&c, "DELETE / HTTP/1.1\r\n\r\n", 21, out, sizeof out);
+    CHECK(!strncmp(out, "HTTP/1.1 405", 12), "405 for other methods");
+    n = http_handle(&c, "garbage", 7, out, sizeof out);
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "400 for garbage");
+    (void)n;
+
+    /* ---- gain / limiter ---- */
+    CHECK(gain_parse_pct("4") == 400 && gain_parse_pct("2.5\n") == 250 &&
+          gain_parse_pct("0.05") == 5 && gain_parse_pct("x") == -1 &&
+          gain_parse_pct("16") == 500, "gain file parse");
+    {
+        char b[16];
+        gain_format(250, b, sizeof b);
+        CHECK(!strcmp(b, "2.50\n"), "gain file format");
+    }
+    {
+        int16_t p[7] = { 32767, -32768, 16000, -16000, 1000, 0, 8000 };
+        int i, ok = 1, peak = gain_apply_soft(p, 7, 4000);
+        /* sign kept, never wraps, < full scale, monotonic */
+        if (p[0] <= 0 || p[1] >= 0 || p[2] <= 0 || p[3] >= 0) ok = 0;
+        for (i = 0; i < 7; i++) if (p[i] > 32766 || p[i] < -32766) ok = 0;
+        if (!(p[0] >= p[2] && p[2] >= p[6] && p[6] >= p[4])) ok = 0;
+        if (p[4] < 3990 || p[4] > 4010) ok = 0;     /* linear below the knee */
+        CHECK(ok && peak < 1000, "soft limiter: no wrap, no hard clip, linear region");
+    }
+    CHECK(ctl_effective_gain_milli(400, 0, -1) == 4000 &&
+          ctl_effective_gain_milli(400, 0, 127) == 4000 &&
+          ctl_effective_gain_milli(400, 0, 0) == 0 &&
+          ctl_effective_gain_milli(400, 1, 127) == 0 &&
+          ctl_effective_gain_milli(200, 0, 64) == 1007, "headset volume maps to gain");
+
+    /* ---- SDP ---- */
+    {
+        unsigned char rsp[700];
+        /* ServiceSearch for AV Remote Control Target 0x110C, max 10 */
+        static const unsigned char ss[] = { 0x02, 0, 1, 0, 8, 0x35, 3, 0x19, 0x11, 0x0C, 0, 10, 0 };
+        /* ServiceSearchAttribute: UUID 0x110E (AVRCP), all attributes */
+        static const unsigned char ssa[] = { 0x06, 0, 2, 0, 15, 0x35, 3, 0x19, 0x11, 0x0E,
+            0x02, 0x00, 0x35, 5, 0x0A, 0, 0, 0xFF, 0xFF, 0 };
+        static const unsigned char feat2[] = { 0x09, 0x03, 0x11, 0x09, 0x00, 0x02 };
+        static const unsigned char psm17[] = { 0x19, 0x01, 0x00, 0x09, 0x00, 0x17 };
+        static const unsigned char tgcl[] = { 0x35, 0x03, 0x19, 0x11, 0x0C };
+        static const unsigned char v15[] = { 0x19, 0x11, 0x0E, 0x09, 0x01, 0x05 };
+        n = sdp_server_handle(ss, sizeof ss, rsp, sizeof rsp);
+        CHECK(n == 14 && rsp[0] == 0x03 && rsp[8] == 1 && rsp[9] == 0 && rsp[10] == 1 &&
+              rsp[11] == 0 && rsp[12] == 2, "SDP: AVRCP Target record found");
+        n = sdp_server_handle(ssa, sizeof ssa, rsp, sizeof rsp);
+        CHECK(n > 20 && rsp[0] == 0x07 && rsp[n - 1] == 0, "SDP: search+attributes, one PDU");
+        CHECK(find(rsp, n, tgcl, 5) && find(rsp, n, feat2, 6) && find(rsp, n, psm17, 6) &&
+              find(rsp, n, v15, 6), "SDP: TG class, AVRCP 1.5, PSM 0x17, Category 2");
+        {
+            /* Same request with max 32 bytes: continuation must reassemble. */
+            unsigned char req[64], all[1024];
+            int tot = 0, guard = 0, full = n;
+            unsigned char ref[700];
+            memcpy(ref, rsp, (size_t)n);
+            memcpy(req, ssa, sizeof ssa);
+            req[10] = 0; req[11] = 32;
+            for (;;) {
+                int rl = (int)sizeof ssa - 1, cl, al;
+                req[4] = (unsigned char)(rl - 5 + 1);
+                n = sdp_server_handle(req, rl + 1, rsp, sizeof rsp);
+                if (n < 8 || rsp[0] != 0x07) break;
+                al = rsp[5] << 8 | rsp[6];
+                memcpy(all + tot, rsp + 7, (size_t)al);
+                tot += al;
+                cl = rsp[7 + al];
+                if (!cl || ++guard > 50) break;
+                /* resend with continuation */
+                memcpy(req, ssa, sizeof ssa - 1);
+                req[10] = 0; req[11] = 32;
+                req[sizeof ssa - 1] = (unsigned char)cl;
+                memcpy(req + sizeof ssa, rsp + 8 + al, (size_t)cl);
+                rl = (int)sizeof ssa + cl - 1;
+                req[4] = (unsigned char)(rl + 1 - 5);
+                n = sdp_server_handle(req, rl + 1, rsp, sizeof rsp);
+                if (n < 8) break;
+                al = rsp[5] << 8 | rsp[6];
+                memcpy(all + tot, rsp + 7, (size_t)al);
+                tot += al;
+                cl = rsp[7 + al];
+                if (!cl) break;
+                req[sizeof ssa - 1] = (unsigned char)cl;
+                memcpy(req + sizeof ssa, rsp + 8 + al, (size_t)cl);
+                /* loop continues with the continuation in place */
+                {
+                    int k;
+                    for (k = 0; k < 50 && cl; k++) {
+                        rl = (int)sizeof ssa + cl - 1;
+                        req[4] = (unsigned char)(rl + 1 - 5);
+                        n = sdp_server_handle(req, rl + 1, rsp, sizeof rsp);
+                        al = rsp[5] << 8 | rsp[6];
+                        memcpy(all + tot, rsp + 7, (size_t)al);
+                        tot += al;
+                        cl = rsp[7 + al];
+                        if (cl) memcpy(req + sizeof ssa, rsp + 8 + al, (size_t)cl);
+                    }
+                }
+                break;
+            }
+            CHECK(tot == (ref[5] << 8 | ref[6]) && !memcmp(all, ref + 7, (size_t)tot) && full > 0,
+                  "SDP: continuation reassembles the same attribute list");
+        }
+    }
+
+    /* ---- AVRCP ---- */
+    {
+        avrcp_state a;
+        unsigned char r[128];
+        static const unsigned char caps[] = { 0x30, 0x11, 0x0E, 0x01, 0x48, 0x00,
+            0x00, 0x19, 0x58, 0x10, 0x00, 0x00, 0x01, 0x03 };
+        static const unsigned char reg[] = { 0x40, 0x11, 0x0E, 0x03, 0x48, 0x00,
+            0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x05, 0x0D, 0, 0, 0, 0 };
+        static const unsigned char setv[] = { 0x50, 0x11, 0x0E, 0x00, 0x48, 0x00,
+            0x00, 0x19, 0x58, 0x50, 0x00, 0x00, 0x01, 0x30 };
+        /* headset's INTERIM then CHANGED to our registration */
+        static const unsigned char interim[] = { 0x12, 0x11, 0x0E, 0x0F, 0x48, 0x00,
+            0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x02, 0x0D, 0x50 };
+        static const unsigned char chg[] = { 0x12, 0x11, 0x0E, 0x0D, 0x48, 0x00,
+            0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x02, 0x0D, 0x20 };
+        avrcp_init(&a, 64);
+        n = avrcp_input(&a, caps, sizeof caps, r, sizeof r);
+        CHECK(n == 16 && r[0] == 0x32 && r[3] == 0x0C && r[9] == 0x10 && r[13] == 0x03 &&
+              r[14] == 1 && r[15] == 0x0D, "AVRCP: GET_CAPABILITIES -> VOLUME_CHANGED");
+        n = avrcp_input(&a, reg, sizeof reg, r, sizeof r);
+        CHECK(n == 15 && r[0] == 0x42 && r[3] == 0x0F && r[13] == 0x0D && r[14] == 64 &&
+              a.notify_label == 4, "AVRCP: REGISTER_NOTIFICATION -> INTERIM 64");
+        n = avrcp_input(&a, setv, sizeof setv, r, sizeof r);
+        CHECK(n == 14 && r[3] == 0x09 && r[13] == 0x30 && a.volume == 0x30 && a.changed,
+              "AVRCP: headset SetAbsoluteVolume accepted");
+        n = avrcp_build_set_volume(&a, 100, r, sizeof r);
+        CHECK(n == 14 && !(r[0] & 0x02) && r[3] == 0x00 && r[9] == 0x50 && r[13] == 100,
+              "AVRCP: our SetAbsoluteVolume command");
+        n = avrcp_build_volume_changed(&a, r, sizeof r);
+        CHECK(n == 15 && r[0] == 0x42 && r[3] == 0x0D && r[14] == 100 && a.notify_label < 0,
+              "AVRCP: CHANGED notification on the headset's label");
+        n = avrcp_build_register_volume(&a, r, sizeof r);
+        CHECK(n == 18 && r[3] == 0x03 && r[9] == 0x31 && r[13] == 0x0D,
+              "AVRCP: our REGISTER_NOTIFICATION");
+        a.changed = 0;
+        avrcp_input(&a, interim, sizeof interim, r, sizeof r);
+        CHECK(a.volume == 0x50 && a.remote_abs && a.ct_registered, "AVRCP: INTERIM volume read");
+        avrcp_input(&a, chg, sizeof chg, r, sizeof r);
+        CHECK(a.volume == 0x20 && a.changed && a.need_register, "AVRCP: CHANGED -> re-register");
+    }
+
+    printf("%s (%d failures)\n", fails ? "FAILED" : "ALL OK", fails);
+    return fails ? 1 : 0;
+}

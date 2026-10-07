@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Check and decode a HearBridge media_dump.bin.
+
+usage: tests/decode_dump media_dump.bin [out.wav] [--expect-hz N]
+
+Verifies every packet: RTP V=2/PT 96/SSRC constant/seq+1/timestamp step =
+frames*samples, the SBC media payload header (F/S/L/RFA = 0, NUM = number
+of frames found), and every SBC frame (sync 0x9C, header fields equal to the
+SET_CONFIGURATION IE stored in the dump, frame length, CRC-8). Then joins the
+SBC frames and decodes them with ffmpeg to WAV. Exit status 0 = all good.
+"""
+import struct, subprocess, sys, tempfile, os
+
+FS = {0: 16000, 1: 32000, 2: 44100, 3: 48000}
+IE_FS = {0x80: 0, 0x40: 1, 0x20: 2, 0x10: 3}
+IE_MODE = {0x08: 0, 0x04: 1, 0x02: 2, 0x01: 3}          # mono dual stereo joint
+IE_BLK = {0x80: 4, 0x40: 8, 0x20: 12, 0x10: 16}
+IE_SB = {0x08: 4, 0x04: 8}
+IE_AL = {0x02: 1, 0x01: 0}                              # snr, loudness
+MODES = ["mono", "dual", "stereo", "joint"]
+
+
+def crc8(bits):
+    r = 0x0F
+    for b in bits:
+        fb = ((r >> 7) & 1) ^ b
+        r = (r << 1) & 0xFF
+        if fb:
+            r ^= 0x1D
+    return r
+
+
+def bits(buf, start, n):
+    return [(buf[(start + i) >> 3] >> (7 - ((start + i) & 7))) & 1 for i in range(n)]
+
+
+def one(field, table, what, errs):
+    hit = [v for m, v in table.items() if field & m]
+    if len(hit) != 1:
+        errs.append("IE %s field %#x must have exactly one bit" % (what, field))
+        return None
+    return hit[0]
+
+
+def frame_len(mode, blocks, nsb, bitpool):
+    nch = 1 if mode == 0 else 2
+    if mode in (0, 1):
+        b = blocks * nch * bitpool
+    else:
+        b = (nsb if mode == 3 else 0) + blocks * bitpool
+    return 4 + (4 * nsb * nch) // 8 + (b + 7) // 8
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    expect_hz = None
+    if "--expect-hz" in sys.argv:
+        expect_hz = float(sys.argv[sys.argv.index("--expect-hz") + 1])
+        args = [a for a in args if a != sys.argv[sys.argv.index("--expect-hz") + 1]]
+    if not args:
+        print(__doc__)
+        return 2
+    data = open(args[0], "rb").read()
+    out_wav = args[1] if len(args) > 1 else os.path.splitext(args[0])[0] + ".wav"
+    errs = []
+    if data[:6] != b"HBMD1\n":
+        print("not a HearBridge media dump")
+        return 2
+    ie = data[6:10]
+    want = dict(fs=one(ie[0] & 0xF0, IE_FS, "freq", errs),
+                mode=one(ie[0] & 0x0F, IE_MODE, "mode", errs),
+                blocks=one(ie[1] & 0xF0, IE_BLK, "blocks", errs),
+                nsb=one(ie[1] & 0x0C, IE_SB, "subbands", errs),
+                alloc=one(ie[1] & 0x03, IE_AL, "alloc", errs))
+    print("SET_CONFIGURATION IE %s: %s Hz %s, %s blocks, %s subbands, %s, bitpool %d-%d"
+          % (ie.hex(" "), FS.get(want["fs"]), MODES[want["mode"]] if want["mode"] is not None else "?",
+             want["blocks"], want["nsb"], "SNR" if want["alloc"] else "loudness", ie[2], ie[3]))
+    pos, npk, nfr = 10, 0, 0
+    sbc = bytearray()
+    prev = None
+    while pos + 2 <= len(data):
+        n = struct.unpack_from("<H", data, pos)[0]
+        pos += 2
+        p = data[pos:pos + n]
+        pos += n
+        if len(p) < n:
+            errs.append("truncated packet %d" % npk)
+            break
+        tag = "pkt %d" % npk
+        if len(p) < 13:
+            errs.append(tag + ": too short")
+            break
+        v, pt = p[0] >> 6, p[1] & 0x7F
+        if v != 2 or p[0] & 0x3F:
+            errs.append(tag + ": RTP byte0 %#x (want 0x80)" % p[0])
+        if pt != 96 or p[1] & 0x80:
+            errs.append(tag + ": RTP PT/M byte %#x (want 0x60)" % p[1])
+        seq, ts, ssrc = struct.unpack_from(">HII", p, 2)
+        hdr = p[12]
+        if hdr & 0xF0:
+            errs.append(tag + ": media header F/S/L/RFA bits set (%#x)" % hdr)
+        num = hdr & 0x0F
+        off, got, spf = 13, 0, None
+        while off < len(p):
+            f = p[off:]
+            if f[0] != 0x9C:
+                errs.append(tag + ": frame %d sync %#x at %d" % (got, f[0], off))
+                break
+            fs, blk = f[1] >> 6, ((f[1] >> 4) & 3) * 4 + 4
+            mode, al, nsb, bp = (f[1] >> 2) & 3, (f[1] >> 1) & 1, 8 if f[1] & 1 else 4, f[2]
+            for k, val in (("fs", fs), ("blocks", blk), ("mode", mode), ("alloc", al), ("nsb", nsb)):
+                if want[k] is not None and val != want[k]:
+                    errs.append(tag + ": frame %s=%s, configured %s" % (k, val, want[k]))
+            if not (ie[2] <= bp <= ie[3]):
+                errs.append(tag + ": bitpool %d outside configured %d-%d" % (bp, ie[2], ie[3]))
+            fl = frame_len(mode, blk, nsb, bp)
+            nch = 1 if mode == 0 else 2
+            hb = (nsb if mode == 3 else 0) + 4 * nsb * nch
+            c = crc8(bits(f, 8, 16) + bits(f, 32, hb))
+            if c != f[3]:
+                errs.append(tag + ": frame %d CRC %#x, computed %#x" % (got, f[3], c))
+            if off + fl > len(p):
+                errs.append(tag + ": frame %d runs past packet end" % got)
+                break
+            sbc += p[off:off + fl]
+            off += fl
+            got += 1
+            spf = blk * nsb
+        if got != num:
+            errs.append(tag + ": NUM=%d but %d frames present" % (num, got))
+        if prev:
+            pseq, pts, pssrc, pspl = prev
+            if seq != (pseq + 1) & 0xFFFF:
+                errs.append(tag + ": seq %d after %d" % (seq, pseq))
+            if ts != (pts + pspl) & 0xFFFFFFFF:
+                errs.append(tag + ": ts step %d, want %d" % ((ts - pts) & 0xFFFFFFFF, pspl))
+            if ssrc != pssrc:
+                errs.append(tag + ": SSRC changed")
+        prev = (seq, ts, ssrc, got * (spf or 0))
+        npk += 1
+        nfr += got
+    print("%d packets, %d SBC frames" % (npk, nfr))
+    if sbc:
+        with tempfile.NamedTemporaryFile(suffix=".sbc", delete=False) as t:
+            t.write(sbc)
+        try:
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "sbc", "-i", t.name, out_wav], check=True)
+            raw = subprocess.run(["ffmpeg", "-v", "error", "-f", "sbc", "-i", t.name, "-f", "s16le", "-ac", "1", "-"],
+                                 check=True, capture_output=True).stdout
+        finally:
+            os.unlink(t.name)
+        smp = struct.unpack("<%dh" % (len(raw) // 2), raw)
+        peak = max(abs(x) for x in smp) if smp else 0
+        rms = (sum(x * x for x in smp) / len(smp)) ** 0.5 if smp else 0
+        print("decoded %d samples -> %s, peak %.4f, rms %.4f" % (len(smp), out_wav, peak / 32768, rms / 32768))
+        if expect_hz:
+            sr = FS.get(want["fs"], 48000)
+            zc = sum(1 for a, b in zip(smp, smp[1:]) if a < 0 <= b)
+            hz = zc * sr / max(1, len(smp))
+            print("estimated tone %.1f Hz (want %.0f)" % (hz, expect_hz))
+            if abs(hz - expect_hz) > expect_hz * 0.02:
+                errs.append("tone frequency %.1f Hz" % hz)
+    for e in errs[:30]:
+        print("ERROR", e)
+    if len(errs) > 30:
+        print("... %d more errors" % (len(errs) - 30))
+    print("RESULT:", "OK" if not errs else "%d problem(s)" % len(errs))
+    return 0 if not errs else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
