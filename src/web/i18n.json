@@ -112,7 +112,10 @@
    "signal": "Signal",
    "perPkt": "frames/packet",
    "notConnected": "Not connected",
-   "disconnected": "Not connected"
+   "disconnected": "Not connected",
+   "lowLatency": "Low latency",
+   "stableMode": "Stable",
+   "latHint": "Low latency: about 0.2 s of buffering. Stable: about 1 s, fewer dropouts when the radio is busy. Press to switch."
   },
   "ar": {
    "language": "اللغة",
@@ -169,7 +172,10 @@
    "signal": "الإشارة",
    "perPkt": "إطار/حزمة",
    "notConnected": "غير متصل",
-   "disconnected": "غير متصل"
+   "disconnected": "غير متصل",
+   "lowLatency": "زمن استجابة منخفض",
+   "stableMode": "مستقر",
+   "latHint": "زمن استجابة منخفض: نحو 0.2 ثانية من التخزين المؤقت. مستقر: نحو ثانية واحدة، انقطاعات أقل عندما يكون الراديو مشغولاً. اضغط للتبديل."
   },
   "es": {
    "language": "Idioma",
@@ -226,7 +232,10 @@
    "signal": "Señal",
    "perPkt": "tramas/paquete",
    "notConnected": "No conectado",
-   "disconnected": "No conectado"
+   "disconnected": "No conectado",
+   "lowLatency": "Baja latencia",
+   "stableMode": "Estable",
+   "latHint": "Baja latencia: unos 0,2 s de búfer. Estable: alrededor de 1 s, menos cortes cuando la radio está ocupada. Pulsa para cambiar."
   },
   "fr": {
    "language": "Langue",
@@ -283,7 +292,10 @@
    "signal": "Signal",
    "perPkt": "trames/paquet",
    "notConnected": "Non connecté",
-   "disconnected": "Non connecté"
+   "disconnected": "Non connecté",
+   "lowLatency": "Faible latence",
+   "stableMode": "Stable",
+   "latHint": "Faible latence : environ 0,2 s de mémoire tampon. Stable : environ 1 s, moins de coupures quand la radio est chargée. Appuyez pour changer."
   },
   "de": {
    "language": "Sprache",
@@ -340,7 +352,10 @@
    "signal": "Signal",
    "perPkt": "Frames/Paket",
    "notConnected": "Nicht verbunden",
-   "disconnected": "Nicht verbunden"
+   "disconnected": "Nicht verbunden",
+   "lowLatency": "Geringe Latenz",
+   "stableMode": "Stabil",
+   "latHint": "Geringe Latenz: etwa 0,2 s Puffer. Stabil: etwa 1 s, weniger Aussetzer bei ausgelastetem Funk. Zum Umschalten drücken."
   },
   "pt": {
    "language": "Idioma",
@@ -397,7 +412,10 @@
    "signal": "Sinal",
    "perPkt": "quadros/pacote",
    "notConnected": "Não conectado",
-   "disconnected": "Não conectado"
+   "disconnected": "Não conectado",
+   "lowLatency": "Baixa latência",
+   "stableMode": "Estável",
+   "latHint": "Baixa latência: cerca de 0,2 s de buffer. Estável: cerca de 1 s, menos cortes quando o rádio está ocupado. Toque para alternar."
   },
   "ru": {
    "language": "Язык",
@@ -454,7 +472,10 @@
    "signal": "Сигнал",
    "perPkt": "кадров/пакет",
    "notConnected": "Не подключено",
-   "disconnected": "Не подключено"
+   "disconnected": "Не подключено",
+   "lowLatency": "Низкая задержка",
+   "stableMode": "Стабильно",
+   "latHint": "Низкая задержка: около 0,2 с буфера. Стабильно: около 1 с, меньше пропаданий звука при загруженном радиоканале. Нажмите, чтобы переключить."
   },
   "ja": {
    "language": "言語",
@@ -511,7 +532,10 @@
    "signal": "信号",
    "perPkt": "フレーム/パケット",
    "notConnected": "未接続",
-   "disconnected": "未接続"
+   "disconnected": "未接続",
+   "lowLatency": "低遅延",
+   "stableMode": "安定",
+   "latHint": "低遅延: 約0.2秒のバッファ。安定: 約1秒、無線が混雑していても途切れにくい。押して切り替え。"
   },
   "zh": {
    "language": "语言",
@@ -568,7 +592,10 @@
    "signal": "信号",
    "perPkt": "帧/包",
    "notConnected": "未连接",
-   "disconnected": "未连接"
+   "disconnected": "未连接",
+   "lowLatency": "低延迟",
+   "stableMode": "稳定",
+   "latHint": "低延迟：约 0.2 秒缓冲。稳定：约 1 秒，无线繁忙时更少断音。按下切换。"
   },
   "it": {
    "language": "Lingua",
@@ -625,7 +652,10 @@
    "signal": "Segnale",
    "perPkt": "frame/pacchetto",
    "notConnected": "Non connesso",
-   "disconnected": "Non connesso"
+   "disconnected": "Non connesso",
+   "lowLatency": "Bassa latenza",
+   "stableMode": "Stabile",
+   "latHint": "Bassa latenza: circa 0,2 s di buffer. Stabile: circa 1 s, meno interruzioni quando la radio è occupata. Premi per cambiare."
   },
   "he": {
    "language": "שפה",
@@ -682,7 +712,10 @@
    "signal": "אות",
    "perPkt": "מסגרות/מנה",
    "notConnected": "לא מחובר",
-   "disconnected": "לא מחובר"
+   "disconnected": "לא מחובר",
+   "lowLatency": "השהיה נמוכה",
+   "stableMode": "יציב",
+   "latHint": "השהיה נמוכה: כ-0.2 שניות של חציצה. יציב: כשנייה אחת, פחות קטיעות כשהרדיו עמוס. לחצו כדי להחליף."
   }
  }
 }

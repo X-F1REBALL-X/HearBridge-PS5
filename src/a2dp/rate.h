@@ -30,4 +30,15 @@ int hb_rate_update(hb_rate *r, long now_ms, int queue, int qmax, long drops);
 #define HB_MEDIA_HDR 13
 int hb_frames_per_packet(int mtu, int frame_len);
 
+/* Media queue depth (packets waiting for the radio) = worst-case added
+ * latency before the oldest packet is dropped. Low latency (default):
+ * ~200 ms, for games. Stable: ~1 s (the 1.0.x behaviour), rides out
+ * longer radio stalls without dropouts. */
+#define HB_QUEUE_LOW_MS     200
+#define HB_QUEUE_STABLE_MS 1000
+#define HB_QUEUE_MIN_PKTS     4
+/* Packets that hold about target_ms of audio at pkt_ms per packet
+ * (rounded to nearest), at least HB_QUEUE_MIN_PKTS. */
+int hb_media_queue_cap(int pkt_ms, int target_ms);
+
 #endif

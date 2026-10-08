@@ -51,6 +51,7 @@
 #define LOCK_PATH STATE_DIR "/hearbridge.lock"
 #define TONE_PATH STATE_DIR "/tone"          /* exists → 1 kHz test tone */
 #define GAIN_PATH STATE_DIR "/gain"          /* text: linear gain, e.g. 5 */
+#define LATENCY_PATH STATE_DIR "/latency"    /* text: "low" (default) or "stable" */
 #define DUMP_PATH STATE_DIR "/media_dump.bin"
 #define NO_TILE_PATH STATE_DIR "/no_tile"      /* exists → never add the home tile */
 #define RM_TILE_PATH STATE_DIR "/remove_tile"  /* exists → remove the tile once */
@@ -976,15 +977,43 @@ static void write_gain_pct(int pct)
     rename(GAIN_PATH ".tmp", GAIN_PATH);
 }
 
+/* Latency mode from LATENCY_PATH: 1 = stable, 0 = low latency (default). */
+static int read_stable(void)
+{
+    char buf[16] = "";
+    FILE *f = fopen(LATENCY_PATH, "r");
+    if (f) {
+        if (!fgets(buf, sizeof buf, f)) buf[0] = 0;
+        fclose(f);
+    }
+    return !strncmp(buf, "stable", 6);
+}
+
+static void write_stable(int stable)
+{
+    FILE *f = fopen(LATENCY_PATH ".tmp", "w");
+    if (!f) return;
+    fputs(stable ? "stable\n" : "low\n", f);
+    fclose(f);
+    rename(LATENCY_PATH ".tmp", LATENCY_PATH);
+}
+
+/* Gain and latency mode changed from the page: write them down. */
 static void persist_gain_if_dirty(void)
 {
-    int pct = -1;
+    int pct = -1, stable = -1;
     CTL_LOCK(&g_ctl);
     if (g_ctl.gain_dirty) { pct = g_ctl.gain_pct; g_ctl.gain_dirty = 0; }
+    if (g_ctl.stable_dirty) { stable = g_ctl.stable; g_ctl.stable_dirty = 0; }
     CTL_UNLOCK(&g_ctl);
     if (pct >= 0) {
         write_gain_pct(pct);
         log_line("volume: base gain %d%% saved", pct);
+    }
+    if (stable >= 0) {
+        write_stable(stable);
+        log_line("latency: %s mode saved (media queue ~%d ms)", stable ? "stable" : "low-latency",
+                 stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS);
     }
 }
 
@@ -997,6 +1026,7 @@ typedef struct {
     hb_rate rate;
     int fsz, samples_per, per_pkt, mtu;
     int max_pp;          /* tuned frames/packet ceiling (0 = MTU fit) */
+    int queue_ms;        /* media queue target: HB_QUEUE_LOW_MS or HB_QUEUE_STABLE_MS */
     int rate_hz;
     unsigned char buf[HCI_PKT_MAX];
     int nbytes, nframes;
@@ -1068,12 +1098,13 @@ static void tune_link(packer *p, long now)
     need_pps = 1000.0 / pkt_ms;
     cred_pps = (double)(cred - l_cred) * 1000.0 / (double)dt;
 
-    /* Queue: about one second of audio, whatever the packet size. */
-    cap = (1000 + pkt_ms - 1) / pkt_ms;
-    if (cap < 16) cap = 16;
+    /* Queue: about queue_ms of audio (low latency ~200 ms, stable ~1 s),
+     * whatever the packet size. */
+    cap = hb_media_queue_cap(pkt_ms, p->queue_ms);
     if (cap != btlink_media_cap(p->link)) {
         btlink_set_media_cap(p->link, cap);
-        log_line("tune: media queue %d packets (~1 s at %d ms/packet)", btlink_media_cap(p->link), pkt_ms);
+        log_line("tune: media queue %d packets (~%d ms at %d ms/packet)", btlink_media_cap(p->link),
+                 btlink_media_cap(p->link) * pkt_ms, pkt_ms);
     }
 
     if (drops > l_drop && (cred_pps >= need_pps * 1.05 ||
@@ -1260,7 +1291,18 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     if (!mtu) mtu = 672;
     pk.mtu = (int)mtu;
     pk.rate_hz = scfg.sample_rate;
+    CTL_LOCK(&g_ctl);
+    pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+    CTL_UNLOCK(&g_ctl);
     packer_size(&pk);
+    {
+        /* Media queue from the first packet (tune_link() keeps it in step). */
+        int pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
+        btlink_set_media_cap(link, hb_media_queue_cap(pkt_ms, pk.queue_ms));
+        log_line("stream: %s mode, media queue %d packets (~%d ms)",
+                 pk.queue_ms == HB_QUEUE_STABLE_MS ? "stable" : "low-latency",
+                 btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
+    }
     hb_rate_init(&pk.rate, av.bitpool_lo ? av.bitpool_lo : av.bitpool,
                  av.bitpool_hi ? av.bitpool_hi : av.bitpool, sbc_encoder_bitpool(enc), now_ms());
     log_line("stream: media MTU %u, SBC frame %d bytes, %d frames/packet, bitpool %d "
@@ -1344,6 +1386,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             gain_pct = g_ctl.gain_pct;
             muted = g_ctl.muted;
             tone = g_ctl.tone || tone_file;
+            pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
             g_ctl.avrcp = avst;
             CTL_UNLOCK(&g_ctl);
             if (changed) log_line("stream: headset volume %d/127 -> gain", v);
@@ -1560,6 +1603,8 @@ int main(void)
     snprintf(g_ctl.saved_path, sizeof g_ctl.saved_path, "%s", SAVED_JSON);
     g_ctl.gain_pct = read_gain_pct();
     log_line("volume: base gain %d%% (%s)", g_ctl.gain_pct, GAIN_PATH);
+    g_ctl.stable = read_stable();
+    log_line("latency: %s mode (%s)", g_ctl.stable ? "stable" : "low-latency", LATENCY_PATH);
     {
         char url[64];
         int port;
