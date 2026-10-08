@@ -6,7 +6,11 @@
 #define HB_RATE_H
 
 #define HB_RATE_FLOOR 22   /* lowest bitpool we step down to (if the range allows) */
-#define HB_RATE_CEIL  45   /* highest bitpool we step up to (if the range allows) */
+/* Highest bitpool we step up to: the A2DP high-quality value for 48 kHz
+ * joint stereo (~345 kbit/s). The sink's own advertised maximum (and the
+ * range accepted in SET_CONFIGURATION) is the real limit; the controller
+ * only climbs while the link returns credits with headroom. */
+#define HB_RATE_CEIL  53
 
 typedef struct {
     int lo, hi;            /* allowed range (configured range ∩ floor/ceiling) */

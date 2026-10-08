@@ -5,7 +5,7 @@
  *     sizing rule (frames/packet from the MTU and the current frame length)
  *     and the real hb_rate controller. Checks that a slow link converges
  *     with no drops and that a fast one climbs back up.
- *  2. Writes an SBC stream whose bitpool changes mid-stream (35→24→30→45)
+ *  2. Writes an SBC stream whose bitpool changes mid-stream (35→24→30→53)
  *     for an external decoder check (ffmpeg + SNR in the Makefile). */
 #include "rate.h"
 #include "sbc.h"
@@ -83,6 +83,11 @@ int main(int argc, char **argv)
     /* controller basics */
     hb_rate_init(&r, 2, 53, 35, 0);
     CHECK(r.lo == HB_RATE_FLOOR && r.hi == HB_RATE_CEIL && r.cur == 35, "range clamps to floor/ceiling");
+    CHECK(HB_RATE_CEIL == 53 && r.hi == 53, "sink max 53: the controller may climb to 53");
+    hb_rate_init(&r, 2, 51, 35, 0);
+    CHECK(r.hi == 51, "sink max 51: the sink's own maximum is the limit");
+    hb_rate_init(&r, 2, 64, 35, 0);
+    CHECK(r.hi == 53, "sink max above 53: capped at 53");
     hb_rate_init(&r, 35, 35, 35, 0);
     CHECK(r.lo == 35 && r.hi == 35 && hb_rate_update(&r, 1000, 10, 10, 5) == 35,
           "fixed bitpool (sink took no range): never changes");
@@ -112,6 +117,11 @@ int main(int argc, char **argv)
     o = simulate(200.0, 672, 120, 10);
     snprintf(m, sizeof m, "fast link: climbs to %d with %ld drops", o.bp_end, o.drops);
     CHECK(o.bp_end == HB_RATE_CEIL && o.drops == 0, m);
+    /* Link fast enough for ~bitpool 45 only (5 frames/packet at 53 = 75 pkt/s):
+     * must not get stuck dropping at 53. */
+    o = simulate(70.0, 672, 180, hb_media_queue_cap(21, HB_QUEUE_LOW_MS));
+    snprintf(m, sizeof m, "70 pkt/s link: settles at bitpool %d, %ld drops in the 2nd half", o.bp_end, o.late_drops);
+    CHECK(o.late_drops <= 2 && o.bp_end < 53, m);
 
     /* Big MTU: up to 15 frames/packet (4-bit NUM field). */
     o = simulate(200.0, 1021, 10, 10);
@@ -151,7 +161,7 @@ int main(int argc, char **argv)
 
     /* Mid-stream bitpool changes for the external decoder check. */
     if (argc >= 3) {
-        static const int seq[] = { 35, 24, 30, 45 };
+        static const int seq[] = { 35, 24, 30, 53 };
         sbc_config cfg;
         sbc_encoder *e;
         FILE *fo = fopen(argv[1], "wb"), *fr = fopen(argv[2], "wb");
