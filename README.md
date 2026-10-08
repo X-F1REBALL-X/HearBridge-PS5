@@ -49,6 +49,19 @@ The page is available in 11 languages, including Hebrew and Arabic (right to lef
 
 **Tested on:** HearBridge was developed and tested on a PS5 fat (original model, CFI-10xx) running firmware 10.20. Other models (Slim, Pro, later fat revisions) and other firmwares are untested and may use a different Bluetooth chip, so reports from them are welcome.
 
+**Tested firmware / models** (from the developer's testing, GitHub issues and the release notes; everything else is untested):
+
+| Console | Firmware | Loader / jailbreak | HearBridge file | Result | Source |
+|---|---|---|---|---|---|
+| PS5 fat, original model (CFI-10xx) | 10.20 | elfldr (port 9021) | 1.0.0, 1.0.1 | Works (development console) | README, release notes |
+| PS5 fat | 13.60 | Relapse | 1.0.x and the experimental fw13.60 build | Does not start: no icon, page on port 8090 does not open | [#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1) |
+| PS5 Pro (CFI-7000) | 13.20 | Payload Manager 0.5.2, kstuff 1.13, ShadowMount 1.7beta4 | 1.0.2 | Does not start: no notification, no page, no icon | [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2) |
+| PS5 Slim, other fat revisions, other firmwares | – | – | – | Untested | – |
+
+1.0.2 itself has not been tested on a real console yet. Headphones tested on the development console: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
+
+Builds after 1.0.2 show a **"HearBridge &lt;version&gt;: starting"** notification first thing when the payload runs. If you do not see it, the loader did not run HearBridge at all; if you see it but nothing else, the log and `diag.txt` say where it stopped.
+
 Common problems:
 
 - **No HearBridge icon on the home screen** after running the ELF.
