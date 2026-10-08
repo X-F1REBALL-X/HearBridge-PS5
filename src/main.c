@@ -53,6 +53,7 @@
 #define GAIN_PATH STATE_DIR "/gain"          /* text: linear gain, e.g. 5 */
 #define LATENCY_PATH STATE_DIR "/latency"    /* text: "low" (default) or "stable" */
 #define DUMP_PATH STATE_DIR "/media_dump.bin"
+#define DUMP_FLAG_PATH STATE_DIR "/media_dump"   /* exists → dump the first media packets (debug) */
 #define NO_TILE_PATH STATE_DIR "/no_tile"      /* exists → never add the home tile */
 #define RM_TILE_PATH STATE_DIR "/remove_tile"  /* exists → remove the tile once */
 #define TILE_URL_PATH STATE_DIR "/tile_url"    /* optional: deep link for the tile ("start" = fallback page) */
@@ -212,7 +213,6 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 #define STATUS_TXT    STATE_DIR "/status.txt"
 #define PAIRED_INI    STATE_DIR "/paired.ini"
 #define SAVED_JSON    STATE_DIR "/saved.json"
-#define RETRY_SAVED_S 10    /* (unused: no background paging) */
 #define SELECT_WAIT_S 86400 /* manual mode: wait for a choice indefinitely */
 /* Scans run only when the user presses Scan: inquiries back to back for
  * SCAN_WINDOW_S, then the list stays until the next press. */
@@ -1078,16 +1078,16 @@ static void packer_flush(packer *p)
 static void tune_link(packer *p, long now)
 {
     static unsigned long l_sent, l_cred;
-    static long l_drop, l_t, t_jit_ok;
+    static long l_drop, l_t;
     static int jitter_s;
     unsigned long sent = 0, cred = 0;
     long drops = btlink_tx_dropped(p->link), dt;
-    int limit = 0, pkt_ms, cap, fit;
+    int limit = 0, pkt_ms, cap;
     double need_pps, cred_pps;
 
     btlink_tx_counters(p->link, &sent, &cred, &limit);
     if (!l_t || sent < l_sent) {                  /* new link */
-        l_sent = sent; l_cred = cred; l_drop = drops; l_t = now; t_jit_ok = now;
+        l_sent = sent; l_cred = cred; l_drop = drops; l_t = now;
         jitter_s = 0;
         return;
     }
@@ -1119,10 +1119,8 @@ static void tune_link(packer *p, long now)
                      cred_pps, need_pps, p->per_pkt);
             jitter_s = 0;
         }
-        t_jit_ok = now;
     } else if (drops == l_drop) {
         jitter_s = 0;
-        (void)fit; (void)t_jit_ok;
     }
     /* Bitpool: only step up while the link returns credits with headroom. */
     if (cred_pps < need_pps * 1.15 && btlink_tx_backlog(p->link) > 1)
@@ -1309,10 +1307,14 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
              "(adapts %d-%d)", mtu, pk.fsz, pk.per_pkt, sbc_encoder_bitpool(enc),
              pk.rate.lo, pk.rate.hi);
 
-    if (avdtp_dump_open(&av, DUMP_PATH, DUMP_PKTS))
-        log_line("stream: dumping first %d media payloads to %s", DUMP_PKTS, DUMP_PATH);
-    else
-        log_line("stream: media dump %s not writable", DUMP_PATH);
+    /* Debug only: create /data/hearbridge/media_dump to write the first
+     * media payloads to media_dump.bin (checked with tests/decode_dump). */
+    if (file_exists(DUMP_FLAG_PATH)) {
+        if (avdtp_dump_open(&av, DUMP_PATH, DUMP_PKTS))
+            log_line("stream: dumping first %d media payloads to %s", DUMP_PKTS, DUMP_PATH);
+        else
+            log_line("stream: media dump %s not writable", DUMP_PATH);
+    }
     tone_file = file_exists(TONE_PATH);
 
     /* AVRCP: most headsets open the control channel themselves right after

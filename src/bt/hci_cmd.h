@@ -1,4 +1,4 @@
-/* Minimal HCI command helpers for HearBridge spikes (no pad host). */
+/* Minimal synchronous HCI command helpers (Command Complete / Status). */
 #ifndef HEARBRIDGE_HCI_CMD_H
 #define HEARBRIDGE_HCI_CMD_H
 
@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-/* Opcodes used by HCI spikes (OGF << 10 | OCF). */
+/* Opcodes used by HearBridge (OGF << 10 | OCF). */
 #define HB_OP_INQUIRY             0x0401
 #define HB_OP_INQUIRY_CANCEL      0x0402
 #define HB_OP_CREATE_CONNECTION   0x0405
