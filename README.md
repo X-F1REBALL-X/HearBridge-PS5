@@ -40,7 +40,7 @@ HearBridge PS5 is a payload (ELF) for a jailbroken PS5. It captures the console'
 - **Equalizer** (builds after 1.0.2): bass, low mid, mid, presence and treble (±12 dB) with presets (Flat, Bass boost, Bass cut, Treble boost, Voice / footsteps). Saved per headset. It runs before the encoder with automatic headroom and a soft limiter, so boosts don't clip.
 - **Codec** (builds after 1.0.2): **Auto** picks the best SBC flavour the headphones accept (SBC-XQ, then SBC HQ, then SBC); you can also pick one. Changing it reconnects. Saved per headset.
 - **Latency** (builds after 1.0.2): a buffer target from 60 ms to 1 s (default 200 ms) and a live **estimate** of the delay to your ears. See *Latency* below.
-- **Stop HearBridge** ends the payload cleanly. Use it before loading the ELF again.
+- **Stop HearBridge** ends the payload cleanly. Sending the ELF again (any version, the same one too) also works: the new copy stops the running one and takes over.
 
 The page is available in 11 languages, including Hebrew and Arabic (right to left).
 

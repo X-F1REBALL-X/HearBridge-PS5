@@ -1727,13 +1727,25 @@ int main(void)
     diag_init(NULL);           /* file path set once we own the lock */
     diag_set("hearbridge", "%s (one build for all firmwares, compiled %s)", HEARBRIDGE_VERSION,
              __DATE__);
-    lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
+    /* A newly sent ELF always wins, whatever version is running (same
+     * one included): the old instance is asked to stop (stop file +
+     * SIGTERM; it closes the headset, the page and the Bluetooth device),
+     * killed if it has not stopped after 10 s, and this one starts. */
+    {
+        long old_pid = 0;
+        lock_rc = lock_take_over(LOCK_PATH, HB_STOP_PATH, 10000, 3000, &lock_errno, &old_pid);
+        if (old_pid && lock_rc != LOCK_BUSY) {
+            log_line("HearBridge PS5 %s: replaced the running instance (pid %ld)", HEARBRIDGE_VERSION, old_pid);
+            notify("HearBridge %s: replaced the running copy", HEARBRIDGE_VERSION);
+            usleep(500 * 1000);   /* let the controller settle after its teardown */
+        }
+    }
     if (lock_rc == LOCK_BUSY) {
-        /* Running the ELF again still brings back a deleted icon. */
-        log_line("HearBridge PS5 %s: another instance is running; refreshing the home-screen icon only",
+        /* Could not stop it: still bring back a deleted icon. */
+        log_line("HearBridge PS5 %s: the running instance would not stop; refreshing the home-screen icon only",
                  HEARBRIDGE_VERSION);
         home_tile(1);
-        notify("HearBridge: already running");
+        notify("HearBridge: already running and could not be stopped. Use Stop on the page, then run it again.");
         log_close();
         return 1;
     }
