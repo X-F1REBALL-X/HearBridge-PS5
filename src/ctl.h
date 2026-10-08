@@ -51,6 +51,11 @@ typedef struct {
     int per_packet;        /* SBC frames per media packet */
     int bitpool_lo, bitpool_hi; /* adaptive range */
     long dropped;          /* media packets dropped (radio too slow) */
+    int xq_low;            /* SBC-XQ held under HB_XQ_LOW_BP: tell the page */
+#define HB_EVENT_N   5
+#define HB_EVENT_LEN 80
+    char events[HB_EVENT_N][HB_EVENT_LEN]; /* last codec switches / disconnects */
+    int event_n;
     unsigned cmd_seq;      /* bumped by the web thread for each select.txt command */
     long t0_s;             /* monotonic seconds at ctl_init (uptime base) */
 } hb_ctl;
@@ -64,6 +69,9 @@ void ctl_new_token(hb_ctl *c);
 /* Zero the per-link status (counters, format, AVRCP, meters); with
  * drop_device also forget the device name. Caller holds the lock. */
 void ctl_clear_link(hb_ctl *c, int drop_device);
+/* Remember one short line for the page (codec switch or disconnect).
+ * Drops the oldest when the list is full. Locks itself. */
+void ctl_event(hb_ctl *c, const char *line);
 /* Seconds since HearBridge started. */
 long ctl_uptime_s(const hb_ctl *c);
 #define CTL_LOCK(c)   pthread_mutex_lock(&(c)->mu)

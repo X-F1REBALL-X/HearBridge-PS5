@@ -172,6 +172,8 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .seg button{min-height:2.5rem;padding:.2rem .4rem;font-size:.88rem}
 .seg button[disabled],.seg button.no{display:none}
 .cno{margin:0 0 var(--s2);color:var(--ink2)}.cno:empty{display:none}
+.evlog{margin:0;font-size:.78rem;line-height:1.4;color:var(--mute)}
+.evlog div{padding:.12rem 0;border-top:1px solid var(--edge)}
 .seg button[disabled]:before{border-style:dashed}
 /* latency meter */
 .latm{margin:0 0 var(--s2);padding:var(--s2) var(--s3);background:var(--card);border:1px solid var(--edge)}
@@ -294,6 +296,7 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 <div><div class="mrow"><span class="k" data-i18n="outPeak">Output peak</span><span class="v" id="opv">-</span></div><div class="meter"><div id="m2"></div></div></div>
 </div>
 </div>
+<div id="evbox" style="display:none"><p class="sub" data-i18n="recent">Recent</p><div class="evlog" id="evlog"></div></div>
 <div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
 <div class="idle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></div>
 </section>
@@ -302,7 +305,7 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 <input type="range" id="gain" min="0" max="500" step="10"></div>
 <div class="ctl"><div class="row"><span class="cl" data-i18n="headset">Headset volume (AVRCP)</span><span class="big" id="hv">-</span></div>
 <input type="range" id="hs" min="0" max="127" step="1"></div>
-<div class="btns"><button id="mute" data-i18n="mute">Mute</button><button id="tone" data-i18n="tone">Test tone</button></div>
+<div class="btns"><button id="mute" data-i18n="mute">Mute</button><button id="tone" data-i18n="tone">Test tone</button><button id="clean" data-i18n="clean">Clean sound</button></div>
 </section>
 <section class="panel eqp" id="eqp"><p class="label" data-i18n="equalizer">Equalizer</p>
 <div class="eqhead"><span class="k note" data-i18n="eqHint">Saved for this headset.</span><button id="eqon" data-i18n="eqOff">Off</button></div>
@@ -322,6 +325,7 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 <p class="sub" data-i18n="codec">Codec</p>
 <div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
 <p class="k note cno" id="codecno"></p>
+<p class="k note cno" id="xqnote"></p>
 <p class="k note" id="codecnote" data-i18n="codecHint">Auto picks the best the headset takes: SBC-XQ, then SBC HQ, then SBC. Switching keeps the headset connected.</p>
 <p class="sub" data-i18n="latency">Latency</p>
 <div class="latm"><div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big" id="latv">-</span></div>
@@ -421,7 +425,12 @@ drawSaved();
 $('pk').textContent=S.pkts+' / '+S.frames+(S.backlog?' ('+t('queue')+' '+S.backlog+')':'');
 
 setHtml('fmt',S.sample_rate?chips([[S.codec||'SBC','hi n'],[S.sample_rate+' Hz','n'],['bitpool '+S.bitpool+(S.bitpool_max>S.bitpool_min?' ('+S.bitpool_min+'–'+S.bitpool_max+')':''),'n'],[S.per_packet+' '+t('perPkt')]]):'-');
-setHtml('av',!S.avrcp.connected?chips([[t('avrcpNone'),'off']]):chips([[S.avrcp.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(S.avrcp.notifications?[[t('notif')]]:[]).concat([[t(S.avrcp.sink_volume?'volOnHeadset':'volSoftware'),S.avrcp.sink_volume?'hi':'']])));
+var av=S.avrcp||{},avUp=av.connected||av.absolute_volume||av.notifications||av.sink_volume;
+setHtml('av',!avUp?chips([[t('avrcpNone'),'off']]):chips([[av.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(av.notifications?[[t('notif')]]:[]).concat([[t(av.sink_volume?'volOnHeadset':'volSoftware'),av.sink_volume?'hi':'']])));
+setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
+var ev=S.events||[],eh='';
+for(var ei=0;ei<ev.length;ei++)eh+='<div>'+esc(ev[ei])+'</div>';
+setHtml('evlog',eh);$('evbox').style.display=ev.length?'':'none';
 $('pkv').textContent=S.peak.toFixed(3);$('m1').style.width=Math.min(100,S.peak*100)+'%';
 $('opv').textContent=S.out_peak.toFixed(3);$('m2').style.width=Math.min(100,S.out_peak*100)+'%';
 if(!busyG)$('gain').value=S.gain_pct;$('gv').textContent=pct(S.gain_pct);
@@ -479,6 +488,7 @@ $('hs').oninput=function(){busyH=1;$('hv').textContent=pct(this.value*100/127)};
 $('hs').onchange=function(){act('/api/headset?vol='+this.value,function(){busyH=0})};
 $('mute').onclick=function(){act('/api/mute?on='+(S&&S.muted?0:1))};
 $('tone').onclick=function(){act('/api/tone?on='+(S&&S.tone?0:1))};
+$('clean').onclick=function(){act('/api/clean')};
 $('lat').oninput=function(){busyL=1;$('latt').textContent=this.value+' ms'};
 $('lat').onchange=function(){act('/api/latency?ms='+this.value,function(){busyL=0})};
 for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!this.disabled)act('/api/codec?mode='+m)}})(cj);
@@ -488,4 +498,5 @@ buildLangs();
 (function(){var c=null,m=/[?&]lang=([a-z]{2})/.exec(location.search);if(m)c=m[1];else try{c=localStorage.getItem('hb_lang')}catch(e){}
 if(!c){var n=(navigator.language||'en').slice(0,2).toLowerCase();c=info(n).code==n?n:'en'}setLang(c)})();
 req('/api/status');setInterval(function(){req('/api/status')},1000);
+hbTest={req:req};
 </script></body></html>

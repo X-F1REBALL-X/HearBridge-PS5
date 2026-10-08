@@ -54,7 +54,6 @@
 #define LOCK_PATH STATE_DIR "/hearbridge.lock"
 #define TONE_PATH STATE_DIR "/tone"          /* exists → 1 kHz test tone */
 #define GAIN_PATH STATE_DIR "/gain"          /* text: linear gain, e.g. 5 */
-#define LATENCY_PATH STATE_DIR "/latency"    /* text: "low" (default) or "stable" */
 #define DUMP_PATH STATE_DIR "/media_dump.bin"
 #define DUMP_FLAG_PATH STATE_DIR "/media_dump"   /* exists → dump the first media packets (debug) */
 #define NO_TILE_PATH STATE_DIR "/no_tile"      /* exists → never add the home tile */
@@ -981,17 +980,6 @@ static void write_gain_pct(int pct)
     rename(GAIN_PATH ".tmp", GAIN_PATH);
 }
 
-/* Latency mode from LATENCY_PATH: 1 = stable, 0 = low latency (default). */
-static int read_stable(void)
-{
-    char buf[16] = "";
-    FILE *f = fopen(LATENCY_PATH, "r");
-    if (f) {
-        if (!fgets(buf, sizeof buf, f)) buf[0] = 0;
-        fclose(f);
-    }
-    return !strncmp(buf, "stable", 6);
-}
 
 /* Per-headset settings (hsprefs.h) of the headset in use. */
 static hb_prefs g_prefs;
@@ -1005,6 +993,7 @@ static void prefs_from_ctl(void)
     g_prefs.latency_ms = g_ctl.latency_ms;
     g_prefs.eq_on = g_ctl.eq_on;
     memcpy(g_prefs.eq_db, g_ctl.eq_db, sizeof g_prefs.eq_db);
+    g_prefs.gain_pct = g_ctl.gain_pct;
 }
 
 /* Page values <- g_prefs. Caller holds the lock. */
@@ -1015,6 +1004,7 @@ static void prefs_to_ctl(void)
     g_ctl.eq_on = g_prefs.eq_on;
     memcpy(g_ctl.eq_db, g_prefs.eq_db, sizeof g_ctl.eq_db);
     g_ctl.eq_seq++;
+    if (g_prefs.gain_pct >= 0) g_ctl.gain_pct = g_prefs.gain_pct;
 }
 
 static void prefs_save(void)
@@ -1049,6 +1039,10 @@ static void prefs_attach(const unsigned char addr[6])
         g_prefs = p;
         CTL_LOCK(&g_ctl);
         prefs_from_ctl();
+        /* No file yet: 200 ms, even if the page was still on the old 1 s mode.
+         * A value already saved above is left alone. */
+        hb_prefs_new_headset(&g_prefs);
+        g_ctl.latency_ms = g_prefs.latency_ms;
         CTL_UNLOCK(&g_ctl);
         prefs_save();
     }
@@ -1070,6 +1064,18 @@ static void persist_gain_if_dirty(void)
     }
 }
 
+/* One line in the log and on the page (last few codec switches / drops). */
+static void note_event(const char *fmt, ...)
+{
+    char buf[HB_EVENT_LEN];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    log_line("%s", buf);
+    ctl_event(&g_ctl, buf);
+}
+
 /* Codec change on the open link: the hb_cswitch in-place steps (asked
  * codec, then plain SBC). 1 = streaming again; 0 = the link is gone or the
  * headset refused both, g_cs then holds the reconnect steps. */
@@ -1084,7 +1090,7 @@ static int codec_switch_in_place(avdtp_session *av, btlink *link, int want, int 
         hb_cs_next(&g_cs, ok, up);
     }
     if (g_cs.step == HB_CS_DONE) {
-        log_line("switch: now %s, headset stayed connected", av->codec.name ? av->codec.name : "SBC");
+        note_event("switch: now %s, headset stayed connected", av->codec.name ? av->codec.name : "SBC");
         g_cs.step = HB_CS_IDLE;
         return 1;
     }
@@ -1304,7 +1310,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
                     hold_clear(ini->addr);
                     r = try_saved(hci, ini, &link, &av_psm, 30000);
                 }
-                if (cs) log_line("switch: reconnect %s", r == 1 ? "worked" : "gave up — press Connect");
+                if (cs) note_event("switch: reconnect %s", r == 1 ? "worked" : "gave up — press Connect");
                 if (r != 1)
                     write_status("error %s %s", conn_fail_label(0), ini->name[0] ? ini->name : "-");
             } else if (g_npaired) {
@@ -1505,22 +1511,22 @@ stream_setup:
 
         if (hb_stop_requested()) { rc = RUN_STOP; break; }
         if (btlink_pump(link, 1) < 0 || !btlink_is_up(link)) {
-            log_line("stream: link dropped");
+            note_event("stream: link dropped");
             rc = RUN_DROPPED;
             break;
         }
         if (av.remote_closed) {
-            log_line("stream: headset closed the stream");
+            note_event("stream: headset closed the stream");
             rc = RUN_DROPPED;
             break;
         }
         if (!btlink_chan_is_open(link, av.media_scid)) {
-            log_line("stream: headset closed the media channel");
+            note_event("stream: headset closed the media channel");
             rc = RUN_DROPPED;
             break;
         }
         if (btlink_ms_since_credit(link) > 4000) {
-            log_line("stream: no packet acknowledged for 4 s — link lost");
+            note_event("stream: no packet acknowledged for 4 s — link lost");
             rc = RUN_DROPPED;
             break;
         }
@@ -1534,7 +1540,11 @@ stream_setup:
             g_ctl.req_hs_volume = -1;
             req_disc = g_ctl.req_disconnect;
             g_ctl.req_disconnect = 0;
-            if (changed || (avst & 1)) g_ctl.hs_volume = (avst & 3) ? v : -1;
+            /* Bit 0: channel open, or the headset has registered / reported
+             * volume (avrcp_reported). Same test as the status chip, so a
+             * live percentage cannot sit next to "not connected". */
+            if (avst & 1) g_ctl.hs_volume = v;
+            else g_ctl.hs_volume = -1;
             if (req_vol >= 0) g_ctl.hs_volume = req_vol;
             /* The headset applies its own volume (it took SetAbsoluteVolume or
              * answered our registration): software gain stays at the base,
@@ -1591,14 +1601,14 @@ stream_setup:
                 switched = 1;
                 goto stream_setup;
             }
-            log_line("stream: codec switch lost the link — paging the headset again");
+            note_event("stream: codec switch lost the link — paging the headset again");
             memset(&g_pending, 0, sizeof g_pending);
             g_pending.kind = CMD_RECONNECT;
             rc = RUN_SWITCH;
             break;
         }
         if (req_disc) {
-            log_line("stream: Disconnect requested from the web page");
+            note_event("stream: Disconnect requested from the web page");
             rc = RUN_PAUSED;
             break;
         }
@@ -1686,11 +1696,14 @@ stream_setup:
                  * channel sounds worse than joint stereo SBC at 51-53. */
                 xq_low_s = pk.rate.cur < HB_XQ_LOW_BP ? xq_low_s + 1 : 0;
                 if (xq_low_s >= 30) {
-                    log_line("codec: SBC-XQ stays at bitpool %d (<%d) on this link", pk.rate.cur, HB_XQ_LOW_BP);
+                    note_event("codec: SBC-XQ stays at bitpool %d (under %d) on this link", pk.rate.cur, HB_XQ_LOW_BP);
+                    CTL_LOCK(&g_ctl);
+                    g_ctl.xq_low = 1;
+                    CTL_UNLOCK(&g_ctl);
                     xq_bad_s = 10;
                 }
                 if (xq_bad_s >= 10) {
-                    log_line("codec: SBC-XQ does not hold on this link — auto uses SBC for this headset from now on");
+                    note_event("codec: SBC-XQ does not hold on this link — auto uses SBC for this headset from now on");
                     g_prefs.auto_no_xq = 1;
                     prefs_save();
                     cs_want = HB_CODEC_AUTO;      /* switched in place on the next pass */
@@ -1857,8 +1870,8 @@ int main(void)
     log_line("volume: base gain %d%% (%s)", g_ctl.gain_pct, GAIN_PATH);
     /* The old global mode file is the default for headsets without
      * their own setting yet. */
-    g_ctl.latency_ms = read_stable() ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
-    log_line("latency: default target %d ms (%s), per headset after that", g_ctl.latency_ms, LATENCY_PATH);
+    g_ctl.latency_ms = HB_LAT_DEFAULT_MS;
+    log_line("latency: default target %d ms for a new headset", g_ctl.latency_ms);
     {
         char url[64];
         int port;

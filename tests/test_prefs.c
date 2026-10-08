@@ -35,6 +35,15 @@ int main(int argc, char **argv)
     CHECK(hb_prefs_load(dir, addr, &q) && !memcmp(&p, &q, sizeof p), "load what was saved");
     CHECK(hb_codec_from_key("hq") == HB_CODEC_SBC_HQ && hb_codec_from_key("x") < 0 &&
           !strcmp(hb_codec_key(99), "auto"), "codec keys");
+    CHECK(p.gain_pct < 0, "no gain line: left unset, an old file is not overwritten");
+    p.latency_ms = 1000;
+    p.codec = HB_CODEC_SBC_XQ;
+    hb_prefs_new_headset(&p);
+    CHECK(p.latency_ms == HB_LAT_DEFAULT_MS && p.codec == HB_CODEC_SBC_XQ,
+          "new headset: buffer is 200 ms, the rest stays");
+    p.gain_pct = 250;
+    CHECK(hb_prefs_format(&p, buf, sizeof buf) > 0 && strstr(buf, "gain=250\n") &&
+          strstr(buf, "latency_ms=200\n"), "format: gain and the 200 ms default");
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

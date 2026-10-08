@@ -21,9 +21,13 @@ typedef struct {
     int latency_ms;          /* media queue target */
     int eq_on;
     int eq_db[HB_EQ_BANDS];  /* -12..+12 dB per band */
+    int gain_pct;            /* software gain, -1 = not in the file yet */
 } hb_prefs;
 
 void hb_prefs_default(hb_prefs *p);
+/* A headset with no saved file: keep whatever else was copied off the page,
+ * but the buffer target is the default (200 ms), not an old 1 s mode. */
+void hb_prefs_new_headset(hb_prefs *p);
 /* Parse "key=value" lines; unknown keys and bad values are ignored. */
 void hb_prefs_parse(hb_prefs *p, const char *text);
 int  hb_prefs_format(const hb_prefs *p, char *out, int max);

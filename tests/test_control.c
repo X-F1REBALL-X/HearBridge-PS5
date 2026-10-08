@@ -128,6 +128,18 @@ int main(int argc, char **argv)
           strstr(out, "\"eq\":{\"on\":1,\"db\":[6,0,0,0,-12]}"), "eq: bands set (clamped), saved per headset");
     post(&c, "/api/eq");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "eq: no parameter -> 400");
+    c.eq_on = 1; c.eq_db[0] = 6; c.gain_pct = 250; c.latency_ms = 1000; c.prefs_dirty = c.gain_dirty = 0;
+    post(&c, "/api/clean");
+    CHECK(!c.eq_on && !c.eq_db[0] && c.gain_pct == 500 && c.latency_ms == 200 && c.prefs_dirty && c.gain_dirty,
+          "clean sound: EQ flat, gain 500, buffer 200, saved");
+    ctl_event(&c, "switch: now SBC");
+    ctl_event(&c, "stream: link dropped");
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"xq_low\":0") && strstr(out, "switch: now SBC") && strstr(out, "stream: link dropped"),
+          "status: recent codec switch and disconnect");
+    c.xq_low = 1;
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"xq_low\":1"), "status: low SBC-XQ note flag");
     diag_init(NULL);
     get(&c, "/api/diag");
     CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/plain") &&
@@ -378,6 +390,12 @@ int main(int argc, char **argv)
         CHECK(a.volume == 0x50 && a.remote_abs && a.ct_registered, "AVRCP: INTERIM volume read");
         avrcp_input(&a, chg, sizeof chg, r, sizeof r);
         CHECK(a.volume == 0x20 && a.changed && a.need_register, "AVRCP: CHANGED -> re-register");
+        CHECK(avrcp_reported(&a), "AVRCP: a volume report counts as connected for the page");
+        {
+            avrcp_state quiet;
+            avrcp_init(&quiet, 64);
+            CHECK(!avrcp_reported(&quiet), "AVRCP: default volume alone is not a report");
+        }
         CHECK(a.sink_renders, "AVRCP: headset answered our registration -> it applies the volume");
         {
             /* a headset that refuses SetAbsoluteVolume (NOT IMPLEMENTED) and never

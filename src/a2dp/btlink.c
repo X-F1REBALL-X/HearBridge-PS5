@@ -2072,6 +2072,10 @@ int btlink_avrcp_state(const btlink *l)
     if (l->avrcp.remote_abs) st |= 2;
     if (l->avrcp.ct_registered || l->avrcp.notify_label >= 0) st |= 4;
     if (l->avrcp.sink_renders) st |= 8;
+    /* Bit 0 is what the page calls "connected". The volume number is shown
+     * once the headset has reported it, so the chip has to agree even when
+     * the channel-open check is false (seen on Sony WF-1000XM6). */
+    if (avrcp_reported(&l->avrcp)) st |= 1;
     return st;
 }
 

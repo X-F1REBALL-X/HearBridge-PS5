@@ -83,7 +83,7 @@ static int is_write_path(const char *path)
     static const char *const w[] = {
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
-        "/api/stop", "/api/latency", "/api/codec", "/api/eq",
+        "/api/stop", "/api/latency", "/api/codec", "/api/eq", "/api/clean",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -93,11 +93,22 @@ static int is_write_path(const char *path)
 
 static int status_json(hb_ctl *c, char *o, int max)
 {
-    char dev[140], st[70], url[140], det[200];
+    char dev[140], st[70], url[140], det[200], ev[700];
+    int ei, en;
     json_esc(dev, sizeof dev, c->device);
     json_esc(st, sizeof st, c->state);
     json_esc(url, sizeof url, c->url);
     json_esc(det, sizeof det, c->detail);
+    ev[0] = '[';
+    en = 1;
+    for (ei = 0; ei < c->event_n && ei < HB_EVENT_N; ei++) {
+        char one[HB_EVENT_LEN * 2];
+        json_esc(one, sizeof one, c->events[ei]);
+        en += snprintf(ev + en, sizeof ev - (size_t)en, "%s\"%s\"", ei ? "," : "", one);
+        if (en < 1 || en >= (int)sizeof ev - 2) break;
+    }
+    if (en > 0 && en < (int)sizeof ev) ev[en++] = ']';
+    ev[en < (int)sizeof ev ? en : (int)sizeof ev - 1] = 0;
     return snprintf(o, (size_t)max,
         "{\"version\":\"%s\",\"connected\":%d,\"detail\":\"%s\",\"state\":\"%s\",\"device\":\"%s\",\"url\":\"%s\","
         "\"gain_pct\":%d,\"muted\":%d,\"tone\":%d,\"paused\":%d,"
@@ -106,7 +117,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"peak\":%.3f,\"out_peak\":%.3f,\"sample_rate\":%d,\"bitpool\":%d,"
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
-        "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]}}",
+        "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,\"events\":%s}",
         c->version, !strcmp(c->state, "streaming"), det, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
@@ -116,7 +127,8 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->latency_ms, c->lat_total, c->lat_capture, c->lat_packet, c->lat_queue, c->lat_radio,
         c->lat_sink, c->lat_sink_reported, c->codec,
         c->codec_pref, c->codec_avail,
-        c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4]);
+        c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4],
+        c->xq_low, ev);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,
@@ -138,7 +150,7 @@ static int respond(char *out, int max, int code, const char *ctype,
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 {
     char method[8], path[128], *q;
-    char body[2048];
+    char body[4096];
     int i = 0, j = 0, v, bl, is_api;
 
     while (i < reqlen && req[i] != ' ' && j < (int)sizeof method - 1) method[j++] = req[i++];
@@ -300,6 +312,17 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
                            "{\"error\":\"not supported by this headset\"}", 41);
         }
         c->codec_pref = v;
+        c->prefs_dirty = 1;
+    } else if (!strcmp(path, "/api/clean")) {
+        /* EQ off and flat, software gain back to the default, buffer 200 ms.
+         * Saved for this headset (prefs) and the gain file. */
+        int k;
+        c->eq_on = 0;
+        for (k = 0; k < 5; k++) c->eq_db[k] = 0;
+        c->eq_seq++;
+        c->gain_pct = HB_GAIN_DEFAULT_PCT;
+        c->gain_dirty = 1;
+        c->latency_ms = HB_QUEUE_LOW_MS;
         c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/eq")) {
         /* on=0|1 and/or b0..b4=-12..12 (dB); saved per headset. */

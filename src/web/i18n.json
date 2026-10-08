@@ -82,6 +82,8 @@
    "unmute": "Unmute",
    "tone": "Test tone",
    "toneOn": "Tone on",
+   "clean": "Clean sound",
+   "recent": "Recent",
    "connection": "Connection",
    "connect": "Connect",
    "disconnect": "Disconnect",
@@ -145,7 +147,8 @@
    "latRadio": "Radio",
    "latSink": "Headset",
    "latSinkTyp": "Headset (typical)",
-   "codecWait": "SBC HQ and SBC-XQ show up once a headset that supports them is connected."
+   "codecWait": "SBC HQ and SBC-XQ show up once a headset that supports them is connected.",
+   "xqLow": "SBC-XQ is staying at a low bitpool on this link. Plain SBC will sound better."
   },
   "ar": {
    "language": "اللغة",
@@ -172,6 +175,8 @@
    "unmute": "إلغاء الكتم",
    "tone": "نغمة اختبار",
    "toneOn": "النغمة تعمل",
+   "clean": "صوت نظيف",
+   "recent": "الأخير",
    "connection": "الاتصال",
    "connect": "اتصال",
    "disconnect": "قطع الاتصال",
@@ -235,7 +240,8 @@
    "latRadio": "الراديو",
    "latSink": "السماعة",
    "latSinkTyp": "السماعة (نموذجي)",
-   "codecWait": "يظهر SBC HQ وSBC-XQ عند توصيل سماعة تدعمهما."
+   "codecWait": "يظهر SBC HQ وSBC-XQ عند توصيل سماعة تدعمهما.",
+   "xqLow": "SBC-XQ عالق عند معدل بت منخفض على هذا الرابط. صوت SBC العادي سيكون أفضل."
   },
   "es": {
    "language": "Idioma",
@@ -262,6 +268,8 @@
    "unmute": "Activar sonido",
    "tone": "Tono de prueba",
    "toneOn": "Tono activo",
+   "clean": "Sonido limpio",
+   "recent": "Reciente",
    "connection": "Conexión",
    "connect": "Conectar",
    "disconnect": "Desconectar",
@@ -325,7 +333,8 @@
    "latRadio": "Radio",
    "latSink": "Auriculares",
    "latSinkTyp": "Auriculares (típico)",
-   "codecWait": "SBC HQ y SBC-XQ aparecen al conectar unos auriculares que los admitan."
+   "codecWait": "SBC HQ y SBC-XQ aparecen al conectar unos auriculares que los admitan.",
+   "xqLow": "SBC-XQ se queda en un bitpool bajo en este enlace. El SBC normal sonará mejor."
   },
   "fr": {
    "language": "Langue",
@@ -352,6 +361,8 @@
    "unmute": "Rétablir le son",
    "tone": "Son de test",
    "toneOn": "Son actif",
+   "clean": "Son net",
+   "recent": "Récent",
    "connection": "Connexion",
    "connect": "Connecter",
    "disconnect": "Déconnecter",
@@ -415,7 +426,8 @@
    "latRadio": "Radio",
    "latSink": "Casque",
    "latSinkTyp": "Casque (typique)",
-   "codecWait": "SBC HQ et SBC-XQ apparaissent quand un casque qui les accepte est connecté."
+   "codecWait": "SBC HQ et SBC-XQ apparaissent quand un casque qui les accepte est connecté.",
+   "xqLow": "SBC-XQ reste sur un bitpool bas sur cette liaison. Le SBC simple sonnera mieux."
   },
   "de": {
    "language": "Sprache",
@@ -442,6 +454,8 @@
    "unmute": "Ton an",
    "tone": "Testton",
    "toneOn": "Ton läuft",
+   "clean": "Klarer Klang",
+   "recent": "Zuletzt",
    "connection": "Verbindung",
    "connect": "Verbinden",
    "disconnect": "Trennen",
@@ -505,7 +519,8 @@
    "latRadio": "Funk",
    "latSink": "Headset",
    "latSinkTyp": "Headset (typisch)",
-   "codecWait": "SBC HQ und SBC-XQ erscheinen, sobald ein Headset verbunden ist, das sie unterstützt."
+   "codecWait": "SBC HQ und SBC-XQ erscheinen, sobald ein Headset verbunden ist, das sie unterstützt.",
+   "xqLow": "SBC-XQ bleibt auf diesem Link bei einem niedrigen Bitpool. Normales SBC klingt besser."
   },
   "pt": {
    "language": "Idioma",
@@ -532,6 +547,8 @@
    "unmute": "Reativar som",
    "tone": "Tom de teste",
    "toneOn": "Tom ligado",
+   "clean": "Som limpo",
+   "recent": "Recente",
    "connection": "Conexão",
    "connect": "Conectar",
    "disconnect": "Desconectar",
@@ -595,7 +612,8 @@
    "latRadio": "Rádio",
    "latSink": "Headset",
    "latSinkTyp": "Headset (típico)",
-   "codecWait": "SBC HQ e SBC-XQ aparecem quando um headset compatível estiver conectado."
+   "codecWait": "SBC HQ e SBC-XQ aparecem quando um headset compatível estiver conectado.",
+   "xqLow": "O SBC-XQ fica num bitpool baixo nesta ligação. O SBC normal vai soar melhor."
   },
   "ru": {
    "language": "Язык",
@@ -622,6 +640,8 @@
    "unmute": "Включить звук",
    "tone": "Тестовый тон",
    "toneOn": "Тон включён",
+   "clean": "Чистый звук",
+   "recent": "Недавнее",
    "connection": "Подключение",
    "connect": "Подключить",
    "disconnect": "Отключить",
@@ -685,7 +705,8 @@
    "latRadio": "Радио",
    "latSink": "Гарнитура",
    "latSinkTyp": "Гарнитура (типично)",
-   "codecWait": "SBC HQ и SBC-XQ появятся, когда подключится гарнитура с их поддержкой."
+   "codecWait": "SBC HQ и SBC-XQ появятся, когда подключится гарнитура с их поддержкой.",
+   "xqLow": "SBC-XQ держится на низком битпуле на этом канале. Обычный SBC будет звучать лучше."
   },
   "ja": {
    "language": "言語",
@@ -712,6 +733,8 @@
    "unmute": "ミュート解除",
    "tone": "テストトーン",
    "toneOn": "トーン再生中",
+   "clean": "クリアな音",
+   "recent": "履歴",
    "connection": "接続",
    "connect": "接続",
    "disconnect": "切断",
@@ -775,7 +798,8 @@
    "latRadio": "無線",
    "latSink": "ヘッドセット",
    "latSinkTyp": "ヘッドセット (標準)",
-   "codecWait": "SBC HQ と SBC-XQ は対応ヘッドセットの接続時に表示されます。"
+   "codecWait": "SBC HQ と SBC-XQ は対応ヘッドセットの接続時に表示されます。",
+   "xqLow": "この接続では SBC-XQ のビットプールが低いままです。通常の SBC の方がきれいに聞こえます。"
   },
   "zh": {
    "language": "语言",
@@ -802,6 +826,8 @@
    "unmute": "取消静音",
    "tone": "测试音",
    "toneOn": "测试音开启",
+   "clean": "纯净声音",
+   "recent": "最近",
    "connection": "连接",
    "connect": "连接",
    "disconnect": "断开",
@@ -865,7 +891,8 @@
    "latRadio": "无线",
    "latSink": "耳机",
    "latSinkTyp": "耳机（典型）",
-   "codecWait": "连接支持的耳机后才会显示 SBC HQ 和 SBC-XQ。"
+   "codecWait": "连接支持的耳机后才会显示 SBC HQ 和 SBC-XQ。",
+   "xqLow": "这条链路上 SBC-XQ 的比特池一直很低。普通 SBC 会更好听。"
   },
   "it": {
    "language": "Lingua",
@@ -892,6 +919,8 @@
    "unmute": "Riattiva audio",
    "tone": "Tono di prova",
    "toneOn": "Tono attivo",
+   "clean": "Suono pulito",
+   "recent": "Recenti",
    "connection": "Connessione",
    "connect": "Connetti",
    "disconnect": "Disconnetti",
@@ -955,7 +984,8 @@
    "latRadio": "Radio",
    "latSink": "Cuffie",
    "latSinkTyp": "Cuffie (tipico)",
-   "codecWait": "SBC HQ e SBC-XQ compaiono quando sono collegate cuffie che li supportano."
+   "codecWait": "SBC HQ e SBC-XQ compaiono quando sono collegate cuffie che li supportano.",
+   "xqLow": "SBC-XQ resta su un bitpool basso su questo collegamento. L'SBC normale suonerà meglio."
   },
   "he": {
    "language": "שפה",
@@ -982,6 +1012,8 @@
    "unmute": "בטל השתקה",
    "tone": "צליל בדיקה",
    "toneOn": "צליל פועל",
+   "clean": "צליל נקי",
+   "recent": "אחרונים",
    "connection": "חיבור",
    "connect": "התחבר",
    "disconnect": "התנתק",
@@ -1045,7 +1077,8 @@
    "latRadio": "רדיו",
    "latSink": "אוזניות",
    "latSinkTyp": "אוזניות (טיפוסי)",
-   "codecWait": "SBC HQ ו-SBC-XQ יופיעו כשיחוברו אוזניות שתומכות בהם."
+   "codecWait": "SBC HQ ו-SBC-XQ יופיעו כשיחוברו אוזניות שתומכות בהם.",
+   "xqLow": "SBC-XQ נשאר על ביטפול נמוך בקישור הזה. SBC רגיל יישמע טוב יותר."
   }
  }
 }
