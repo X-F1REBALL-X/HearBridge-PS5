@@ -6,6 +6,7 @@
 #include "hci_cmd.h"
 #include "log.h"
 #include "util.h"
+#include "rate.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1976,6 +1977,11 @@ long btlink_ms_since_credit(const btlink *l)
     return now_ms() - l->pool.last_credit_ms;
 }
 
+long btlink_acl_gap_avg(const btlink *l)
+{
+    return l ? l->pool.gap_avg : 0;
+}
+
 long btlink_tx_dropped(const btlink *l)
 {
     return l ? (long)l->pool.media_dropped : 0;
@@ -1994,7 +2000,7 @@ int btlink_media_cap(const btlink *l)
 void btlink_set_media_cap(btlink *l, int n)
 {
     if (!l) return;
-    if (n < 8) n = 8;
+    if (n < HB_QUEUE_FLOOR_PKTS) n = HB_QUEUE_FLOOR_PKTS;
     if (n > MEDIA_Q_MAX) n = MEDIA_Q_MAX;
     l->media_cap = n;
 }

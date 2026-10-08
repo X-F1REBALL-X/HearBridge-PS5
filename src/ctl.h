@@ -22,8 +22,7 @@ typedef struct {
     int req_hs_volume;     /* 0..127 to send as SetAbsoluteVolume, -1 none */
     int req_connect, req_disconnect, req_stop;
     int paused;            /* user pressed Disconnect: stay idle */
-    int stable;            /* 0 = low latency (~200 ms queue), 1 = stable (~1 s) */
-    int stable_dirty;      /* persist `stable` to the latency file */
+    int latency_ms;        /* media queue target, 60..1000 ms (per headset) */
     int codec_pref;        /* HB_CODEC_* picked on the page (per headset) */
     int prefs_dirty;       /* per-headset settings changed: save them */
     int codec_avail;       /* bit per HB_CODEC_* the current sink takes (0 = unknown) */
@@ -38,6 +37,8 @@ typedef struct {
     char url[64];
     char detail[96];       /* full status line (e.g. "waiting-selection 3") */
     char devices_path[96]; /* devices.json written by the scan */
+    int lat_total, lat_capture, lat_packet, lat_queue, lat_radio, lat_sink; /* estimate, ms */
+    int lat_sink_reported; /* lat_sink from an AVDTP delay report */
     char select_path[96];  /* select.txt read by the chooser */
     char saved_path[96];   /* saved.json: paired headsets (no keys) */
     int hs_volume;         /* 0..127, -1 unknown */

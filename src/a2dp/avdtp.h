@@ -33,6 +33,7 @@ typedef struct {
     int sample_rate;        /* preferred Hz after negotiation, 0 if none */
     int channels;           /* 1 or 2 */
     int joint_stereo;       /* prefer joint stereo when offered */
+    int delay_report;       /* sink lists the Delay Reporting capability */
 } avdtp_sink_info;
 
 typedef struct {
@@ -61,6 +62,9 @@ typedef struct {
     int unsupported_format;   /* the sink cannot take 48 kHz stereo SBC */
     int want_codec, no_xq;    /* request (HB_CODEC_*), see avdtp_sbc_pick() */
     avdtp_codec_pick codec;   /* what was configured */
+    int delay_on;             /* Delay Reporting was configured */
+    int sink_delay_x10;       /* last DELAY_REPORT from the sink, 1/10 ms (0 = none yet) */
+    long delay_reports;
 } avdtp_session;
 
 /* Sampling frequency + channel mode octet (A2DP SBC IE octet 0) chosen

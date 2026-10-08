@@ -105,14 +105,16 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"notifications\":%d,\"sink_volume\":%d},\"pkts\":%ld,\"frames\":%ld,\"empty_reads\":%ld,"
         "\"peak\":%.3f,\"out_peak\":%.3f,\"sample_rate\":%d,\"bitpool\":%d,"
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
-        "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
+        "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]}}",
         c->version, !strcmp(c->state, "streaming"), det, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
         c->out_peak_milli / 1000.0, c->sample_rate, c->bitpool, c->backlog,
         c->bitpool_lo, c->bitpool_hi, c->per_packet, c->dropped, ctl_uptime_s(c), c->uptime_s,
-        c->stable, c->stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS, c->codec,
+        c->latency_ms >= 500, c->latency_ms,
+        c->latency_ms, c->lat_total, c->lat_capture, c->lat_packet, c->lat_queue, c->lat_radio,
+        c->lat_sink, c->lat_sink_reported, c->codec,
         c->codec_pref, c->codec_avail,
         c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4]);
 }
@@ -279,10 +281,13 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->req_hs_volume = v;
         c->hs_volume = v;
     } else if (!strcmp(path, "/api/latency")) {
-        /* stable=1: ~1 s media queue; stable=0: low latency (~200 ms). */
-        if (!query_int(q, "stable", &v)) goto bad;
-        c->stable = v != 0;
-        c->stable_dirty = 1;
+        /* ms=60..1000: media queue target, saved per headset.
+         * stable=0|1 (older pages): 200 ms / 1 s. */
+        if (query_int(q, "ms", &v)) { }
+        else if (query_int(q, "stable", &v)) v = v ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+        else goto bad;
+        c->latency_ms = hb_latency_clamp(v);
+        c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/codec")) {
         /* mode=0 auto, 1 SBC, 2 SBC HQ, 3 SBC-XQ (hsprefs.h); the stream
          * loop reconnects the headset to apply it. */

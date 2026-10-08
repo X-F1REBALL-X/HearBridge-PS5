@@ -22,6 +22,7 @@ class XHR {
 const STATUS = { version: '1.0.2', state: 'streaming', connected: 1, device: 'X', gain_pct: 500, muted: 0, tone: 0,
   paused: 0, headset_volume: 64, avrcp: { connected: 1 }, pkts: 1, frames: 1, peak: 0, out_peak: 0, sample_rate: 48000,
   bitpool: 35, bitpool_min: 2, bitpool_max: 53, per_packet: 8, backlog: 0, stable: 0, queue_ms: 200, detail: '',
+  latency: { target_ms: 200, estimate_ms: 187, capture_ms: 21, packet_ms: 11, queue_ms: 20, radio_ms: 5, sink_ms: 130, sink_reported: 1 },
   codec: 'SBC-XQ', codec_pref: 0, codec_avail: 10, eq: { on: 1, db: [6, 3, 0, 0, 0] } };
 const ctx = {
   document: { getElementById: el, querySelectorAll: () => [], documentElement: {} },
@@ -32,7 +33,7 @@ new Function(...Object.keys(ctx), js)(...Object.values(ctx));
 let fails = 0;
 const check = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 check(calls.length && calls[0].m === 'GET' && calls[0].p === '/api/status' && !calls[0].h['X-HB-Token'], 'page: status poll is a plain GET');
-const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], ['lat', '/api/latency?stable=1'],
+const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], 
   ['scan', '/api/scan'], ['stop', '/api/stop']];
 for (const [id, path] of actions) {
   calls.length = 0; el(id).onclick();
@@ -43,7 +44,11 @@ calls.length = 0; el('gain').value = 250; el('gain').onchange.call(el('gain'));
 check(calls[0].m === 'POST' && calls[0].p === '/api/volume?pct=250' && calls[0].h['X-HB-Token'], 'page: volume -> POST with token');
 calls.length = 0; el('hs').value = 100; el('hs').onchange.call(el('hs'));
 check(calls[0].m === 'POST' && calls[0].p === '/api/headset?vol=100' && calls[0].h['X-HB-Token'], 'page: headset volume -> POST with token');
-check(el('lat').textContent === 'Low latency', 'page: latency button shows the mode');
+check(el('latv').textContent === '≈ 187 ms' && el('latt').textContent === '200 ms' && String(el('lat').value) === '200',
+  'page: latency meter shows the estimate and the target');
+check(/Headset <em>130 ms/.test(el('lkeys').innerHTML) && /Queue <em>20 ms/.test(el('lkeys').innerHTML), 'page: latency breakdown, headset value from its report');
+calls.length = 0; el('lat').value = 120; el('lat').onchange.call(el('lat'));
+check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=120' && calls[0].h['X-HB-Token'], 'page: latency slider -> POST with token');
 check(el('cd0').className === 'act' && el('cd2').disabled && !el('cd3').disabled, 'page: codec picker shows auto, greys out what the sink lacks');
 calls.length = 0; el('cd3').onclick.call(el('cd3'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/codec?mode=3' && calls[0].h['X-HB-Token'], 'page: codec -> POST with token');

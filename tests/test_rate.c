@@ -210,6 +210,29 @@ int main(int argc, char **argv)
         fclose(fo); fclose(fr); free(pcm); sbc_encoder_close(e);
         CHECK(!bad, "mid-stream bitpool change: every frame header and length match");
     }
+    {   /* latency slider + estimate */
+        hb_latency L;
+        int t, fit = 1;
+        CHECK(hb_latency_clamp(10) == 60 && hb_latency_clamp(5000) == 1000 && hb_latency_clamp(300) == 300,
+              "latency target clamps to 60..1000 ms");
+        CHECK(hb_latency_frames_cap(200, 48000, 128) == 0 && hb_latency_frames_cap(1000, 48000, 128) == 0,
+              "200 ms and up: packets stay MTU-sized");
+        for (t = 60; t < 200; t += 10) {
+            int n = hb_latency_frames_cap(t, 48000, 128);
+            if (n < 2 || (n > 2 && HB_QUEUE_FLOOR_PKTS * n * 128 * 1000 / 48000 > t)) fit = 0;
+        }
+        CHECK(fit && hb_latency_frames_cap(60, 48000, 128) == 2 && hb_latency_frames_cap(100, 48000, 128) == 4,
+              "below 200 ms: the 8-packet queue floor fits in the target (2 frames minimum)");
+        hb_latency_estimate(&L, 11, 20, 24, 0);
+        CHECK(L.queue_ms == 22 && L.sink_ms == HB_SINK_TYPICAL_MS && !L.sink_reported &&
+              L.total_ms == HB_CAPTURE_MS + 11 + 22 + 24 + HB_SINK_TYPICAL_MS,
+              "estimate: capture + packet + queue + radio + typical headset buffer");
+        hb_latency_estimate(&L, 29, 0, 0, 1305);
+        CHECK(L.sink_ms == 131 && L.sink_reported && L.queue_ms == 0 && L.total_ms == HB_CAPTURE_MS + 29 + 131,
+              "estimate: headset delay report (1/10 ms) replaces the typical value");
+        hb_latency_estimate(&L, 29, 10, 4000, 0);
+        CHECK(L.radio_ms == 500, "estimate: a stalled radio counts at most 500 ms");
+    }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }
