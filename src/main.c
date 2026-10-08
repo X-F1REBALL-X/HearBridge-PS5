@@ -1400,7 +1400,11 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             g_ctl.req_disconnect = 0;
             if (changed || (avst & 1)) g_ctl.hs_volume = (avst & 3) ? v : -1;
             if (req_vol >= 0) g_ctl.hs_volume = req_vol;
-            hs_vol = (avst & 2) || req_vol >= 0 ? g_ctl.hs_volume : -1;
+            /* The headset applies its own volume (it took SetAbsoluteVolume or
+             * answered our registration): software gain stays at the base,
+             * else the level would be lowered twice. Otherwise the headset
+             * volume scales the software gain. */
+            hs_vol = (avst & 8) ? -1 : (avst & 2) || req_vol >= 0 ? g_ctl.hs_volume : -1;
             gain_pct = g_ctl.gain_pct;
             muted = g_ctl.muted;
             tone = g_ctl.tone || tone_file;

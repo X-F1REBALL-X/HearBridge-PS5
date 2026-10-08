@@ -87,7 +87,8 @@ void btlink_set_inbound_rx(btlink *l, unsigned psm, btlink_rx_fn fn, void *ud);
 /* AVRCP absolute volume (0..127). set_volume sends SetAbsoluteVolume and a
  * VOLUME_CHANGED notification when the control channel is open. volume()
  * returns the current value; *changed = 1 once after a headset change.
- * state(): bit0 channel open, bit1 headset uses absolute volume,
+ * state(): bit3 the headset applies the volume itself (no software scaling),
+ * bit0 channel open, bit1 headset uses absolute volume,
  * bit2 volume notifications registered. connect(): open AVRCP ourselves. */
 void btlink_avrcp_set_volume(btlink *l, int vol);
 int  btlink_avrcp_volume(btlink *l, int *changed);

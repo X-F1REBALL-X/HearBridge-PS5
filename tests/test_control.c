@@ -345,6 +345,21 @@ int main(int argc, char **argv)
         CHECK(a.volume == 0x50 && a.remote_abs && a.ct_registered, "AVRCP: INTERIM volume read");
         avrcp_input(&a, chg, sizeof chg, r, sizeof r);
         CHECK(a.volume == 0x20 && a.changed && a.need_register, "AVRCP: CHANGED -> re-register");
+        CHECK(a.sink_renders, "AVRCP: headset answered our registration -> it applies the volume");
+        {
+            /* a headset that refuses SetAbsoluteVolume (NOT IMPLEMENTED) and never
+             * took our registration: software gain */
+            static const unsigned char ni[] = { 0x22, 0x11, 0x0E, 0x08, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x50, 0x00, 0x00, 0x01, 0x40 };
+            static const unsigned char acc[] = { 0x22, 0x11, 0x0E, 0x09, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x50, 0x00, 0x00, 0x01, 0x40 };
+            avrcp_init(&a, 64);
+            avrcp_input(&a, acc, sizeof acc, r, sizeof r);
+            CHECK(a.sink_renders && a.volume == 0x40, "AVRCP: SetAbsoluteVolume accepted -> headset applies it");
+            avrcp_init(&a, 64);
+            avrcp_input(&a, ni, sizeof ni, r, sizeof r);
+            CHECK(!a.sink_renders, "AVRCP: SetAbsoluteVolume not implemented -> software gain");
+        }
     }
 
     printf("%s (%d failures)\n", fails ? "FAILED" : "ALL OK", fails);
