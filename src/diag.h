@@ -18,6 +18,9 @@
 /* Forget everything; `path` (may be NULL) is where diag_save() writes. */
 void diag_init(const char *path);
 
+/* Change where diag_save() writes (NULL = nowhere) without clearing. */
+void diag_set_path(const char *path);
+
 /* Set `key` to the formatted value. An existing key keeps its position and
  * gets the new value; a new key is appended (silently dropped when full).
  * Newlines in the value are turned into spaces. */

@@ -123,9 +123,83 @@ void tile_files_drop(const char *root)
     rmdir(app);
 }
 
-int tile_need_register(int files_changed, int marker_exists, int appmeta_exists)
+int tile_files_write(const char *root, const char *url,
+                     const unsigned char *png, size_t png_len,
+                     const unsigned char *html, size_t html_len)
 {
-    return files_changed || !marker_exists || !appmeta_exists;
+    char app[P_APP], sys[P_SYS], man[P_FILE], ico[P_FILE], js[2048], st[P_FILE];
+    int jl;
+
+    if ((jl = tile_manifest(js, sizeof js, url)) < 0) return -1;
+    paths(root, app, sys, man, ico);
+    if (ensure_dir(app) || ensure_dir(sys)) return -1;
+    if (store(man, js, (size_t)jl) || store(ico, png, png_len)) return -1;
+    snprintf(st, sizeof st, "%s/start.html", app);
+    if (html && store(st, html, html_len)) return -1;
+    return 0;
+}
+
+int tile_register(const tile_ops *ops, tile_report *r)
+{
+    int ok = 0;
+
+    r->titledir_found = ops->title_dir != NULL;
+    r->all_found = ops->install_all != NULL;
+    r->exists_found = ops->app_exists != NULL;
+    r->exists = -1;
+    r->meta_before = ops->meta_exists ? ops->meta_exists(HB_TILE_ID) : 0;
+
+    if (ops->init) {
+        errno = 0;
+        r->init_called = 1;
+        r->init_rc = ops->init();
+        r->init_errno = errno;
+    }
+    if (r->init_rc) {
+        r->failed = "installer init";
+        r->code = r->init_rc;
+        r->meta_after = r->meta_before;
+        r->result = -1;
+        return -1;
+    }
+    if (ops->title_dir) {
+        errno = 0;
+        r->titledir_called = 1;
+        r->titledir_rc = ops->title_dir(HB_TILE_ID, HB_TILE_ROOT "/", NULL);
+        r->titledir_errno = errno;
+        ok = r->titledir_rc == 0;
+    }
+    if (!ok && ops->install_all) {
+        errno = 0;
+        r->all_called = 1;
+        r->all_rc = ops->install_all(NULL);
+        r->all_errno = errno;
+        ok = r->all_rc == 0;
+    }
+    if (ops->app_exists) {
+        int e = 0;
+        r->exists_rc = ops->app_exists(HB_TILE_ID, &e);
+        r->exists = r->exists_rc == 0 ? (e != 0) : -1;
+    }
+    if (ops->term) ops->term();
+    r->meta_after = ops->meta_exists ? ops->meta_exists(HB_TILE_ID) : 0;
+
+    if (!ok) {
+        /* e.g. "already installed": fine as long as the console has it. */
+        int installed = r->exists == 1 || (r->exists < 0 && r->meta_after);
+        if (installed) {
+            r->already = 1;
+            ok = 1;
+        } else if (r->all_called) {
+            r->failed = "InstallAll"; r->code = r->all_rc;
+        } else if (r->titledir_called) {
+            r->failed = "TitleDir"; r->code = r->titledir_rc;
+        } else {
+            r->failed = "no install function"; r->code = -1;
+        }
+    }
+    r->result = ok ? 0 : -1;
+    return r->result;
 }
 
 static const char *yn(int v) { return v ? "yes" : "no"; }
@@ -138,14 +212,14 @@ int tile_report_line(const tile_report *r, char *out, size_t cap)
 
     if (!cap) return 0;
     out[0] = 0;
-    ADD("files %s (errno %d); marker %s; appmeta before %s",
-        r->files < 0 ? "ERROR" : r->files ? "written" : "unchanged",
-        r->files_errno, yn(r->marker), yn(r->appmeta_before));
-    if (r->files >= 0 && r->skipped) {
-        ADD("; already registered, skipped");
-    } else if (r->files >= 0) {
-        ADD("; authid %#llx -> %#llx", r->authid_before, r->authid_used);
-        ADD("; init %#x (errno %d)", (unsigned)r->init_rc, r->init_errno);
+    if (r->files_failed) {
+        ADD("files ERROR (errno %d)", r->files_errno);
+    } else {
+        ADD("files rewritten");
+        if (r->legacy_marker) ADD(" (old marker removed)");
+        ADD("; appmeta before %s", yn(r->meta_before));
+        if (r->authid_used) ADD("; authid %#llx -> %#llx", r->authid_before, r->authid_used);
+        if (r->init_called) ADD("; init %#x (errno %d)", (unsigned)r->init_rc, r->init_errno);
         if (!r->init_rc) {
             ADD("; TitleDir %s", r->titledir_found ? "found" : "NOT FOUND");
             if (r->titledir_called)
@@ -154,7 +228,11 @@ int tile_report_line(const tile_report *r, char *out, size_t cap)
                 ADD("; InstallAll -> %#x (errno %d)", (unsigned)r->all_rc, r->all_errno);
             else if (!r->all_found)
                 ADD("; InstallAll NOT FOUND");
-            ADD("; appmeta after %s", yn(r->appmeta_after));
+            if (!r->exists_found) ADD("; AppExists NOT FOUND");
+            else if (r->exists < 0) ADD("; AppExists failed %#x", (unsigned)r->exists_rc);
+            else ADD("; AppExists %s", r->exists ? "yes" : "no");
+            ADD("; appmeta after %s", yn(r->meta_after));
+            if (r->already) ADD("; install code treated as success: title is already installed");
         }
     }
     if (r->result)

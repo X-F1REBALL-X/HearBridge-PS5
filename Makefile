@@ -11,7 +11,7 @@ PS5_PAYLOAD_SDK ?= /tmp/sdkx/ps5-payload-sdk
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall
 
 all: ps5
 
@@ -87,7 +87,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -109,8 +109,14 @@ test-pace:
 	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_pace.c src/a2dp/acl_pool.c -o $(BUILD)/host/test_pace
 	$(BUILD)/host/test_pace
 
-# fw13.60 build: diagnostics report, USB descriptor summary, tile decision, lock.
+# fw13.60 build: diagnostics report, USB descriptor summary.
 test-diag:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_LOCK_HOST_TEST -Isrc -Isrc/bt tests/test_diag.c src/diag.c src/tile.c src/bt/usb_hci_desc.c src/lock.c src/log.c src/util.c -lpthread -o $(BUILD)/host/test_diag
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt tests/test_diag.c src/diag.c src/bt/usb_hci_desc.c -lpthread -o $(BUILD)/host/test_diag
 	$(BUILD)/host/test_diag
+
+# Re-install: icon registered on every run (fake installer), lock cases.
+test-reinstall:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_LOCK_HOST_TEST -Isrc tests/test_reinstall.c src/tile.c src/lock.c src/log.c src/util.c -o $(BUILD)/host/test_reinstall
+	$(BUILD)/host/test_reinstall
