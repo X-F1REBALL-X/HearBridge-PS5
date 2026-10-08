@@ -1,13 +1,17 @@
 # HearBridge PS5: Bluetooth headphones (A2DP) on a jailbroken PS5.
 #
-#   make ps5                  builds the payload (needs PS5_PAYLOAD_SDK)
-#   make send PS5_HOST=ip     sends it (ask the user first)
+#   make test                 host tests (cc, ffmpeg, python3 + numpy)
+#   make ps5                  builds dist/HearBridge-PS5-<version>.elf
+#   make send PS5_HOST=ip     builds and sends it to the console's ELF loader
 #
-# Default PS5_PAYLOAD_SDK points at the box SDK at the configured path.
+# PS5_PAYLOAD_SDK must point at an unpacked ps5-payload-sdk release
+# (https://github.com/ps5-payload-dev/sdk/releases), e.g.
+#   export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
+# There is no default, so a missing SDK is reported instead of guessed.
 
 PS5_HOST ?= ps5
 PS5_PORT ?= 9021
-PS5_PAYLOAD_SDK ?= /tmp/sdkx/ps5-payload-sdk
+VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/version.h)
 
 BUILD := build
 
@@ -22,12 +26,10 @@ endif
 	$(MAKE) -f ps5.mk PS5_PAYLOAD_SDK=$(PS5_PAYLOAD_SDK)
 
 send: ps5
-	@echo "Refusing auto-send: ask the user before deploying to the console."
-	@echo "When approved: $(PS5_PAYLOAD_SDK)/bin/prospero-deploy -h $(PS5_HOST) -p $(PS5_PORT) dist/HearBridge-PS5-*.elf"
-	@false
+	$(PS5_PAYLOAD_SDK)/bin/prospero-deploy -h $(PS5_HOST) -p $(PS5_PORT) dist/HearBridge-PS5-$(VERSION).elf
 
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) dist
 
 # Host test for the SBC encoder (needs cc, ffmpeg, python3+numpy).
 test-sbc:
