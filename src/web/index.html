@@ -264,7 +264,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 </div>
 <script>
 var I18N=/*I18N*/;
-var S=null,busyG=0,busyH=0,LANG='en';
+var S=null,busyG=0,busyH=0,LANG='en',TOKEN='HBTOKENxxxxxxxxxxxxxxxxxxxxxxxxx';
 function $(i){return document.getElementById(i)}
 function t(k){var d=I18N.strings[LANG]||I18N.strings.en;return d[k]||I18N.strings.en[k]||k}
 function info(c){for(var i=0;i<I18N.langs.length;i++)if(I18N.langs[i].code==c)return I18N.langs[i];return I18N.langs[0]}
@@ -277,10 +277,12 @@ h+='<button type="button" class="langopt" role="menuitem" data-code="'+L.code+'"
 $('langlist').innerHTML=h;var b=$('langlist').getElementsByTagName('button');
 for(i=0;i<b.length;i++)b[i].onclick=function(){setLang(this.getAttribute('data-code'))};
 $('langbtn').onclick=function(){$('langlist').className=$('langlist').className?'':'show'}}
-function req(p,cb){var x=new XMLHttpRequest();x.open('GET',p,true);x.timeout=4000;
-x.onload=function(){if(x.status==200){try{S=JSON.parse(x.responseText);draw()}catch(e){}}if(cb)cb()};
+function xhr(m,p,cb){var x=new XMLHttpRequest();x.open(m,p,true);x.timeout=4000;if(m=='POST')x.setRequestHeader('X-HB-Token',TOKEN);
+x.onload=function(){if(x.status==200){try{S=JSON.parse(x.responseText);draw()}catch(e){}}else if(x.status==403)$('msg').textContent=t('reload');if(cb)cb()};
 x.onerror=x.ontimeout=function(){$('msg').textContent=t('unreachable');$('live').className='live bad';if(cb)cb()};
 x.send()}
+function req(p,cb){xhr('GET',p,cb)}
+function act(p,cb){xhr('POST',p,cb)}
 var devT=0;
 function esc(x){return String(x).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 var ICON={
@@ -300,9 +302,9 @@ function getj(p,cb){var x=new XMLHttpRequest();x.open('GET',p,true);x.timeout=40
 function row(icon,name,meta,btns,cls,sig){return '<div class="dl'+(cls?' '+cls:'')+'"><span class="ico">'+icon+'</span><span class="nm"><b>'+esc(name)+'</b><span class="k meta">'+meta+'</span></span><span class="sig">'+(sig||'')+'</span><span class="acts">'+btns+'</span></div>'}
 function wire(id){var b=$(id).getElementsByTagName('button');for(var i=0;i<b.length;i++)b[i].onclick=function(){
 var a=this.getAttribute('data-addr'),f=this.getAttribute('data-forget');
-if(this.getAttribute('data-disc')){req('/api/disconnect');return}
-if(f){if(confirm(t('forgetConfirm')))req('/api/forget?addr='+a,saved);return}
-req('/api/select?addr='+a);this.textContent=t('connecting')+'…'}}
+if(this.getAttribute('data-disc')){act('/api/disconnect');return}
+if(f){if(confirm(t('forgetConfirm')))act('/api/forget?addr='+a,saved);return}
+act('/api/select?addr='+a);this.textContent=t('connecting')+'…'}}
 var SAVL=null;
 function stOf(){return S?(S.paused?'paused':S.state):''}
 function linked(){var st=stOf();return st=='streaming'||st=='connected'}
@@ -357,14 +359,14 @@ $('mute').className=S.muted?'ember':'';$('mute').textContent=t(S.muted?'unmute':
 $('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone');
 $('lat').className=S.stable?'':'act';$('lat').textContent=t(S.stable?'stableMode':'lowLatency')}
 $('gain').oninput=function(){busyG=1;$('gv').textContent=pct(this.value)};
-$('gain').onchange=function(){req('/api/volume?pct='+this.value,function(){busyG=0})};
+$('gain').onchange=function(){act('/api/volume?pct='+this.value,function(){busyG=0})};
 $('hs').oninput=function(){busyH=1;$('hv').textContent=pct(this.value*100/127)};
-$('hs').onchange=function(){req('/api/headset?vol='+this.value,function(){busyH=0})};
-$('mute').onclick=function(){req('/api/mute?on='+(S&&S.muted?0:1))};
-$('tone').onclick=function(){req('/api/tone?on='+(S&&S.tone?0:1))};
-$('lat').onclick=function(){req('/api/latency?stable='+(S&&S.stable?0:1))};
-$('scan').onclick=function(){req('/api/scan');$('scanning').style.display=''};
-$('stop').onclick=function(){if(confirm(t('stopConfirm')))req('/api/stop')};
+$('hs').onchange=function(){act('/api/headset?vol='+this.value,function(){busyH=0})};
+$('mute').onclick=function(){act('/api/mute?on='+(S&&S.muted?0:1))};
+$('tone').onclick=function(){act('/api/tone?on='+(S&&S.tone?0:1))};
+$('lat').onclick=function(){act('/api/latency?stable='+(S&&S.stable?0:1))};
+$('scan').onclick=function(){act('/api/scan');$('scanning').style.display=''};
+$('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();
 (function(){var c=null,m=/[?&]lang=([a-z]{2})/.exec(location.search);if(m)c=m[1];else try{c=localStorage.getItem('hb_lang')}catch(e){}
 if(!c){var n=(navigator.language||'en').slice(0,2).toLowerCase();c=info(n).code==n?n:'en'}setLang(c)})();

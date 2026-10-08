@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page
 
 all: ps5
 
@@ -89,7 +89,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -122,3 +122,9 @@ test-reinstall:
 	@mkdir -p $(BUILD)/host
 	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_LOCK_HOST_TEST -Isrc tests/test_reinstall.c src/tile.c src/lock.c src/log.c src/util.c -o $(BUILD)/host/test_reinstall
 	$(BUILD)/host/test_reinstall
+
+# Control page script: GET for reads, POST + token for actions (needs node;
+# skipped when node is not installed).
+test-page:
+	@if command -v node >/dev/null 2>&1; then node tests/test_page.js src/web/index.html src/web/i18n.json; \
+	else echo "skip test-page: node not installed"; fi
