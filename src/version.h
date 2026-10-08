@@ -3,7 +3,7 @@
 #define HEARBRIDGE_VERSION_H
 
 #ifndef HEARBRIDGE_VERSION
-#define HEARBRIDGE_VERSION "1.0.1"
+#define HEARBRIDGE_VERSION "1.0.2"
 #endif
 
 /* Build variant, appended to the ELF name and shown in diagnostics only

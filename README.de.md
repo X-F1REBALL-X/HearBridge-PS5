@@ -22,9 +22,9 @@ HearBridge PS5 ist ein Payload (ELF) für eine gejailbreakte PS5. Er nimmt den T
 
 ## Installation und Start
 
-1. Lade **HearBridge-PS5-1.0.1.elf** aus dem [Release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1) herunter.
+1. Lade **HearBridge-PS5-1.0.2.elf** aus dem [Release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2) herunter.
 2. Sende sie an den Loader der Konsole, zum Beispiel:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. Öffne **http://&lt;console-ip&gt;:8090** (oder die Kachel **HearBridge**, die beim ersten Start zum Startbildschirm hinzugefügt wird).
 
 ## Bedienung
@@ -44,6 +44,36 @@ Die Seite gibt es in 11 Sprachen, darunter Hebräisch und Arabisch (von rechts n
 - Nur SBC-Codec, ein Gerät zur Zeit, kein Mikrofon. Der Fernseher gibt den Ton weiterhin aus.
 - Getestet mit Sony WF-1000XM6, OnePlus Buds Ace 2 und Xbox Wireless Headset.
 - Einstellungen, gespeicherte Geräte und das Log liegen in `/data/hearbridge/` (`hearbridge.log` protokolliert jeden Schritt).
+
+## Fehlerbehebung / Problem melden
+
+**Getestet auf:** HearBridge wurde auf einer PS5 Fat (Originalmodell, CFI-10xx) mit Firmware 10.20 entwickelt und getestet. Andere Modelle (Slim, Pro, spätere Fat-Revisionen) und andere Firmwares sind ungetestet und können einen anderen Bluetooth-Chip haben – Berichte von diesen Konsolen sind daher willkommen.
+
+Häufige Probleme:
+
+- **Kein HearBridge-Symbol auf dem Startbildschirm** nach dem Start der ELF.
+- **Die Seite öffnet sich nicht** (http://&lt;console-ip&gt;:8090).
+- **Kopfhörer werden nicht gefunden**, wenn du Nach Geräten suchen drückst.
+- **Kein Ton**, obwohl die Kopfhörer verbunden sind.
+
+**Firmware 13.60:** Probiere **HearBridge-PS5-1.0.2-fw13.60.elf** aus dem [Release v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). Das ist ein experimenteller Build, der das fehlende Symbol auf dem Startbildschirm beheben soll und Diagnosedaten hinzufügt. Er wurde noch nicht auf einer echten Konsole getestet.
+
+**Log holen:**
+
+1. Sende einen FTP-Server-Payload (zum Beispiel [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)) mit demselben Loader, den du für HearBridge nutzt.
+2. Verbinde dich mit FileZilla mit der IP der Konsole auf dem Port, den der Server anzeigt (ftpsrv nutzt meist **2121**).
+3. Lade `/data/hearbridge/hearbridge.log` herunter und, mit dem fw13.60-Build, auch `/data/hearbridge/diag.txt`.
+
+Mit dem fw13.60-Build kannst du auch **http://&lt;console-ip&gt;:8090/api/diag** öffnen und den Text kopieren.
+
+**Eröffne ein [GitHub-Issue](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose)** mit:
+
+- dem Konsolenmodell (CFI-Nummer, z. B. CFI-1016A)
+- der Firmware-Version
+- dem verwendeten Loader
+- ob die Meldung **„HearBridge 1.0.2: http://…“** erschienen ist
+- ob sich die Seite öffnet
+- den Log-Dateien (`hearbridge.log`, `diag.txt`)
 
 ## Bauen
 
