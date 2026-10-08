@@ -1,6 +1,7 @@
-/* After the link drops: listen for the headset to connect in, then one
- * short page, a few times, then only listen. Some headsets (the Xbox one)
- * ignore pages for minutes after the host disconnects. Pure. */
+/* After the link drops: a short listen (so we do not page in the same
+ * instant the host disconnected — some headsets ignore that), then one
+ * page, a few times, then only listen. The listens are a second or two,
+ * not half a minute. Pure. */
 #ifndef HEARBRIDGE_REJOIN_H
 #define HEARBRIDGE_REJOIN_H
 

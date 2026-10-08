@@ -3,7 +3,7 @@
 
 int hb_re_listen_ms(int pages)
 {
-    static const int ms[HB_RE_PAGES] = { 15000, 30000, 60000 };
+    static const int ms[HB_RE_PAGES] = { 1200, 1800, 2500 };
     if (pages < 0) pages = 0;
     if (pages >= HB_RE_PAGES) return 0;
     return ms[pages];
