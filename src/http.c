@@ -105,13 +105,13 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"notifications\":%d},\"pkts\":%ld,\"frames\":%ld,\"empty_reads\":%ld,"
         "\"peak\":%.3f,\"out_peak\":%.3f,\"sample_rate\":%d,\"bitpool\":%d,"
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
-        "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d}",
+        "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"codec\":\"%s\"}",
         c->version, !strcmp(c->state, "streaming"), det, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
         c->out_peak_milli / 1000.0, c->sample_rate, c->bitpool, c->backlog,
         c->bitpool_lo, c->bitpool_hi, c->per_packet, c->dropped, ctl_uptime_s(c), c->uptime_s,
-        c->stable, c->stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS);
+        c->stable, c->stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS, c->codec);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,
@@ -132,7 +132,7 @@ static int respond(char *out, int max, int code, const char *ctype,
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 {
     char method[8], path[128], *q;
-    char body[1024];
+    char body[2048];
     int i = 0, j = 0, v, bl, is_api;
 
     while (i < reqlen && req[i] != ' ' && j < (int)sizeof method - 1) method[j++] = req[i++];

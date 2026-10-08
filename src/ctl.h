@@ -39,6 +39,7 @@ typedef struct {
     long pkts, frames, empty_reads, uptime_s;
     int peak_milli;        /* capture peak x1000 (last second) */
     int out_peak_milli;    /* after gain/limiter */
+    char codec[24];        /* e.g. "SBC" / "SBC-XQ" (empty = none) */
     int sample_rate, bitpool, backlog;
     int per_packet;        /* SBC frames per media packet */
     int bitpool_lo, bitpool_hi; /* adaptive range */

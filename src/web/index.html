@@ -348,7 +348,7 @@ if(Date.now()-devT>3000){devT=Date.now();devices();saved()}
 drawSaved();
 $('pk').textContent=S.pkts+' / '+S.frames+(S.backlog?' ('+t('queue')+' '+S.backlog+')':'');
 
-setHtml('fmt',S.sample_rate?chips([['SBC','hi n'],[S.sample_rate+' Hz','n'],['bitpool '+S.bitpool+(S.bitpool_max>S.bitpool_min?' ('+S.bitpool_min+'–'+S.bitpool_max+')':''),'n'],[S.per_packet+' '+t('perPkt')]]):'-');
+setHtml('fmt',S.sample_rate?chips([[S.codec||'SBC','hi n'],[S.sample_rate+' Hz','n'],['bitpool '+S.bitpool+(S.bitpool_max>S.bitpool_min?' ('+S.bitpool_min+'–'+S.bitpool_max+')':''),'n'],[S.per_packet+' '+t('perPkt')]]):'-');
 setHtml('av',!S.avrcp.connected?chips([[t('avrcpNone'),'off']]):chips([[S.avrcp.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(S.avrcp.notifications?[[t('notif')]]:[])));
 $('pkv').textContent=S.peak.toFixed(3);$('m1').style.width=Math.min(100,S.peak*100)+'%';
 $('opv').textContent=S.out_peak.toFixed(3);$('m2').style.width=Math.min(100,S.out_peak*100)+'%';

@@ -12,21 +12,43 @@
  * only climbs while the link returns credits with headroom. */
 #define HB_RATE_CEIL  53
 
+/* Packets that normally sit in the media queue on a healthy link and are
+ * NOT congestion: the pacer holds up to PACE_TARGET_PKTS (3, acl_pool.h)
+ * until their due time, and the stream loop runs up to ~40 ms (one more
+ * packet) ahead of the audio clock. Only packets beyond this are late. */
+#define HB_RATE_SLACK 4
+
 typedef struct {
     int lo, hi;            /* allowed range (configured range ∩ floor/ceiling) */
     int cur;
     long t_down, t_up, t_calm;  /* ms: last decrease, last increase, start of calm */
     long last_drops;
     int downs, ups;
+    int cap;               /* temporary ceiling after congestion at cap+1 (0 = none) */
+    long t_cap;            /* when that ceiling was set */
+    long t_late;           /* since when packets beyond the slack wait (-1 none) */
 } hb_rate;
 
-/* lo/hi = configured bitpool range, start = first bitpool. */
+/* lo/hi = configured bitpool range, start = first bitpool. hi is capped at
+ * HB_RATE_CEIL; hb_rate_set_ceiling() lifts that for high-quality modes. */
 void hb_rate_init(hb_rate *r, int lo, int hi, int start, long now_ms);
+/* Highest bitpool to climb to (still within the configured range). */
+void hb_rate_set_ceiling(hb_rate *r, int cfg_hi, int ceil);
 
 /* Call often (every packet or so). queue = media packets waiting,
  * qmax = queue capacity, drops = total media packets dropped so far.
- * Returns the bitpool to use from now on. */
+ * Returns the bitpool to use from now on.
+ *  - down: a drop (-4); late packets (beyond HB_RATE_SLACK) filling half
+ *    the room for 300 ms (-3) or staying for 600 ms (-1); at most one step
+ *    per 300 ms. Short bursts that drain by themselves do not count.
+ *  - up: after 4 s without a drop, step down or late packets lasting
+ *    200 ms, +2 per 2 s while
+ *    8 or more below the top, then +1. A bitpool that congested the link
+ *    is not tried again for 30 s. */
 int hb_rate_update(hb_rate *r, long now_ms, int queue, int qmax, long drops);
+/* The link stays slow although the queue looks calm (credits returned
+ * without headroom): restart the calm period. */
+void hb_rate_not_calm(hb_rate *r, long now_ms);
 
 /* Whole SBC frames per media packet that fit the peer's L2CAP MTU:
  * RTP header 12 + SBC media header 1 + n * frame_len <= mtu, n <= 15
