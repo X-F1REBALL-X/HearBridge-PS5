@@ -1,9 +1,7 @@
 /* Developed by X-F1REBALL-X. Host tests for the fw13.60 build additions:
- * diagnostics report, USB descriptor summary, tile re-register decision and
- * report line, lock error classification. */
+ * diagnostics report and USB descriptor summary (icon registration and
+ * the lock: tests/test_reinstall.c). */
 #include "diag.h"
-#include "lock.h"
-#include "tile.h"
 #include "usb_hci_desc.h"
 
 #include <errno.h>
@@ -88,82 +86,10 @@ static void test_usb_describe(void)
     }
 }
 
-static void test_tile_logic(void)
-{
-    tile_report r;
-    char line[512];
-
-    CHECK(tile_need_register(1, 1, 1) == 1, "changed files -> register");
-    CHECK(tile_need_register(0, 0, 1) == 1, "no marker -> register");
-    CHECK(tile_need_register(0, 1, 0) == 1, "marker but no appmeta -> register again");
-    CHECK(tile_need_register(0, 1, 1) == 0, "marker + appmeta + unchanged -> skip");
-
-    memset(&r, 0, sizeof r);
-    r.marker = 1; r.appmeta_before = 1; r.appmeta_after = 1; r.skipped = 1;
-    tile_report_line(&r, line, sizeof line);
-    CHECK(strstr(line, "already registered, skipped") && strstr(line, "RESULT ok"), "report: skipped");
-
-    memset(&r, 0, sizeof r);
-    r.files = 1; r.authid_before = 0x4800000000000006ULL; r.authid_used = 0x4801000000000013ULL;
-    r.titledir_found = 1; r.titledir_called = 1; r.titledir_rc = (int)0x80990015u;
-    r.all_found = 1; r.all_called = 1; r.all_rc = (int)0x80990016u;
-    r.result = -1; r.failed = "InstallAll"; r.code = (int)0x80990016u;
-    tile_report_line(&r, line, sizeof line);
-    CHECK(strstr(line, "TitleDir found -> 0x80990015") && strstr(line, "InstallAll -> 0x80990016") &&
-          strstr(line, "authid 0x4800000000000006 -> 0x4801000000000013") &&
-          strstr(line, "RESULT failed at InstallAll (0x80990016)"), "report: both calls failed");
-
-    memset(&r, 0, sizeof r);
-    r.files = 0; r.all_found = 1; r.all_called = 1; r.appmeta_after = 1;
-    tile_report_line(&r, line, sizeof line);
-    CHECK(strstr(line, "TitleDir NOT FOUND") && strstr(line, "InstallAll -> 0") &&
-          strstr(line, "appmeta after yes") && strstr(line, "RESULT ok"), "report: fallback used");
-
-    memset(&r, 0, sizeof r);
-    r.files = -1; r.files_errno = EACCES; r.result = -1; r.failed = "writing"; r.code = EACCES;
-    tile_report_line(&r, line, sizeof line);
-    CHECK(strstr(line, "files ERROR (errno 13)") && !strstr(line, "init"), "report: write error");
-
-    memset(&r, 0, sizeof r);
-    r.init_rc = (int)0x80990001u; r.result = -1; r.failed = "installer init"; r.code = r.init_rc;
-    tile_report_line(&r, line, sizeof line);
-    CHECK(strstr(line, "init 0x80990001") && !strstr(line, "TitleDir"), "report: init failed");
-    {
-        char tiny[16];
-        CHECK(tile_report_line(&r, tiny, sizeof tiny) == 15 && tiny[15] == 0, "report truncates safely");
-    }
-}
-
-static void test_lock(void)
-{
-    char dir[] = "/tmp/hb_lock_XXXXXX", path[300];
-    FILE *f;
-    int err = -1;
-
-    CHECK(mkdtemp(dir) != NULL, "lock temp dir");
-    snprintf(path, sizeof path, "%s/hearbridge.lock", dir);
-    CHECK(lock_take_ex(path, &err) == LOCK_OK && err == 0, "lock taken");
-    lock_release();
-    f = fopen(path, "w");
-    if (f) { fprintf(f, "%ld 0\n", (long)getppid()); fclose(f); }
-    CHECK(lock_take_ex(path, &err) == LOCK_BUSY && err == 0, "live owner -> busy");
-    f = fopen(path, "w");
-    if (f) { fprintf(f, "999999 0\n"); fclose(f); }
-    CHECK(lock_take_ex(path, &err) == LOCK_OK, "dead owner -> taken over");
-    lock_release();
-    CHECK(lock_take_ex("/nonexistent-dir/hearbridge.lock", &err) == LOCK_NO_WRITE && err == ENOENT,
-          "unwritable folder -> no-write with errno (not 'already running')");
-    CHECK(lock_take("/nonexistent-dir/hearbridge.lock") == 0, "old API still reports failure");
-    unlink(path);
-    rmdir(dir);
-}
-
 int main(void)
 {
     test_diag();
     test_usb_describe();
-    test_tile_logic();
-    test_lock();
     if (fails) printf("%d test(s) FAILED\n", fails);
     return fails != 0;
 }
