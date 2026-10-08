@@ -22,9 +22,9 @@ HearBridge PS5 es un payload (ELF) para una PS5 con jailbreak. Captura el audio 
 
 ## Instalación y ejecución
 
-1. Descarga **HearBridge-PS5-1.0.1.elf** desde la [versión](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
+1. Descarga **HearBridge-PS5-1.0.2.elf** desde la [versión](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2).
 2. Envíalo al cargador de la consola, por ejemplo:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. Abre **http://&lt;console-ip&gt;:8090** (o el icono **HearBridge** que se añade a la pantalla de inicio la primera vez).
 
 ## Uso
@@ -56,7 +56,7 @@ Problemas habituales:
 - **No se encuentran los auriculares** al pulsar Buscar dispositivos.
 - **No hay sonido** aunque los auriculares están conectados.
 
-**Firmware 13.60:** prueba **HearBridge-PS5-1.0.1-fw13.60.elf** de la [versión v1.0.1](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1). Es una versión experimental pensada para corregir el icono que falta en la pantalla de inicio y añade diagnósticos. Todavía no se ha probado en una consola real.
+**Firmware 13.60:** prueba **HearBridge-PS5-1.0.2-fw13.60.elf** de la [versión v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). Es una versión experimental pensada para corregir el icono que falta en la pantalla de inicio y añade diagnósticos. Todavía no se ha probado en una consola real.
 
 **Obtener el registro:**
 
@@ -71,7 +71,7 @@ Con la versión fw13.60 también puedes abrir **http://&lt;console-ip&gt;:8090/a
 - el modelo de la consola (número CFI, p. ej. CFI-1016A)
 - la versión del firmware
 - el cargador que usaste
-- si apareció la notificación **"HearBridge 1.0.1: http://…"**
+- si apareció la notificación **"HearBridge 1.0.2: http://…"**
 - si la página se abre
 - los archivos de registro (`hearbridge.log`, `diag.txt`)
 

@@ -22,9 +22,9 @@ HearBridge PS5 is a payload (ELF) for a jailbroken PS5. It captures the console'
 
 ## Install and run
 
-1. Download **HearBridge-PS5-1.0.1.elf** from the [release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
+1. Download **HearBridge-PS5-1.0.2.elf** from the [release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2).
 2. Send it to the console's loader, for example:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. Open **http://&lt;console-ip&gt;:8090** (or the **HearBridge** tile that is added to the home screen on first run).
 
 ## Usage
@@ -56,7 +56,7 @@ Common problems:
 - **Headphones are not found** when you press Scan.
 - **No sound** although the headphones are connected.
 
-**Firmware 13.60:** try **HearBridge-PS5-1.0.1-fw13.60.elf** from the [v1.0.1 release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1). It is an experimental build meant to fix the missing home-screen icon and adds diagnostics. It has not been tested on a real console yet.
+**Firmware 13.60:** try **HearBridge-PS5-1.0.2-fw13.60.elf** from the [v1.0.2 release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). It is an experimental build meant to fix the missing home-screen icon and adds diagnostics. It has not been tested on a real console yet.
 
 **Get the log:**
 
@@ -71,7 +71,7 @@ With the fw13.60 build you can also open **http://&lt;console-ip&gt;:8090/api/di
 - the console model (CFI number, e.g. CFI-1016A)
 - the firmware version
 - the loader you used
-- whether the **"HearBridge 1.0.1: http://…"** notification appeared
+- whether the **"HearBridge 1.0.2: http://…"** notification appeared
 - whether the page opens
 - the log files (`hearbridge.log`, `diag.txt`)
 

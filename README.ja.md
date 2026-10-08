@@ -22,9 +22,9 @@ HearBridge PS5 は脱獄済み PS5 用のペイロード（ELF）です。本体
 
 ## インストールと起動
 
-1. [リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1)から **HearBridge-PS5-1.0.1.elf** をダウンロードします。
+1. [リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2)から **HearBridge-PS5-1.0.2.elf** をダウンロードします。
 2. 本体のローダーに送信します。例:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. **http://&lt;console-ip&gt;:8090** を開きます（初回起動時にホーム画面に追加される **HearBridge** タイルからも開けます）。
 
 ## 使い方
@@ -56,7 +56,7 @@ HearBridge PS5 は脱獄済み PS5 用のペイロード（ELF）です。本体
 - **デバイスを検索** を押しても **ヘッドホンが見つからない**。
 - ヘッドホンは接続されているのに **音が出ない**。
 
-**ファームウェア 13.60:** [v1.0.1 リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1)の **HearBridge-PS5-1.0.1-fw13.60.elf** を試してください。ホーム画面のアイコンが出ない問題の修正を目的とし、診断情報を追加した実験的なビルドです。まだ実機ではテストされていません。
+**ファームウェア 13.60:** [v1.0.2 リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2)の **HearBridge-PS5-1.0.2-fw13.60.elf** を試してください。ホーム画面のアイコンが出ない問題の修正を目的とし、診断情報を追加した実験的なビルドです。まだ実機ではテストされていません。
 
 **ログの取得:**
 
@@ -71,7 +71,7 @@ fw13.60 ビルドでは **http://&lt;console-ip&gt;:8090/api/diag** を開いて
 - 本体のモデル（CFI 番号、例: CFI-1016A）
 - ファームウェアのバージョン
 - 使用したローダー
-- **「HearBridge 1.0.1: http://…」** の通知が表示されたか
+- **「HearBridge 1.0.2: http://…」** の通知が表示されたか
 - ページが開くか
 - ログファイル（`hearbridge.log`、`diag.txt`）
 
