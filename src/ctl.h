@@ -8,6 +8,10 @@
 #define HB_GAIN_DEFAULT_PCT 500   /* software base gain 5.0 */
 #define HB_GAIN_MAX_PCT     500
 
+/* Per-run random token: the page carries it and sends it back in the
+ * X-HB-Token header of every state-changing POST (see http.c). */
+#define HB_TOKEN_LEN 32
+
 typedef struct {
     pthread_mutex_t mu;
     /* controls (web → stream loop) */
@@ -21,6 +25,7 @@ typedef struct {
     int stable;            /* 0 = low latency (~200 ms queue), 1 = stable (~1 s) */
     int stable_dirty;      /* persist `stable` to the latency file */
     /* status (stream loop → web) */
+    char token[HB_TOKEN_LEN + 1];  /* hex, set once by ctl_init() */
     char version[16];
     char state[32];        /* idle / connecting / streaming / reconnecting / paused */
     char device[64];
@@ -45,6 +50,9 @@ typedef struct {
 extern hb_ctl g_ctl;
 
 void ctl_init(hb_ctl *c, const char *version);
+/* New random c->token (128 bits as 32 hex digits): /dev/urandom, or a
+ * clock/pid mix when it cannot be read. Called by ctl_init(). */
+void ctl_new_token(hb_ctl *c);
 /* Zero the per-link status (counters, format, AVRCP, meters); with
  * drop_device also forget the device name. Caller holds the lock. */
 void ctl_clear_link(hb_ctl *c, int drop_device);

@@ -43,6 +43,54 @@ static void json_esc(char *o, size_t max, const char *s)
     o[n] = 0;
 }
 
+/* Value of header `name` (case-insensitive) into v; 1 if present. */
+static int header_value(const char *req, int reqlen, const char *name, char *v, size_t vmax)
+{
+    size_t nl = strlen(name);
+    int i = 0;
+    /* skip the request line */
+    while (i < reqlen && req[i] != '\n') i++;
+    while (++i < reqlen) {
+        int j = 0;
+        if (req[i] == '\r' || req[i] == '\n') break;        /* end of headers */
+        while (i + j < reqlen && (size_t)j < nl &&
+               (req[i + j] | 0x20) == (name[j] | 0x20)) j++;
+        if ((size_t)j == nl && i + j < reqlen && req[i + j] == ':') {
+            size_t n = 0;
+            i += j + 1;
+            while (i < reqlen && (req[i] == ' ' || req[i] == '\t')) i++;
+            while (i < reqlen && req[i] != '\r' && req[i] != '\n' && n + 1 < vmax) v[n++] = req[i++];
+            v[n] = 0;
+            return 1;
+        }
+        while (i < reqlen && req[i] != '\n') i++;
+    }
+    return 0;
+}
+
+/* Same length, compared without an early exit. */
+static int token_ok(const char *got, const char *want)
+{
+    size_t i, n = strlen(want);
+    unsigned d = 0;
+    if (!n || strlen(got) != n) return 0;
+    for (i = 0; i < n; i++) d |= (unsigned char)(got[i] ^ want[i]);
+    return d == 0;
+}
+
+static int is_write_path(const char *path)
+{
+    static const char *const w[] = {
+        "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
+        "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
+        "/api/stop", "/api/latency",
+    };
+    size_t i;
+    for (i = 0; i < sizeof w / sizeof w[0]; i++)
+        if (!strcmp(path, w[i])) return 1;
+    return 0;
+}
+
 static int status_json(hb_ctl *c, char *o, int max)
 {
     char dev[140], st[70], url[140], det[200];
@@ -70,7 +118,7 @@ static int respond(char *out, int max, int code, const char *ctype,
                    const char *body, int blen)
 {
     const char *reason = code == 200 ? "OK" : code == 404 ? "Not Found" :
-                         code == 405 ? "Method Not Allowed" :
+                         code == 405 ? "Method Not Allowed" : code == 403 ? "Forbidden" :
                          code == 500 ? "Internal Server Error" : "Bad Request";
     int n = snprintf(out, (size_t)max,
         "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
@@ -99,12 +147,29 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
     q = strchr(path, '?');
     if (q) *q++ = 0;
 
-    if (!strcmp(path, "/") || !strcmp(path, "/index.html"))
-        return respond(out, max, 200, "text/html; charset=utf-8", HB_WEBPAGE,
-                       (int)sizeof HB_WEBPAGE - 1);
+    if (!strcmp(path, "/") || !strcmp(path, "/index.html")) {
+        /* The page carries this run's token (same length as the slot). */
+        int n = respond(out, max, 200, "text/html; charset=utf-8", HB_WEBPAGE,
+                        (int)sizeof HB_WEBPAGE - 1);
+        int i, sl = (int)sizeof HB_TOKEN_SLOT - 1;
+        for (i = 0; n > 0 && i + sl <= n; i++)
+            if (out[i] == 'H' && !memcmp(out + i, HB_TOKEN_SLOT, (size_t)sl)) {
+                memcpy(out + i, c->token, HB_TOKEN_LEN);
+                break;
+            }
+        return n;
+    }
 
     is_api = !strncmp(path, "/api/", 5);
     if (!is_api) return respond(out, max, 404, "text/plain", "not found\n", 10);
+
+    if (is_write_path(path)) {
+        char tok[HB_TOKEN_LEN + 8];
+        if (strcmp(method, "POST"))
+            return respond(out, max, 405, "application/json", "{\"error\":\"use POST\"}", 20);
+        if (!header_value(req, reqlen, "X-HB-Token", tok, sizeof tok) || !token_ok(tok, c->token))
+            return respond(out, max, 403, "application/json", "{\"error\":\"token\"}", 17);
+    }
 
     if (!strcmp(path, "/api/diag")) {
         /* Plain-text diagnostics report (see diag.h), also in diag.txt. */

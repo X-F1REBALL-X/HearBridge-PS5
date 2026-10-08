@@ -1,8 +1,11 @@
 /* Developed by X-F1REBALL-X. */
 #include "ctl.h"
 
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 static long mono_s(void)
 {
@@ -15,6 +18,44 @@ long ctl_uptime_s(const hb_ctl *c) { return mono_s() - c->t0_s; }
 
 hb_ctl g_ctl;
 
+static uint64_t mix64(uint64_t x)
+{
+    x ^= x >> 30; x *= 0xbf58476d1ce4e5b9ULL;
+    x ^= x >> 27; x *= 0x94d049bb133111ebULL;
+    return x ^ (x >> 31);
+}
+
+void ctl_new_token(hb_ctl *c)
+{
+    static uint64_t counter;
+    unsigned char b[HB_TOKEN_LEN / 2];
+    size_t got = 0;
+    int i;
+    FILE *f = fopen("/dev/urandom", "rb");
+
+    if (f) {
+        got = fread(b, 1, sizeof b, f);
+        fclose(f);
+    }
+    if (got != sizeof b) {
+        /* No /dev/urandom: not cryptographic, but unguessable enough for a
+         * LAN page (clock nanoseconds, pid, stack address, call count). */
+        struct timespec rt, mt;
+        uint64_t s;
+        clock_gettime(CLOCK_REALTIME, &rt);
+        clock_gettime(CLOCK_MONOTONIC, &mt);
+        s = (uint64_t)rt.tv_sec * 1000000007ULL ^ (uint64_t)rt.tv_nsec ^
+            ((uint64_t)mt.tv_nsec << 21) ^ ((uint64_t)getpid() << 40) ^
+            (uint64_t)(uintptr_t)&s ^ ++counter;
+        for (i = 0; i < (int)sizeof b; i++) {
+            if (!(i % 8)) s = mix64(s + 0x9e3779b97f4a7c15ULL);
+            b[i] = (unsigned char)(s >> (8 * (i % 8)));
+        }
+    }
+    for (i = 0; i < (int)sizeof b; i++)
+        snprintf(c->token + 2 * i, 3, "%02x", b[i]);
+}
+
 void ctl_init(hb_ctl *c, const char *version)
 {
     memset(c, 0, sizeof *c);
@@ -25,6 +66,7 @@ void ctl_init(hb_ctl *c, const char *version)
     strncpy(c->version, version, sizeof c->version - 1);
     strcpy(c->state, "starting");
     c->t0_s = mono_s();
+    ctl_new_token(c);
 }
 
 /* Headset volume 0..127 scales the base gain linearly (127 = full base
