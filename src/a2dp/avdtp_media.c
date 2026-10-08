@@ -62,13 +62,14 @@ int avdtp_sbc_pick(const uint8_t caps[4], int want, int no_xq, avdtp_codec_pick 
         if ((caps[0] & 0x04) && hi >= HB_XQ_MIN_BP) o->avail |= 1 << HB_CODEC_SBC_XQ;
     }
 
-    if (want == HB_CODEC_AUTO && held_codec >= HB_CODEC_SBC && held_codec < HB_CODEC_N &&
-        (o->avail & (1 << held_codec)) && !(held_codec == HB_CODEC_SBC_XQ && no_xq))
-        want = held_codec;                 /* start from what held last time */
-    else if (want == HB_CODEC_AUTO)
-        want = (o->avail & (1 << HB_CODEC_SBC_XQ)) && !no_xq ? HB_CODEC_SBC_XQ :
-               (o->avail & (1 << HB_CODEC_SBC_HQ)) ? HB_CODEC_SBC_HQ : HB_CODEC_SBC;
-    if (want < HB_CODEC_SBC || want >= HB_CODEC_N || !(o->avail & (1 << want))) want = HB_CODEC_SBC;
+    /* Auto is plain SBC on every headset. HQ and XQ only when the page
+     * asks for them, and only if the sink advertised them. A remembered
+     * XQ is not where auto starts. */
+    if (want == HB_CODEC_AUTO)
+        want = HB_CODEC_SBC;
+    else if (want < HB_CODEC_SBC || want >= HB_CODEC_N || !(o->avail & (1 << want)))
+        want = HB_CODEC_SBC;
+    (void)no_xq;
 
     o->codec = want;
     o->cfg[1] = out1;
@@ -89,7 +90,9 @@ int avdtp_sbc_pick(const uint8_t caps[4], int want, int no_xq, avdtp_codec_pick 
     if (o->ceil < lo) o->ceil = lo;
     o->cfg[3] = (unsigned char)o->ceil;
     o->start_bp = 35 < o->ceil ? 35 : o->ceil;
-    if (held_bp >= lo && held_bp <= o->ceil) o->start_bp = held_bp;
+    /* Only the bitpool that held on this same codec. An XQ number must
+     * not become the SBC start. */
+    if (held_codec == want && held_bp >= lo && held_bp <= o->ceil) o->start_bp = held_bp;
     if (o->start_bp < lo) o->start_bp = lo;
     return 1;
 }

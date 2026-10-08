@@ -50,11 +50,15 @@ int main(int argc, char **argv)
         avdtp_codec_pick c;
         const char *why;
         int bad = 0;
-        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC_XQ ||
-            c.cfg[0] != 0x14 || c.ceil != HB_XQ_CEIL || c.cfg[3] != HB_XQ_CEIL || c.start_bp != 35 ||
-            c.avail != 0x0E) bad |= 1;                    /* auto -> XQ, all three available */
-        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 1, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC_HQ || c.ceil != 60 ||
-            c.cfg[0] != 0x11) bad |= 2;                   /* XQ failed before -> HQ */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC ||
+            c.cfg[0] != 0x11 || c.ceil != 53 || c.start_bp != 35 ||
+            c.avail != 0x0E) bad |= 1;                    /* auto -> plain SBC, HQ and XQ still available */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 1, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC || c.ceil != 53)
+            bad |= 2;                                     /* auto stays SBC */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC_HQ, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC_HQ || c.ceil != 60)
+            bad |= 2;                                     /* HQ only when asked, and the sink can take it */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC_XQ, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC_XQ ||
+            c.cfg[0] != 0x14 || c.ceil != HB_XQ_CEIL) bad |= 2;
         if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC || c.ceil != 53 ||
             c.cfg[3] != 53 || c.cfg[2] != 2 || c.cfg[1] != 0x15) bad |= 4;   /* plain SBC: 53 */
         if (!avdtp_sbc_pick(nodual, HB_CODEC_AUTO, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC || c.avail != 0x02)
@@ -75,10 +79,12 @@ int main(int argc, char **argv)
         if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why, HB_CODEC_SBC, 28) ||
             c.codec != HB_CODEC_SBC || c.start_bp != 28) bad |= 2048;    /* held SBC at 28, not XQ */
         if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why, HB_CODEC_SBC_XQ, 24) ||
-            c.codec != HB_CODEC_SBC_XQ || c.start_bp != 24) bad |= 4096;
+            c.codec != HB_CODEC_SBC || c.start_bp != 35) bad |= 4096; /* remembered XQ is not the auto start */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC_XQ, 0, &c, &why, HB_CODEC_SBC_XQ, 24) ||
+            c.codec != HB_CODEC_SBC_XQ || c.start_bp != 24) bad |= 4096; /* manual XQ can reuse its own bitpool */
         if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC, 0, &c, &why, HB_CODEC_SBC_XQ, 24) ||
             c.codec != HB_CODEC_SBC) bad |= 8192;                        /* a manual pick wins */
-        printf("%s   codec pick: auto -> SBC-XQ on the Xbox caps, HQ/SBC fallbacks, HQ/XQ only with 16 blocks/8 subbands, refuse mono%s\n",
+        printf("%s   codec pick: auto is plain SBC, HQ/XQ only when asked and the sink allows them, refuse mono%s\n",
                bad ? "FAIL" : "ok", bad ? " (see bits)" : "");
         if (bad) { printf("FAIL bits %#x\n", bad); return 1; }
     }

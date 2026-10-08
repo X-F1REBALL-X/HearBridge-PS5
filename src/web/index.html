@@ -170,11 +170,11 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 /* codec picker: segmented row */
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);grid-gap:var(--s1);margin:0 0 var(--s2)}
 .seg button{min-height:2.5rem;padding:.2rem .4rem;font-size:.88rem}
-.seg button[disabled],.seg button.no{display:none}
+.seg button[disabled],.seg button.no{color:var(--mute);opacity:.45;cursor:default;pointer-events:none}
 .cno{margin:0 0 var(--s2);color:var(--ink2)}.cno:empty{display:none}
 .evlog{margin:0;font-size:.78rem;line-height:1.4;color:var(--mute)}
 .evlog div{padding:.12rem 0;border-top:1px solid var(--edge)}
-.seg button[disabled]:before{border-style:dashed}
+.seg button[disabled]:before,.seg button.no:before{background:transparent;border-color:var(--edge);border-style:dashed}
 /* latency meter */
 .latm{margin:0 0 var(--s2);padding:var(--s2) var(--s3);background:var(--card);border:1px solid var(--edge)}
 .latm .big{font-size:1.9rem;white-space:nowrap;flex:0 0 auto}.latm .row .cl{min-width:0}
@@ -325,7 +325,7 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 <div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
 <p class="k note cno" id="codecno"></p>
 <p class="k note cno" id="xqnote"></p>
-<p class="k note" id="codecnote" data-i18n="codecHint">Auto picks the best the headset takes: SBC-XQ, then SBC HQ, then SBC. Switching keeps the headset connected.</p>
+<p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p>
 <p class="sub" data-i18n="latency">Latency</p>
 <div class="latm"><div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big" id="latv">-</span></div>
 <div class="lbar" id="lbar"><i id="lb0" style="background:var(--b0)"></i><i id="lb1" style="background:var(--b2)"></i><i id="lb2" style="background:var(--b3)"></i><i id="lb3" style="background:var(--b4)"></i></div>

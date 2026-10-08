@@ -55,8 +55,10 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150',
 check(html.indexOf('id="evbox"') < html.indexOf('id="devlist"') && html.indexOf('id="evbox"') > html.indexOf('data-i18n="found"'),
   'page: recent log sits in Found nearby');
 check(html.indexOf('id="evbox"') < html.indexOf('data-i18n="status"'), 'page: recent log is not in the status panel');
-check(el('cd0').className === 'act' && el('cd2').disabled && el('cd2').className === 'no' && !el('cd3').disabled,
-  'page: codec picker shows auto, hides what the headset cannot take');
+check(el('cd0').className === 'act' && el('cd2').disabled && el('cd2').className === 'no' && !el('cd3').disabled && el('cd3').className !== 'no',
+  'page: auto is on, a supported codec stays clickable, an unsupported one is grey');
+check(/\.seg button\[disabled\],\.seg button\.no\{color:var\(--mute\)/.test(html) && !/\.seg button\[disabled\],\.seg button\.no\{display:none\}/.test(html),
+  'page: unsupported codecs stay visible and grey, not hidden');
 check(/Not supported by this headset: SBC HQ/.test(el('codecno').innerHTML), 'page: says which codecs this headset does not support');
 calls.length = 0; el('cd2').onclick.call(el('cd2'));
 check(calls.length === 0, 'page: an unsupported codec cannot be picked');
