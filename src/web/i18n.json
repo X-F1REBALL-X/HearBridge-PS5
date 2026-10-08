@@ -116,7 +116,8 @@
    "lowLatency": "Low latency",
    "stableMode": "Stable",
    "latHint": "Low latency: about 0.2 s of buffering. Stable: about 1 s, fewer dropouts when the radio is busy. Press to switch.",
-   "reload": "HearBridge was restarted. Reload this page."
+   "reload": "HearBridge was restarted. Reload this page.",
+   "unsupportedFmt": "device needs 48 kHz stereo, not supported"
   },
   "ar": {
    "language": "اللغة",
@@ -177,7 +178,8 @@
    "lowLatency": "زمن استجابة منخفض",
    "stableMode": "مستقر",
    "latHint": "زمن استجابة منخفض: نحو 0.2 ثانية من التخزين المؤقت. مستقر: نحو ثانية واحدة، انقطاعات أقل عندما يكون الراديو مشغولاً. اضغط للتبديل.",
-   "reload": "تمت إعادة تشغيل HearBridge. أعد تحميل هذه الصفحة."
+   "reload": "تمت إعادة تشغيل HearBridge. أعد تحميل هذه الصفحة.",
+   "unsupportedFmt": "الجهاز لا يدعم 48 كيلوهرتز ستيريو، غير مدعوم"
   },
   "es": {
    "language": "Idioma",
@@ -238,7 +240,8 @@
    "lowLatency": "Baja latencia",
    "stableMode": "Estable",
    "latHint": "Baja latencia: unos 0,2 s de búfer. Estable: alrededor de 1 s, menos cortes cuando la radio está ocupada. Pulsa para cambiar.",
-   "reload": "HearBridge se ha reiniciado. Recarga esta página."
+   "reload": "HearBridge se ha reiniciado. Recarga esta página.",
+   "unsupportedFmt": "el dispositivo no admite 48 kHz estéreo, no compatible"
   },
   "fr": {
    "language": "Langue",
@@ -299,7 +302,8 @@
    "lowLatency": "Faible latence",
    "stableMode": "Stable",
    "latHint": "Faible latence : environ 0,2 s de mémoire tampon. Stable : environ 1 s, moins de coupures quand la radio est chargée. Appuyez pour changer.",
-   "reload": "HearBridge a redémarré. Rechargez cette page."
+   "reload": "HearBridge a redémarré. Rechargez cette page.",
+   "unsupportedFmt": "l'appareil n'accepte pas le 48 kHz stéréo, non pris en charge"
   },
   "de": {
    "language": "Sprache",
@@ -360,7 +364,8 @@
    "lowLatency": "Geringe Latenz",
    "stableMode": "Stabil",
    "latHint": "Geringe Latenz: etwa 0,2 s Puffer. Stabil: etwa 1 s, weniger Aussetzer bei ausgelastetem Funk. Zum Umschalten drücken.",
-   "reload": "HearBridge wurde neu gestartet. Seite neu laden."
+   "reload": "HearBridge wurde neu gestartet. Seite neu laden.",
+   "unsupportedFmt": "Gerät unterstützt kein 48 kHz Stereo, nicht unterstützt"
   },
   "pt": {
    "language": "Idioma",
@@ -421,7 +426,8 @@
    "lowLatency": "Baixa latência",
    "stableMode": "Estável",
    "latHint": "Baixa latência: cerca de 0,2 s de buffer. Estável: cerca de 1 s, menos cortes quando o rádio está ocupado. Toque para alternar.",
-   "reload": "O HearBridge foi reiniciado. Recarregue esta página."
+   "reload": "O HearBridge foi reiniciado. Recarregue esta página.",
+   "unsupportedFmt": "o dispositivo não aceita 48 kHz estéreo, não suportado"
   },
   "ru": {
    "language": "Язык",
@@ -482,7 +488,8 @@
    "lowLatency": "Низкая задержка",
    "stableMode": "Стабильно",
    "latHint": "Низкая задержка: около 0,2 с буфера. Стабильно: около 1 с, меньше пропаданий звука при загруженном радиоканале. Нажмите, чтобы переключить.",
-   "reload": "HearBridge перезапущен. Перезагрузите эту страницу."
+   "reload": "HearBridge перезапущен. Перезагрузите эту страницу.",
+   "unsupportedFmt": "устройство не поддерживает 48 кГц стерео"
   },
   "ja": {
    "language": "言語",
@@ -543,7 +550,8 @@
    "lowLatency": "低遅延",
    "stableMode": "安定",
    "latHint": "低遅延: 約0.2秒のバッファ。安定: 約1秒、無線が混雑していても途切れにくい。押して切り替え。",
-   "reload": "HearBridge が再起動されました。このページを再読み込みしてください。"
+   "reload": "HearBridge が再起動されました。このページを再読み込みしてください。",
+   "unsupportedFmt": "48 kHz ステレオ非対応のデバイスです"
   },
   "zh": {
    "language": "语言",
@@ -604,7 +612,8 @@
    "lowLatency": "低延迟",
    "stableMode": "稳定",
    "latHint": "低延迟：约 0.2 秒缓冲。稳定：约 1 秒，无线繁忙时更少断音。按下切换。",
-   "reload": "HearBridge 已重新启动。请重新加载此页面。"
+   "reload": "HearBridge 已重新启动。请重新加载此页面。",
+   "unsupportedFmt": "设备不支持 48 kHz 立体声"
   },
   "it": {
    "language": "Lingua",
@@ -665,7 +674,8 @@
    "lowLatency": "Bassa latenza",
    "stableMode": "Stabile",
    "latHint": "Bassa latenza: circa 0,2 s di buffer. Stabile: circa 1 s, meno interruzioni quando la radio è occupata. Premi per cambiare.",
-   "reload": "HearBridge è stato riavviato. Ricarica questa pagina."
+   "reload": "HearBridge è stato riavviato. Ricarica questa pagina.",
+   "unsupportedFmt": "il dispositivo non accetta 48 kHz stereo, non supportato"
   },
   "he": {
    "language": "שפה",
@@ -726,7 +736,8 @@
    "lowLatency": "השהיה נמוכה",
    "stableMode": "יציב",
    "latHint": "השהיה נמוכה: כ-0.2 שניות של חציצה. יציב: כשנייה אחת, פחות קטיעות כשהרדיו עמוס. לחצו כדי להחליף.",
-   "reload": "HearBridge הופעל מחדש. טענו מחדש את הדף."
+   "reload": "HearBridge הופעל מחדש. טענו מחדש את הדף.",
+   "unsupportedFmt": "המכשיר לא תומך ב-48 kHz סטריאו, לא נתמך"
   }
  }
 }

@@ -1228,6 +1228,16 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
 
     {
         int av_ok = avdtp_setup(&av, link, av_psm);
+        if (!av_ok && av.unsupported_format) {
+            /* Retrying cannot help: the sink cannot take 48 kHz stereo. */
+            g_kept_link = 0;
+            log_line("stream: %s takes no 48 kHz stereo SBC; HearBridge has no resampler or "
+                     "downmix, so it does not stream to it", ini->name[0] ? ini->name : "the headset");
+            write_status("error unsupported-format %s", ini->name[0] ? ini->name : "-");
+            notify("HearBridge: %s is not supported (needs 48 kHz stereo)",
+                   ini->name[0] ? ini->name : "this device");
+            goto done;
+        }
         if (!av_ok && g_kept_link && !hb_stop_requested()) {
             /* Kept pairing link: AVDTP failed there — close, page, retry once. */
             log_line("stream: AVDTP on the pairing link failed — closing it and paging");
@@ -1257,6 +1267,13 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     memset(&scfg, 0, sizeof scfg);
     scfg.sample_rate = av.sink.sample_rate ? av.sink.sample_rate : 48000;
     scfg.channels = av.sink.channels ? av.sink.channels : 2;
+    if (scfg.sample_rate != 48000 || scfg.channels != 2) {
+        /* avdtp only configures 48 kHz stereo; never stream anything else. */
+        log_line("stream: sink format %d Hz / %d ch is not 48 kHz stereo — not streaming",
+                 scfg.sample_rate, scfg.channels);
+        write_status("error unsupported-format %s", ini->name[0] ? ini->name : "-");
+        goto done;
+    }
     scfg.bitpool = av.bitpool;
     scfg.blocks = 16;
     scfg.subbands = 8;
@@ -1269,9 +1286,6 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         log_line("stream: SBC encoder open failed");
         goto done;
     }
-    if (scfg.sample_rate != 48000)
-        log_line("stream: WARN sink %d Hz, capture is 48 kHz (no resample yet)",
-                 scfg.sample_rate);
 
     cap = avcap2_session_open();
     if (!cap) {
