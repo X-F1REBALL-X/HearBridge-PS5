@@ -50,28 +50,34 @@ int main(int argc, char **argv)
         avdtp_codec_pick c;
         const char *why;
         int bad = 0;
-        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why) || c.codec != HB_CODEC_SBC_XQ ||
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC_XQ ||
             c.cfg[0] != 0x14 || c.ceil != HB_XQ_CEIL || c.cfg[3] != HB_XQ_CEIL || c.start_bp != 35 ||
             c.avail != 0x0E) bad |= 1;                    /* auto -> XQ, all three available */
-        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 1, &c, &why) || c.codec != HB_CODEC_SBC_HQ || c.ceil != 60 ||
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 1, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC_HQ || c.ceil != 60 ||
             c.cfg[0] != 0x11) bad |= 2;                   /* XQ failed before -> HQ */
-        if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC, 0, &c, &why) || c.codec != HB_CODEC_SBC || c.ceil != 53 ||
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC || c.ceil != 53 ||
             c.cfg[3] != 53 || c.cfg[2] != 2 || c.cfg[1] != 0x15) bad |= 4;   /* plain SBC: 53 */
-        if (!avdtp_sbc_pick(nodual, HB_CODEC_AUTO, 0, &c, &why) || c.codec != HB_CODEC_SBC || c.avail != 0x02)
+        if (!avdtp_sbc_pick(nodual, HB_CODEC_AUTO, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC || c.avail != 0x02)
             bad |= 8;                                     /* no dual, max 53 -> SBC */
-        if (!avdtp_sbc_pick(nodual, HB_CODEC_SBC_XQ, 0, &c, &why) || c.codec != HB_CODEC_SBC) bad |= 16;
-        if (!avdtp_sbc_pick(lowbp, HB_CODEC_AUTO, 0, &c, &why) || c.codec != HB_CODEC_SBC || c.ceil != 32 ||
+        if (!avdtp_sbc_pick(nodual, HB_CODEC_SBC_XQ, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC) bad |= 16;
+        if (!avdtp_sbc_pick(lowbp, HB_CODEC_AUTO, 0, &c, &why, 0, 0) || c.codec != HB_CODEC_SBC || c.ceil != 32 ||
             c.start_bp != 32) bad |= 32;                  /* bitpool max 32: too low for XQ */
-        if (avdtp_sbc_pick((const uint8_t[4]){ 0x18, 0xff, 2, 53 }, HB_CODEC_AUTO, 0, &c, &why)) bad |= 64;
+        if (avdtp_sbc_pick((const uint8_t[4]){ 0x18, 0xff, 2, 53 }, HB_CODEC_AUTO, 0, &c, &why, 0, 0)) bad |= 64;
         /* HQ / XQ need 16 blocks + 8 subbands advertised */
-        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xef, 2, 60 }, HB_CODEC_SBC_XQ, 0, &c, &why) ||
+        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xef, 2, 60 }, HB_CODEC_SBC_XQ, 0, &c, &why, 0, 0) ||
             c.avail != 0x02 || c.codec != HB_CODEC_SBC) bad |= 128;          /* no 16 blocks */
-        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xfb, 2, 60 }, HB_CODEC_SBC_HQ, 0, &c, &why) ||
+        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xfb, 2, 60 }, HB_CODEC_SBC_HQ, 0, &c, &why, 0, 0) ||
             c.avail != 0x02 || c.codec != HB_CODEC_SBC) bad |= 256;          /* 4 subbands only */
-        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x15, 0x15, 2, 60 }, HB_CODEC_AUTO, 0, &c, &why) ||
+        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x15, 0x15, 2, 60 }, HB_CODEC_AUTO, 0, &c, &why, 0, 0) ||
             c.avail != 0x0E) bad |= 512;          /* 48k joint+dual, 16/8 loudness: all three */
-        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xff, 2, 34 }, HB_CODEC_SBC_XQ, 0, &c, &why) ||
+        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xff, 2, 34 }, HB_CODEC_SBC_XQ, 0, &c, &why, 0, 0) ||
             (c.avail & 0x08) || c.codec != HB_CODEC_SBC) bad |= 1024;     /* max 34 < 35: no XQ */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why, HB_CODEC_SBC, 28) ||
+            c.codec != HB_CODEC_SBC || c.start_bp != 28) bad |= 2048;    /* held SBC at 28, not XQ */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why, HB_CODEC_SBC_XQ, 24) ||
+            c.codec != HB_CODEC_SBC_XQ || c.start_bp != 24) bad |= 4096;
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC, 0, &c, &why, HB_CODEC_SBC_XQ, 24) ||
+            c.codec != HB_CODEC_SBC) bad |= 8192;                        /* a manual pick wins */
         printf("%s   codec pick: auto -> SBC-XQ on the Xbox caps, HQ/SBC fallbacks, HQ/XQ only with 16 blocks/8 subbands, refuse mono%s\n",
                bad ? "FAIL" : "ok", bad ? " (see bits)" : "");
         if (bad) { printf("FAIL bits %#x\n", bad); return 1; }

@@ -79,5 +79,8 @@ check(/absolute volume/.test(el('av').innerHTML) && !/not connected/.test(el('av
 check(el('hv').textContent === '97%', 'page: headset volume 123/127 is 97%');
 check(/low bitpool/.test(el('xqnote').innerHTML), 'page: says plain SBC will sound better when XQ stays low');
 check(/link dropped/.test(el('evlog').innerHTML) && el('evbox').style.display === '', 'page: recent switches and disconnects');
+STATUS.state = 'disconnected'; STATUS.connected = 0; STATUS.why = 'dropped';
+global.hbTest.req('/api/status');
+check(/headset dropped the link/.test(el('state').textContent), 'page: shows why the headset disconnected');
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);

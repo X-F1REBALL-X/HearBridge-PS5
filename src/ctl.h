@@ -36,6 +36,7 @@ typedef struct {
     char device[64];
     char url[64];
     char detail[96];       /* full status line (e.g. "waiting-selection 3") */
+    char why[16];          /* short disconnect reason key, "" if none */
     char devices_path[96]; /* devices.json written by the scan */
     int lat_total, lat_capture, lat_packet, lat_queue, lat_radio, lat_sink; /* estimate, ms */
     int lat_sink_reported; /* lat_sink from an AVDTP delay report */

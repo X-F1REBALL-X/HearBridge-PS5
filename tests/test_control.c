@@ -58,6 +58,7 @@ int main(int argc, char **argv)
     n = get(&c, "/api/status");
     CHECK(n > 0 && strstr(out, "application/json") && strstr(out, "\"gain_pct\":500"),
           "status JSON, default gain 500%");
+    CHECK(strstr(out, "\"why\":\"\""), "status: no disconnect reason until there is one");
     CHECK(strstr(out, "WF-\\\"1000\\\"XM6") != NULL, "device name JSON-escaped");
     if (argc > 1) {
         FILE *f = fopen(argv[1], "w");

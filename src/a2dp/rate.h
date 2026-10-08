@@ -46,6 +46,9 @@ void hb_rate_set_ceiling(hb_rate *r, int cfg_hi, int ceil);
  *    8 or more below the top, then +1. A bitpool that congested the link
  *    is not tried again for 30 s. */
 int hb_rate_update(hb_rate *r, long now_ms, int queue, int qmax, long drops);
+/* 1 when nothing has been dropped or late for the calm window: safe to
+ * remember this bitpool, and the only time the controller steps up. */
+int hb_rate_settled(const hb_rate *r, long now_ms);
 /* The link stays slow although the queue looks calm (credits returned
  * without headroom): restart the calm period. */
 void hb_rate_not_calm(hb_rate *r, long now_ms);

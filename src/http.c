@@ -93,12 +93,13 @@ static int is_write_path(const char *path)
 
 static int status_json(hb_ctl *c, char *o, int max)
 {
-    char dev[140], st[70], url[140], det[200], ev[700];
+    char dev[140], st[70], url[140], det[200], why[40], ev[700];
     int ei, en;
     json_esc(dev, sizeof dev, c->device);
     json_esc(st, sizeof st, c->state);
     json_esc(url, sizeof url, c->url);
     json_esc(det, sizeof det, c->detail);
+    json_esc(why, sizeof why, c->why);
     ev[0] = '[';
     en = 1;
     for (ei = 0; ei < c->event_n && ei < HB_EVENT_N; ei++) {
@@ -110,7 +111,7 @@ static int status_json(hb_ctl *c, char *o, int max)
     if (en > 0 && en < (int)sizeof ev) ev[en++] = ']';
     ev[en < (int)sizeof ev ? en : (int)sizeof ev - 1] = 0;
     return snprintf(o, (size_t)max,
-        "{\"version\":\"%s\",\"connected\":%d,\"detail\":\"%s\",\"state\":\"%s\",\"device\":\"%s\",\"url\":\"%s\","
+        "{\"version\":\"%s\",\"connected\":%d,\"detail\":\"%s\",\"why\":\"%s\",\"state\":\"%s\",\"device\":\"%s\",\"url\":\"%s\","
         "\"gain_pct\":%d,\"muted\":%d,\"tone\":%d,\"paused\":%d,"
         "\"headset_volume\":%d,\"avrcp\":{\"connected\":%d,\"absolute_volume\":%d,"
         "\"notifications\":%d,\"sink_volume\":%d},\"pkts\":%ld,\"frames\":%ld,\"empty_reads\":%ld,"
@@ -118,7 +119,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,\"events\":%s}",
-        c->version, !strcmp(c->state, "streaming"), det, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
+        c->version, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
         c->out_peak_milli / 1000.0, c->sample_rate, c->bitpool, c->backlog,

@@ -104,8 +104,10 @@ int main(int argc, char **argv)
     CHECK(hb_rate_update(&r, 1800, HB_RATE_SLACK + 2, 20, 2) == 28, "a few late packets for 100 ms: no change");
     CHECK(hb_rate_update(&r, 2400, HB_RATE_SLACK + 2, 20, 2) == 27, "late packets staying 600 ms: -1");
     CHECK(hb_rate_update(&r, 5000, 0, 20, 2) == 27, "no step up before the calm period");
+    CHECK(!hb_rate_settled(&r, 5000), "still dropping or not calm yet: do not treat the bitpool as held");
     CHECK(hb_rate_update(&r, 6500, HB_RATE_SLACK, 20, 2) == 28,
           "step up after 4 s calm (paced packets count as calm); +1 near the ceiling");
+    CHECK(hb_rate_settled(&r, 6500), "clean for the calm window: this bitpool can be remembered");
     CHECK(hb_rate_update(&r, 7000, 0, 20, 2) == 28, "steps up are spaced");
     hb_rate_update(&r, 8500, 0, 20, 2); hb_rate_update(&r, 10500, 0, 20, 2);
     hb_rate_update(&r, 12500, 0, 20, 2);

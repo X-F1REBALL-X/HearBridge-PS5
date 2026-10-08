@@ -334,7 +334,7 @@ static int pick_sbc_config(avdtp_session *s, int want)
     memcpy(caps, s->sink.sbc_caps, 4);
     caps[2] = (uint8_t)s->sink.bitpool_min;
     caps[3] = (uint8_t)s->sink.bitpool_max;
-    if (!avdtp_sbc_pick(caps, want, s->no_xq, &s->codec, &why)) {
+    if (!avdtp_sbc_pick(caps, want, s->no_xq, &s->codec, &why, s->held_codec, s->held_bp)) {
         log_line("sbc: NOT SUPPORTED: %s (capabilities %02x)", why ? why : "?", caps[0]);
         return 0;
     }
