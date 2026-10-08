@@ -18,6 +18,8 @@ typedef struct {
     int req_hs_volume;     /* 0..127 to send as SetAbsoluteVolume, -1 none */
     int req_connect, req_disconnect, req_stop;
     int paused;            /* user pressed Disconnect: stay idle */
+    int stable;            /* 0 = low latency (~200 ms queue), 1 = stable (~1 s) */
+    int stable_dirty;      /* persist `stable` to the latency file */
     /* status (stream loop → web) */
     char version[16];
     char state[32];        /* idle / connecting / streaming / reconnecting / paused */

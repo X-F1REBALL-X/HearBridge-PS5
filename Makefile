@@ -106,7 +106,7 @@ test-track:
 
 test-pace:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_pace.c src/a2dp/acl_pool.c -o $(BUILD)/host/test_pace
+	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_pace.c src/a2dp/acl_pool.c src/a2dp/rate.c -o $(BUILD)/host/test_pace
 	$(BUILD)/host/test_pace
 
 # Diagnostics report (/api/diag, diag.txt), USB descriptor summary.

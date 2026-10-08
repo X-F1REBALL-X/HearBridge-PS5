@@ -255,6 +255,8 @@ html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 <div class="btns"><button id="mute" data-i18n="mute">Mute</button><button id="tone" data-i18n="tone">Test tone</button></div>
 </section>
 <section class="panel conn"><p class="label" data-i18n="connection">Connection</p>
+<div class="btns"><button id="lat" data-i18n="lowLatency">Low latency</button></div>
+<p class="k note" id="latnote" data-i18n="latHint">Low latency: about 0.2 s of buffering. Stable: about 1 s, fewer dropouts on a busy radio.</p>
 <div class="cbox"><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
 <p class="k note" data-i18n="footer">Closing this page leaves HearBridge running.</p></div>
 </section>
@@ -352,13 +354,15 @@ if(!busyH&&S.headset_volume>=0)$('hs').value=S.headset_volume;
 $('hv').textContent=S.headset_volume<0?'-':pct(S.headset_volume*100/127);
 
 $('mute').className=S.muted?'ember':'';$('mute').textContent=t(S.muted?'unmute':'mute');
-$('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone')}
+$('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone');
+$('lat').className=S.stable?'':'act';$('lat').textContent=t(S.stable?'stableMode':'lowLatency')}
 $('gain').oninput=function(){busyG=1;$('gv').textContent=pct(this.value)};
 $('gain').onchange=function(){req('/api/volume?pct='+this.value,function(){busyG=0})};
 $('hs').oninput=function(){busyH=1;$('hv').textContent=pct(this.value*100/127)};
 $('hs').onchange=function(){req('/api/headset?vol='+this.value,function(){busyH=0})};
 $('mute').onclick=function(){req('/api/mute?on='+(S&&S.muted?0:1))};
 $('tone').onclick=function(){req('/api/tone?on='+(S&&S.tone?0:1))};
+$('lat').onclick=function(){req('/api/latency?stable='+(S&&S.stable?0:1))};
 $('scan').onclick=function(){req('/api/scan');$('scanning').style.display=''};
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))req('/api/stop')};
 buildLangs();

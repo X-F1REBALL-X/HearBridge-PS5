@@ -77,6 +77,15 @@ int main(int argc, char **argv)
     CHECK(c.req_connect && !c.paused, "connect");
     get(&c, "/api/stop");
     CHECK(c.req_stop, "stop");
+    n = get(&c, "/api/status");
+    CHECK(strstr(out, "\"stable\":0") && strstr(out, "\"queue_ms\":200"), "latency: low latency by default (200 ms)");
+    get(&c, "/api/latency?stable=1");
+    CHECK(c.stable == 1 && c.stable_dirty && strstr(out, "\"queue_ms\":1000"), "latency: stable mode set + saved");
+    c.stable_dirty = 0;
+    get(&c, "/api/latency?stable=0");
+    CHECK(c.stable == 0 && c.stable_dirty, "latency: back to low latency");
+    get(&c, "/api/latency");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "latency without stable= -> 400");
     diag_init(NULL);
     get(&c, "/api/diag");
     CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/plain") &&
