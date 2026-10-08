@@ -162,7 +162,8 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
              * for its own request during this Connect only. */
             log_line("select: page timeout — listening briefly for the device to connect in");
             ok = accept_one(link, ini, 2000);
-        } else if (btlink_last_connect_fail() == 0x0B || btlink_last_connect_fail() == 0) {
+        } else if (!connect_abort(ini->addr) &&
+                   (btlink_last_connect_fail() == 0x0B || btlink_last_connect_fail() == 0)) {
             unsigned h = acl_track_handle(ini->addr);
             if (h) {
                 /* 0x0b: a link exists after all — close that handle, page once more. */
@@ -171,11 +172,12 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
                 ok = btlink_connect(link, ini->addr, 0x01, 0, ini->link_key, ini->key_type,
                                     ini->name, (int)sizeof ini->name, timeout_ms);
             } else {
-                /* Handle unknown: the headset is calling us. Accept it. */
-                log_line("select: 0x0b with no known handle — the link was opened outside this app "
-                         "(no Connection Complete reached us; HCI has no safe handle->address lookup, "
-                         "so no other handle is touched). Waiting for the headset to connect in");
-                ok = accept_one(link, ini, 2000);
+                /* No handle of ours. The page was cancelled in btlink.
+                 * Do not guess a handle (that drops a pad) and do not sit. */
+                long age = acl_track_request_age(ini->addr, now_ms());
+                log_line("select: 0x0b, no headset ACL of ours — page cancelled");
+                if (age >= 0 && age < 2500)
+                    ok = accept_one(link, ini, 1500);
             }
         }
         if (!ok) {
@@ -225,9 +227,10 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 #define PAIRED_INI    STATE_DIR "/paired.ini"
 #define SAVED_JSON    STATE_DIR "/saved.json"
 #define SELECT_WAIT_S 86400 /* manual mode: wait for a choice indefinitely */
-/* Scans run only when the user presses Scan: inquiries back to back for
- * SCAN_WINDOW_S, then the list stays until the next press. */
-#define SCAN_WINDOW_S 6
+/* A scan (button or page refresh) runs inquiries back to back for
+ * SCAN_WINDOW_S. Each result is written to devices.json as it arrives.
+ * The list stays until the next scan. */
+#define SCAN_WINDOW_S 10
 
 static void write_status(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void write_status(const char *fmt, ...)
@@ -487,7 +490,11 @@ static int connect_abort(const unsigned char addr[6])
     FILE *f;
     char line[64];
     unsigned char a[6];
-    int stop = 1;
+    int stop = 1, reset = 0;
+    CTL_LOCK(&g_ctl);
+    reset = g_ctl.req_reset;
+    CTL_UNLOCK(&g_ctl);
+    if (reset) return 1;                 /* drop our page, not anyone else's */
     if (!cmd_waiting()) return 0;
     if (!g_user_connect) return 1;
     f = fopen(SELECT_TXT, "r");
@@ -496,8 +503,10 @@ static int connect_abort(const unsigned char addr[6])
         line[strcspn(line, "\r\n")] = 0;
         if (!strncmp(line, "forget ", 7))
             stop = headset_parse_addr(line + 7, a) && !memcmp(a, addr, 6);
+        else if (!strcmp(line, "scan") || !strcmp(line, "reconnect"))
+            stop = 1;
         else if (headset_parse_addr(line, a))
-            stop = memcmp(a, addr, 6) != 0;      /* same device again: keep going */
+            stop = 1;                    /* a new press starts again, same headset too */
     }
     fclose(f);
     return stop;
@@ -1287,7 +1296,7 @@ static int packer_feed(packer *p, const int16_t *pcm, int frames)
     return 1;
 }
 
-enum { RUN_DROPPED = 0, RUN_STOP = 1, RUN_FAIL = 2, RUN_PAUSED = 3, RUN_SWITCH = 4 };
+enum { RUN_DROPPED = 0, RUN_STOP = 1, RUN_FAIL = 2, RUN_PAUSED = 3, RUN_SWITCH = 4, RUN_AWAY = 5 };
 
 /* One connection: select/connect → AVDTP → SBC → capture → stream until
  * the stop file or a link drop. */
@@ -1566,9 +1575,18 @@ stream_setup:
 
         if (hb_stop_requested()) { rc = RUN_STOP; break; }
         if (btlink_pump(link, 1) < 0 || !btlink_is_up(link)) {
-            note_event("stream: link dropped");
-            set_why("dropped");
-            rc = RUN_DROPPED;
+            /* 0x13 remote user / 0x08 supervision: buds went in the case
+             * (or just died). That is a disconnect, not a reason to page. */
+            int dr = btlink_last_disc_reason();
+            if (dr == 0x13 || dr == 0x08) {
+                note_event("stream: headset went away");
+                set_why("away");
+                rc = RUN_AWAY;
+            } else {
+                note_event("stream: link dropped");
+                set_why("dropped");
+                rc = RUN_DROPPED;
+            }
             break;
         }
         if (av.remote_closed) {
@@ -1595,6 +1613,15 @@ stream_setup:
             int v = btlink_avrcp_volume(link, &changed);
             avst = btlink_avrcp_state(link);
             CTL_LOCK(&g_ctl);
+            if (g_ctl.req_reset) {
+                g_ctl.req_reset = 0;
+                CTL_UNLOCK(&g_ctl);
+                note_event("link: reset");
+                btlink_disconnect(link);   /* our handle only */
+                set_why("off");
+                rc = RUN_AWAY;
+                break;
+            }
             req_vol = g_ctl.req_hs_volume;
             g_ctl.req_hs_volume = -1;
             req_disc = g_ctl.req_disconnect;
@@ -1797,7 +1824,10 @@ stream_setup:
                 hb_cmd c;
                 if (poll_cmd(&c, ini)) {
                     int same = c.kind == CMD_ADDR && !memcmp(c.addr, ini->addr, 6);
-                    if (!same && c.kind != CMD_NONE) {
+                    if (c.kind == CMD_SCAN) {
+                        /* A refresh asks for a scan. Don't drop a live headset for it. */
+                        log_line("scan: headset is up — not dropping it");
+                    } else if (!same && c.kind != CMD_NONE) {
                         log_line("stream: switching on request from the page — closing the current headset first");
                         if (c.kind == CMD_ADDR) want_device(c.addr);
                         g_pending = c;
@@ -1810,8 +1840,8 @@ stream_setup:
     }
     log_line("stream: ended — pkts=%ld sbc=%ld reads ok=%ld empty=%ld",
              pk.pkts, pk.frames, reads_ok, reads_empty);
-    if (rc == RUN_DROPPED) {
-        write_status("disconnected waiting for %s", ini->name[0] ? ini->name : "-");
+    if (rc == RUN_DROPPED || rc == RUN_AWAY) {
+        write_status("disconnected");
         ctl_set_state("disconnected", ini->name);
     }
 
@@ -1890,7 +1920,11 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
         int listen, left, sit;
         if (hb_stop_requested()) return 0;
         {
-            int go = 0;
+            int go = 0, reset = 0;
+            CTL_LOCK(&g_ctl);
+            reset = g_ctl.req_reset;
+            CTL_UNLOCK(&g_ctl);
+            if (reset) return 0;          /* idle path clears our page / ACL */
             CTL_LOCK(&g_ctl);
             go = g_ctl.req_connect;
             g_ctl.req_connect = 0;
@@ -2085,6 +2119,8 @@ int main(void)
             g_want_until = 0;
             notify("HearBridge: connection lost");
         }
+        /* Case / power-off (RUN_AWAY): stay disconnected and listen.
+         * Don't page a headset that just went away. */
         if (r == RUN_DROPPED && !paused && ini.ok && !held(ini.addr)) {
             int j = gentle_rejoin(hci, &ini);
             if (j == 1) continue;
@@ -2095,7 +2131,7 @@ int main(void)
             }
         }
         publish_saved(NULL);
-        if (r == RUN_PAUSED || paused || r == RUN_DROPPED || !g_ctl.detail[0] ||
+        if (r == RUN_PAUSED || paused || r == RUN_DROPPED || r == RUN_AWAY || !g_ctl.detail[0] ||
             strncmp(g_ctl.detail, "error", 5)) {
             write_status("disconnected");
             ctl_set_state("disconnected", NULL);
@@ -2127,8 +2163,40 @@ int main(void)
                     g_user_connect = 1;
                     break;
                 }
+                {
+                    int reset = 0;
+                    CTL_LOCK(&g_ctl);
+                    reset = g_ctl.req_reset;
+                    if (reset) g_ctl.req_reset = 0;
+                    CTL_UNLOCK(&g_ctl);
+                    if (reset && ini.ok) {
+                        unsigned h = acl_track_handle(ini.addr);
+                        btlink *rl = btlink_create(hci, 1021, 7);
+                        if (hci.ops && hci.ops->cmd)
+                            hci.ops->cmd(hci.ctx, 0x0402, NULL, 0); /* our inquiry */
+                        if (rl) {
+                            if (hci.ops && hci.ops->cmd)
+                                hci.ops->cmd(hci.ctx, 0x0408, ini.addr, 6); /* our page */
+                            if (h) btlink_drop_handle(rl, h, 800); /* this headset only */
+                            btlink_destroy(rl);
+                        }
+                        note_event("link: reset");
+                        log_line("link: reset our page and our headset ACL only");
+                    }
+                }
                 persist_gain_if_dirty();
-                idle_pump(hci, 100);
+                if (!paused && ini.ok && !held(ini.addr)) {
+                    btlink *back = NULL;
+                    unsigned bpsm = 0;
+                    if (listen_saved(hci, &ini, &back, &bpsm, 400)) {
+                        note_event("rejoin: headset connected in");
+                        g_ready = back;
+                        g_ready_psm = bpsm;
+                        break;
+                    }
+                } else {
+                    idle_pump(hci, 100);
+                }
             }
         }
         if (hb_stop_requested()) { rc = 0; break; }

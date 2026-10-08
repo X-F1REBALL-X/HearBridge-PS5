@@ -43,8 +43,8 @@ text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;transform:skewX(
 .msg:empty{display:none}
 /* dashboard: phone = one column (devices, volume, status, connection) */
 .grid{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:var(--gap);
-grid-template-areas:"dev" "vol" "eq" "st" "conn"}
-.hero{grid-area:dev}.vol{grid-area:vol}.status{grid-area:st}.conn{grid-area:conn}.eqp{grid-area:eq}
+grid-template-areas:"dev" "log" "vol" "eq" "st" "conn"}
+.hero{grid-area:dev}.logp{grid-area:log}.vol{grid-area:vol}.status{grid-area:st}.conn{grid-area:conn}.eqp{grid-area:eq}
 .panel{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;padding:var(--s3) var(--s5) var(--s4);
 background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0) 6rem),var(--deck);
 border:1px solid var(--edge);border-inline-start:4px solid var(--ember);
@@ -227,7 +227,7 @@ background:linear-gradient(90deg,rgba(255,255,255,.07) 0 85%,rgba(255,61,90,.3) 
 background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25% - 1px) 25%,transparent 25% calc(50% - 1px),var(--deck) calc(50% - 1px) 50%,transparent 50% calc(75% - 1px),var(--deck) calc(75% - 1px) 75%,transparent 75%)}
 /* mid widths: two columns, page may scroll */
 @media(min-width:760px){
-.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "dev vol" "dev eq" "dev conn";grid-template-rows:auto auto auto 1fr}
+.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "log log" "dev vol" "dev eq" "dev conn";grid-template-rows:auto auto auto auto 1fr}
 .conn{align-self:start}
 }
 /* TV: one screen, no page scroll. Everything is rem, rem follows the viewport. */
@@ -235,7 +235,7 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 .wrap{height:100vh}
 .grid{flex:1;min-height:0;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr);
-grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) auto}
+grid-template-areas:"dev st log" "dev vol conn";grid-template-rows:minmax(0,1fr) auto}
 .eqp{min-height:0}
 .conn{align-self:stretch}
 #savedlist{flex:0 1 auto;max-height:34%}
@@ -282,8 +282,10 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 <button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
 <p class="k hint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p>
 <p class="sub" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div>
-<p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="evbox" style="display:none"><p class="sub" data-i18n="recent">Recent</p><div class="evlog" id="evlog"></div></div><div id="devlist" class="list"></div>
+<p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div>
 </section>
+<section class="panel logp"><p class="label" data-i18n="log">Log</p>
+<div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section>
 <section class="panel status"><p class="label" data-i18n="status">Status</p>
 <div id="stats" style="display:none">
 <div class="kv">
@@ -332,7 +334,7 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 <div class="lkeys" id="lkeys"></div>
 <div class="lt"><span class="cl" data-i18n="latTarget">Buffer target</span><input type="range" id="lat" min="60" max="200" step="1"><span class="v" id="latt">-</span></div></div>
 <p class="k note" id="latnote" data-i18n="latHint">Lower: less delay. Higher: fewer dropouts when the radio is busy. Saved for this headset.</p>
-<div class="cbox"><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
+<div class="cbox"><button id="reset" data-i18n="reset">Reset link</button><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
 <p class="k note" data-i18n="footer">Closing this page leaves HearBridge running.</p></div>
 </section>
 </main>
@@ -358,7 +360,7 @@ x.onerror=x.ontimeout=function(){$('msg').textContent=t('unreachable');$('live')
 x.send()}
 function req(p,cb){xhr('GET',p,cb)}
 function act(p,cb){xhr('POST',p,cb)}
-var devT=0;
+var devT=0,scanLive=0;
 function esc(x){return String(x).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 var ICON={
 head:'<path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="3" y="14" width="5" height="7" rx="2" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="2" fill="currentColor"/>',
@@ -420,7 +422,9 @@ $('live').className='live '+(st=='streaming'||st=='connected'?'ok':(st=='paused'
 var on=!!S.connected,link=on||((st=='connecting'||st=='pairing')&&S.device);
 $('dev').textContent=link?(S.device||'-'):t('notConnected');$('stats').style.display=on?'':'none';
 if(!on){S.pkts=S.frames=S.backlog=S.sample_rate=0;S.peak=S.out_peak=0;S.avrcp={}}
-$('scanning').style.display=st=='scanning'?'':'none';
+if(st=='scanning')scanLive=Date.now()+12000;
+if(scanLive&&(st=='waiting-selection'||st=='streaming'||st=='connected'||st=='connecting'||st=='error'||st=='paused'))scanLive=0;
+$('scanning').style.display=(st=='scanning'||(scanLive&&Date.now()<scanLive))?'':'none';
 if(Date.now()-devT>3000){devT=Date.now();devices();saved()}
 drawSaved();
 $('pk').textContent=S.pkts+' / '+S.frames+(S.backlog?' ('+t('queue')+' '+S.backlog+')':'');
@@ -430,8 +434,9 @@ var av=S.avrcp||{},avUp=av.connected||av.absolute_volume||av.notifications||av.s
 setHtml('av',!avUp?chips([[t('avrcpNone'),'off']]):chips([[av.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(av.notifications?[[t('notif')]]:[]).concat([[t(av.sink_volume?'volOnHeadset':'volSoftware'),av.sink_volume?'hi':'']])));
 setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
 var ev=S.events||[],eh='';
-for(var ei=0;ei<ev.length;ei++)eh+='<div>'+esc(ev[ei])+'</div>';
-setHtml('evlog',eh);$('evbox').style.display=ev.length?'':'none';
+if(!ev.length)eh='<div class="k">'+esc(t('logEmpty'))+'</div>';
+else for(var ei=0;ei<ev.length;ei++)eh+='<div>'+esc(ev[ei])+'</div>';
+setHtml('evlog',eh);
 $('pkv').textContent=S.peak.toFixed(3);$('m1').style.width=Math.min(100,S.peak*100)+'%';
 $('opv').textContent=S.out_peak.toFixed(3);$('m2').style.width=Math.min(100,S.out_peak*100)+'%';
 if(!busyG)$('gain').value=S.gain_pct;$('gv').textContent=pct(S.gain_pct);
@@ -496,11 +501,14 @@ function sendLat(v){clearTimeout(latT);latT=setTimeout(function(){act('/api/late
 $('lat').oninput=function(){busyL=1;$('latt').textContent=this.value+' ms';sendLat(this.value)};
 $('lat').onchange=function(){busyL=1;clearTimeout(latT);act('/api/latency?ms='+this.value,function(){busyL=0})};
 for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!this.disabled)act('/api/codec?mode='+m)}})(cj);
-$('scan').onclick=function(){act('/api/scan');$('scanning').style.display=''};
+function armScan(){scanLive=Date.now()+12000;$('scanning').style.display='';devices()}
+$('scan').onclick=function(){act('/api/scan');armScan()};
+$('reset').onclick=function(){act('/api/reset')};
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();
 (function(){var c=null,m=/[?&]lang=([a-z]{2})/.exec(location.search);if(m)c=m[1];else try{c=localStorage.getItem('hb_lang')}catch(e){}
 if(!c){var n=(navigator.language||'en').slice(0,2).toLowerCase();c=info(n).code==n?n:'en'}setLang(c)})();
-req('/api/status');setInterval(function(){req('/api/status')},1000);
+req('/api/status');act('/api/scan');armScan();setInterval(function(){req('/api/status')},1000);
+setInterval(function(){if(scanLive&&Date.now()<scanLive)devices()},300);
 hbTest={req:req};
 </script></body></html>

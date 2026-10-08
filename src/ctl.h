@@ -20,7 +20,7 @@ typedef struct {
     int muted;
     int tone;              /* web tone toggle (or the tone file) */
     int req_hs_volume;     /* 0..127 to send as SetAbsoluteVolume, -1 none */
-    int req_connect, req_disconnect, req_stop;
+    int req_connect, req_disconnect, req_stop, req_reset;
     int paused;            /* user pressed Disconnect: stay idle */
     int latency_ms;        /* media queue target, 60..1000 ms (per headset) */
     int codec_pref;        /* HB_CODEC_* picked on the page (per headset) */

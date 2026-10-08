@@ -33,8 +33,11 @@ new Function(...Object.keys(ctx), js)(...Object.values(ctx));
 let fails = 0;
 const check = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 check(calls.length && calls[0].m === 'GET' && calls[0].p === '/api/status' && !calls[0].h['X-HB-Token'], 'page: status poll is a plain GET');
+check(calls.some(function(c,i){return i>0 && c.m==='POST' && c.p==='/api/scan' && c.h['X-HB-Token']}), 'page: refresh starts a scan');
+check(/setInterval\(function\(\)\{if\(scanLive/.test(html), 'page: devices are polled during the scan, not after it');
+check(/Nothing yet/.test(el('evlog').innerHTML), 'page: empty log says nothing yet');
 const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], 
-  ['scan', '/api/scan'], ['stop', '/api/stop'], ['clean', '/api/clean']];
+  ['scan', '/api/scan'], ['reset', '/api/reset'], ['stop', '/api/stop'], ['clean', '/api/clean']];
 for (const [id, path] of actions) {
   calls.length = 0; el(id).onclick();
   const c = calls[0];
@@ -52,9 +55,9 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=120' 
 check(/id="lat" min="60" max="200" step="1"/.test(html), 'page: slider ends at 200 ms in 1 ms steps');
 calls.length = 0; el('lat').value = 150; el('lat').oninput.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150', 'page: moving the slider posts the buffer target');
-check(html.indexOf('id="evbox"') < html.indexOf('id="devlist"') && html.indexOf('id="evbox"') > html.indexOf('data-i18n="found"'),
-  'page: recent log sits in Found nearby');
-check(html.indexOf('id="evbox"') < html.indexOf('data-i18n="status"'), 'page: recent log is not in the status panel');
+check(html.indexOf('class="panel logp"') > html.indexOf('id="devlist"') && html.indexOf('id="evbox"') < 0 &&
+  html.indexOf('data-i18n="log"') > 0 && html.indexOf('data-i18n="logEmpty"') > 0,
+  'page: log is its own panel, not inside devices');
 check(el('cd0').className === 'act' && el('cd2').disabled && el('cd2').className === 'no' && !el('cd3').disabled && el('cd3').className !== 'no',
   'page: auto is on, a supported codec stays clickable, an unsupported one is grey');
 check(/\.seg button\[disabled\],\.seg button\.no\{color:var\(--mute\)/.test(html) && !/\.seg button\[disabled\],\.seg button\.no\{display:none\}/.test(html),
@@ -86,7 +89,7 @@ check(/absolute volume/.test(el('av').innerHTML) && !/not connected/.test(el('av
   'page: AVRCP says connected when the headset is reporting volume');
 check(el('hv').textContent === '97%', 'page: headset volume 123/127 is 97%');
 check(/low bitpool/.test(el('xqnote').innerHTML), 'page: says plain SBC will sound better when XQ stays low');
-check(/link dropped/.test(el('evlog').innerHTML) && el('evbox').style.display === '', 'page: recent switches and disconnects');
+check(/link dropped/.test(el('evlog').innerHTML), 'page: recent switches and disconnects');
 STATUS.state = 'disconnected'; STATUS.connected = 0; STATUS.why = 'dropped';
 global.hbTest.req('/api/status');
 check(/headset dropped the link/.test(el('state').textContent), 'page: shows why the headset disconnected');
