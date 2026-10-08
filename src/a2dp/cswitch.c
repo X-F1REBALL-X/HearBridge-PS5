@@ -6,7 +6,7 @@
 
 long hb_cs_delay(int attempt)
 {
-    static const long d[HB_CS_TRIES] = { 1000, 3000, 8000, 15000 };
+    static const long d[HB_CS_TRIES] = { 1200, 1600, 2000, 2500 };
     if (attempt < 0) attempt = 0;
     return d[attempt < HB_CS_TRIES ? attempt : HB_CS_TRIES - 1];
 }

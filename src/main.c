@@ -117,6 +117,11 @@ static int accept_one(btlink *link, const headset_ini *ini, int ms)
                          (const unsigned char (*)[16])k, kt, 1, ms, &which) && which == 0;
 }
 
+/* How long a page may take. A headset that is there answers in a
+ * second or two; this only bounds a miss. Long enough that a slow page
+ * still finishes, short enough that we do not sit for half a minute. */
+#define HB_PAGE_MS 5000
+
 static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
                              unsigned *psm, int timeout_ms)
 {
@@ -145,8 +150,8 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
         if (h) {
             log_line("select: an ACL to this device already exists (handle %#05x) — closing it", h);
             (void)btlink_drop_handle(link, h, 2500);
-        } else if (age >= 0 && age < 8000) {
-            if (accept_one(link, ini, 6000)) return probe_link(link, ini, linkp, psm);
+        } else if (age >= 0 && age < 2500) {
+            if (accept_one(link, ini, 2000)) return probe_link(link, ini, linkp, psm);
         }
     }
     if (!btlink_connect(link, ini->addr, 0x01, 0, ini->link_key, ini->key_type,
@@ -155,8 +160,8 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
         if (btlink_last_connect_fail() == 0x04 && !connect_abort(ini->addr)) {
             /* Page timeout: the device may connect in on power-up. Listen
              * for its own request during this Connect only. */
-            log_line("select: page timeout — waiting 8 s for the device to connect in");
-            ok = accept_one(link, ini, 8000);
+            log_line("select: page timeout — listening briefly for the device to connect in");
+            ok = accept_one(link, ini, 2000);
         } else if (btlink_last_connect_fail() == 0x0B || btlink_last_connect_fail() == 0) {
             unsigned h = acl_track_handle(ini->addr);
             if (h) {
@@ -170,7 +175,7 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
                 log_line("select: 0x0b with no known handle — the link was opened outside this app "
                          "(no Connection Complete reached us; HCI has no safe handle->address lookup, "
                          "so no other handle is touched). Waiting for the headset to connect in");
-                ok = accept_one(link, ini, 8000);
+                ok = accept_one(link, ini, 2000);
             }
         }
         if (!ok) {
@@ -200,7 +205,7 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
         *linkp = link;
         return 1;
     }
-    sdp = sdp_probe_a2dp_sink(link, 12000, psm);
+    sdp = sdp_probe_a2dp_sink(link, 6000, psm);
     if (sdp == 0) {
         log_choice("no A2DP Sink in SDP — rejecting", ini);
         btlink_disconnect(link);
@@ -222,7 +227,7 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 #define SELECT_WAIT_S 86400 /* manual mode: wait for a choice indefinitely */
 /* Scans run only when the user presses Scan: inquiries back to back for
  * SCAN_WINDOW_S, then the list stays until the next press. */
-#define SCAN_WINDOW_S 20
+#define SCAN_WINDOW_S 6
 
 static void write_status(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void write_status(const char *fmt, ...)
@@ -649,10 +654,10 @@ static int try_device(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
         if (k && !btlink_is_up(k) && !connect_abort(ini->addr)) {
             /* The headset itself dropped the new link: it usually comes
              * back on its own. Listen for it (stored key) before paging. */
-            log_line("select: headset closed the pairing link — waiting 12 s for it to connect in");
+            log_line("select: headset closed the pairing link — listening briefly, then paging");
             btlink_destroy(k);
             k = btlink_create(hci, 1021, 7);          /* fresh state for the new link */
-            if (k && accept_one(k, ini, 12000)) {
+            if (k && accept_one(k, ini, 2000)) {
                 int pr2 = probe_link(k, ini, linkp, psm);
                 if (pr2 == 1) {
                     log_choice("chosen", ini);
@@ -785,7 +790,7 @@ static int try_pick(a2dp_session *asess, hci_t hci, const hb_cmd *c,
         int s = paired_find(g_paired, g_npaired, c->addr);
         if (s >= 0) {                              /* already paired: use the key */
             use_saved(s, ini);
-            if (try_saved(hci, ini, linkp, psm, 30000)) return 1;   /* one attempt */
+            if (try_saved(hci, ini, linkp, psm, HB_PAGE_MS)) return 1;   /* one attempt */
             write_status("error %s %s", conn_fail_label(0), ini->name[0] ? ini->name : "-");
             log_line("select: saved device did not connect — is it on?");
             return 0;
@@ -867,7 +872,7 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
                 if (cand.ok) {
                     g_user_connect = 1;
                     hold_clear(cand.addr);
-                    if (try_saved(hci, &cand, linkp, psm, 30000)) {
+                    if (try_saved(hci, &cand, linkp, psm, HB_PAGE_MS)) {
                         *ini = cand;
                         keep_identity(ini);
             if (!headset_ini_save(ini)) log_line("saved: cannot write headset.ini");
@@ -892,7 +897,7 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
                 continue;
             }
             g_user_connect = 1;
-            if (c.kind == CMD_RECONNECT) ok = try_all_saved(hci, ini, linkp, psm, 20000, 12000);
+            if (c.kind == CMD_RECONNECT) ok = try_all_saved(hci, ini, linkp, psm, HB_PAGE_MS, HB_PAGE_MS);
             else ok = try_pick(asess, hci, &c, found, order, ncand, ini, linkp, psm);
             if (ok) return 1;
             if (c.kind != CMD_ADDR) write_status("waiting-selection %d", ncand);
@@ -1340,7 +1345,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
                     }
                 }
                 if (r != 1)
-                    r = try_saved(hci, ini, &link, &av_psm, cs ? 8000 : 30000);
+                    r = try_saved(hci, ini, &link, &av_psm, HB_PAGE_MS);
                 while (cs && r != 1 && !hb_stop_requested() && !cmd_waiting() &&
                        hb_cs_next(&g_cs, 0, 0) == HB_CS_RECONNECT) {
                     int left = g_cs.delay_ms > 0 ? (int)g_cs.delay_ms : 8000;
@@ -1353,7 +1358,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
                     }
                     if (r == 1) break;
                     hold_clear(ini->addr);
-                    r = try_saved(hci, ini, &link, &av_psm, 8000);
+                    r = try_saved(hci, ini, &link, &av_psm, HB_PAGE_MS);
                 }
                 if (cs) note_event("switch: reconnect %s", r == 1 ? "worked" : "gave up — press Connect");
                 if (r != 1)
@@ -1362,7 +1367,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
                 headset_ini first = g_paired[0];        /* most recent saved device */
                 first.ok = first.have_addr = 1;
                 hold_clear(first.addr);
-                r = try_saved(hci, &first, &link, &av_psm, 30000);
+                r = try_saved(hci, &first, &link, &av_psm, HB_PAGE_MS);
                 if (r == 1) {
                     *ini = first;
                     keep_identity(ini);
@@ -1422,7 +1427,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             }
             g_user_connect = 1;
             g_av_fail_ms = now_ms();
-            av_ok = connect_and_probe(hci, ini, &link, &av_psm, 30000) == 1 &&
+            av_ok = connect_and_probe(hci, ini, &link, &av_psm, HB_PAGE_MS) == 1 &&
                     avdtp_setup(&av, link, av_psm, want_codec, g_prefs.auto_no_xq);
             g_user_connect = 0;
         }
@@ -1919,7 +1924,7 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
         pages++;
         log_line("rejoin: gentle page %d of %d", pages, HB_RE_PAGES);
         g_user_connect = 0;
-        if (try_saved(hci, ini, &g_ready, &g_ready_psm, 8000)) {
+        if (try_saved(hci, ini, &g_ready, &g_ready_psm, HB_PAGE_MS)) {
             note_event("rejoin: gentle page worked");
             return 1;
         }
@@ -2049,7 +2054,7 @@ int main(void)
     }
 
     memset(&opts, 0, sizeof opts);
-    opts.inquiry_seconds = 10;
+    opts.inquiry_seconds = 3;
     if (ini.have_addr) memcpy(opts.prefer_addr, ini.addr, 6);
     asess = a2dp_open(hci, &opts);
     if (!asess) {

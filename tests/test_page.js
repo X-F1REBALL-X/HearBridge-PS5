@@ -27,7 +27,7 @@ const STATUS = { version: '1.0.2', state: 'streaming', connected: 1, device: 'X'
 const ctx = {
   document: { getElementById: el, querySelectorAll: () => [], documentElement: {} },
   XMLHttpRequest: XHR, localStorage: { getItem: () => 'en', setItem() {} }, navigator: { language: 'en' },
-  location: { search: '' }, confirm: () => true, setInterval() {}, Date, JSON, Math, String, parseInt,
+  location: { search: '' }, confirm: () => true, setInterval() {}, setTimeout(fn) { fn(); return 1; }, clearTimeout() {}, Date, JSON, Math, String, parseInt,
 };
 new Function(...Object.keys(ctx), js)(...Object.values(ctx));
 let fails = 0;
@@ -49,6 +49,12 @@ check(el('latv').textContent === '≈ 187 ms' && el('latt').textContent === '200
 check(/Headset <em>130 ms/.test(el('lkeys').innerHTML) && /Queue <em>20 ms/.test(el('lkeys').innerHTML), 'page: latency breakdown, headset value from its report');
 calls.length = 0; el('lat').value = 120; el('lat').onchange.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=120' && calls[0].h['X-HB-Token'], 'page: latency slider -> POST with token');
+check(/id="lat" min="60" max="200" step="1"/.test(html), 'page: slider ends at 200 ms in 1 ms steps');
+calls.length = 0; el('lat').value = 150; el('lat').oninput.call(el('lat'));
+check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150', 'page: moving the slider posts the buffer target');
+check(html.indexOf('id="evbox"') < html.indexOf('id="devlist"') && html.indexOf('id="evbox"') > html.indexOf('data-i18n="found"'),
+  'page: recent log sits in Found nearby');
+check(html.indexOf('id="evbox"') < html.indexOf('data-i18n="status"'), 'page: recent log is not in the status panel');
 check(el('cd0').className === 'act' && el('cd2').disabled && el('cd2').className === 'no' && !el('cd3').disabled,
   'page: codec picker shows auto, hides what the headset cannot take');
 check(/Not supported by this headset: SBC HQ/.test(el('codecno').innerHTML), 'page: says which codecs this headset does not support');

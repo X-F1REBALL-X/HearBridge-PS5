@@ -295,8 +295,8 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->req_hs_volume = v;
         c->hs_volume = v;
     } else if (!strcmp(path, "/api/latency")) {
-        /* ms=60..1000: media queue target, saved per headset.
-         * stable=0|1 (older pages): 200 ms / 1 s. */
+        /* ms=60..200: media queue target, saved per headset.
+         * stable=0|1 (older pages): both land on 200 ms now. */
         if (query_int(q, "ms", &v)) { }
         else if (query_int(q, "stable", &v)) v = v ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
         else goto bad;

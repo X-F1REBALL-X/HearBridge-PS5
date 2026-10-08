@@ -96,11 +96,11 @@ int main(int argc, char **argv)
     post(&c, "/api/latency?ms=5");
     CHECK(c.latency_ms == 60, "latency: clamped to 60 ms");
     post(&c, "/api/latency?ms=99999");
-    CHECK(c.latency_ms == 1000, "latency: clamped to 1000 ms");
+    CHECK(c.latency_ms == 200, "latency: clamped to 200 ms");
     post(&c, "/api/latency?stable=0");
     CHECK(c.latency_ms == 200, "latency: old stable=0 -> 200 ms");
     post(&c, "/api/latency?stable=1");
-    CHECK(c.latency_ms == 1000 && strstr(out, "\"stable\":1"), "latency: old stable=1 -> 1 s");
+    CHECK(c.latency_ms == 200 && strstr(out, "\"stable\":0"), "latency: old stable=1 clamps to 200 ms");
     c.lat_total = 187; c.lat_sink = 130; c.lat_sink_reported = 1;
     get(&c, "/api/status");
     CHECK(strstr(out, "\"estimate_ms\":187") && strstr(out, "\"sink_ms\":130,\"sink_reported\":1"), "latency: estimate in status");

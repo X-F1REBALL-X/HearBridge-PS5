@@ -41,8 +41,10 @@ int main(void)
     CHECK(hb_cs_next(&c, 1, 1) == HB_CS_GIVEUP, "given up stays given up (no surprise reconnects)");
 
     for (i = 1, n = 1; i < HB_CS_TRIES; i++) if (hb_cs_delay(i) <= hb_cs_delay(i - 1)) n = 0;
-    CHECK(n && hb_cs_delay(0) >= 1000 && hb_cs_delay(99) == hb_cs_delay(HB_CS_TRIES - 1),
-          "pauses grow between attempts and stay bounded");
+    CHECK(n && hb_cs_delay(0) >= 1000 && hb_cs_delay(0) <= 1500 &&
+          hb_cs_delay(HB_CS_TRIES - 1) <= 3000 &&
+          hb_cs_delay(99) == hb_cs_delay(HB_CS_TRIES - 1),
+          "pauses stay about a second or two, none of them runs long");
 
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;

@@ -3,7 +3,7 @@
  *   1. in place: CLOSE + SET_CONFIGURATION + OPEN + START on the same link
  *   2. if that fails but the link is still up: in place again with plain SBC
  *   3. if the link is gone (or SBC failed too): page the headset again,
- *      HB_CS_TRIES attempts with growing pauses, then give up (idle).
+ *      HB_CS_TRIES attempts, a second or two apart, then give up (idle).
  * The auto SBC-XQ -> SBC fallback goes through the same steps. */
 #ifndef HB_CSWITCH_H
 #define HB_CSWITCH_H

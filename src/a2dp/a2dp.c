@@ -598,8 +598,8 @@ int a2dp_inquiry(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound)
 /* ---- sink pick + Classic SSP pair (Core Vol 3 Part C 5.2.2) ------------ */
 
 #define HEADSET_INI "/data/hearbridge/headset.ini"
-#define T_PAIR_CONN_MS   20000
-#define T_PAIR_SETUP_MS  25000
+#define T_PAIR_CONN_MS    8000
+#define T_PAIR_SETUP_MS  10000
 
 /* Only headphones and speakers are listed (hb_dev_rank): headphones / headsets first,
  * then speakers / portable audio, hands-free and headphone-like names. A2DP Sink support is confirmed later via SDP 0x110B. */
