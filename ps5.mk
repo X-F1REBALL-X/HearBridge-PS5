@@ -4,16 +4,21 @@ include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
 
 VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/version.h)
 ELF   := dist/HearBridge-PS5-$(VERSION).elf
-BUILD := build/ps5
+BUILD ?= build/ps5
 
 CFLAGS  := -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/bt -Isrc/a2dp
 
-LDLIBS  += -lSceSystemService -lSceAppInstUtil -lpthread
+# One build for every firmware. libSceSystemService was linked but never
+# used (dropped). libSceAppInstUtil stays linked so the module is loaded;
+# sceAppInstUtilAppInstallTitleDir/AppInstallAll/AppExists are looked up at
+# run time (tile_sys.c), so a firmware without one of them still loads.
+LDLIBS  += -lSceAppInstUtil -lpthread
 
 # 1.0.0: generic A2DP source — saved device or inquiry → SSP pair →
 # SDP A2DP Sink → AVDTP (SNK+SBC) → Avcap2 capture → SBC stream.
 SRCS := \
 	src/util.c src/stop.c src/log.c src/lock.c src/notify.c src/avcap2.c \
+	src/diag.c src/creds.c src/sysinfo.c \
 	src/bt/hci_usb.c src/bt/acl_track.c src/bt/usb_hci_desc.c src/bt/hci_evasm.c src/bt/hci_cmd.c \
 	src/a2dp/a2dp.c src/a2dp/btlink.c src/a2dp/acl_pool.c src/a2dp/sdp_a2dp.c src/a2dp/avdtp.c src/a2dp/avdtp_media.c \
 	src/a2dp/avrcp.c src/a2dp/sdp_server.c src/ctl.c src/gain.c src/http.c \

@@ -20,6 +20,8 @@
 #include "a2dp/sbc.h"
 #include "a2dp/sdp_a2dp.h"
 #include "avcap2.h"
+#include "diag.h"
+#include "sysinfo.h"
 #include "hci_cmd.h"
 #include "hci_usb.h"
 #include "acl_track.h"
@@ -53,6 +55,7 @@
 #define NO_TILE_PATH STATE_DIR "/no_tile"      /* exists → never add the home tile */
 #define RM_TILE_PATH STATE_DIR "/remove_tile"  /* exists → remove the tile once */
 #define TILE_URL_PATH STATE_DIR "/tile_url"    /* optional: deep link for the tile ("start" = fallback page) */
+#define DIAG_PATH STATE_DIR "/diag.txt"        /* diagnostics report, also at /api/diag */
 #define DUMP_PKTS 200
 
 #define PCM_CAP_FRAMES  1024  /* matches Avcap2 READ_BYTES / (2*sizeof float) */
@@ -1472,6 +1475,7 @@ static void home_tile(int second)
 {
     if (!second && access(RM_TILE_PATH, F_OK) == 0) {
         tile_uninstall();
+        (void)diag_save();
         unlink(RM_TILE_PATH);
         { FILE *f = fopen(NO_TILE_PATH, "w"); if (f) fclose(f); }
     } else if (access(NO_TILE_PATH, F_OK) != 0 && access(RM_TILE_PATH, F_OK) != 0) {
@@ -1486,8 +1490,20 @@ static void home_tile(int second)
         }
         if (tile_install(u, &tr) != 0)
             notify("HearBridge: home-screen icon not added (%s, code %#x). Details: %s",
-                   tr.failed ? tr.failed : "?", (unsigned)tr.code, LOG_PATH);
+                   tr.failed ? tr.failed : "?", (unsigned)tr.code, second ? LOG_PATH : DIAG_PATH);
+    } else {
+        diag_set("tile", "disabled (%s exists)", NO_TILE_PATH);
     }
+}
+
+/* When Bluetooth cannot start, keep the web page (and
+ * /api/diag) up until Stop is pressed or the stop file appears, instead of
+ * exiting at once, so the report can be read from a phone or PC. */
+static void bt_failed_wait(const char *status)
+{
+    write_status("%s", status);
+    log_line("hearbridge: %s - page and /api/diag stay up until Stop", status);
+    while (!hb_stop_requested()) usleep(500 * 1000);
 }
 
 int main(void)
@@ -1496,13 +1512,17 @@ int main(void)
     a2dp_session *asess = NULL;
     a2dp_open_opts opts;
     headset_ini ini;
-    int rc = 2, lock_rc, lock_errno = 0;
+    int rc = 2, mk_errno = 0, lock_rc, lock_errno = 0, log_ok;
 
-    mkdir(STATE_DIR, 0755);
+    if (mkdir(STATE_DIR, 0755) != 0 && errno != EEXIST) mk_errno = errno;
     unlink(DEVICES_JSON);      /* a list from an older run or build is stale */
 
-    /* Log first so a lock problem is written down too. */
-    log_open(LOG_PATH);
+    /* Log first so a lock problem is written down too (a second instance
+     * only appends a few lines before it exits). */
+    log_ok = log_open(LOG_PATH);
+    diag_init(NULL);           /* file path set once we own the lock */
+    diag_set("hearbridge", "%s (one build for all firmwares, compiled %s)", HEARBRIDGE_VERSION,
+             __DATE__);
     lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
     if (lock_rc == LOCK_BUSY) {
         /* Running the ELF again still brings back a deleted icon. */
@@ -1513,12 +1533,20 @@ int main(void)
         log_close();
         return 1;
     }
-    if (lock_rc == LOCK_NO_WRITE)      /* not "already running": /data not writable */
+    diag_set_path(DIAG_PATH);
+    if (lock_rc == LOCK_NO_WRITE) {
+        /* Not "already running": the state folder is not writable. Carry on
+         * so the page and /api/diag still work. */
         notify("HearBridge: cannot write %s (errno %d). Continuing; settings and logs may not be saved.",
                STATE_DIR, lock_errno);
+    }
 
     hb_stop_init();
     log_line("HearBridge PS5 %s", HEARBRIDGE_VERSION);
+    diag_set("state dir", "%s: mkdir errno %d; lock %s (errno %d); log %s", STATE_DIR, mk_errno,
+             lock_rc == LOCK_OK ? "ok" : "NOT WRITABLE", lock_errno, log_ok ? "ok" : "NOT WRITABLE");
+    sysinfo_collect();
+    (void)diag_save();
     log_line("attach to running controller (no reset); stop file %s", HB_STOP_PATH);
     ctl_init(&g_ctl, HEARBRIDGE_VERSION);
     snprintf(g_ctl.devices_path, sizeof g_ctl.devices_path, "%s", DEVICES_JSON);
@@ -1539,15 +1567,22 @@ int main(void)
             snprintf(g_ctl.url, sizeof g_ctl.url, "%s", url);
             CTL_UNLOCK(&g_ctl);
             log_line("http: control page at %s", url);
+            diag_set("web page", "%s (diagnostics at %s/api/diag)", url, url);
             notify("HearBridge %s: %s", HEARBRIDGE_VERSION, url);
         } else {
             log_line("http: control page could not start");
+            diag_set("web page", "FAILED to start (ports %d-%d)", HB_HTTP_PORT, HB_HTTP_PORT + 5);
             notify("hearbridge: started\n%s", HEARBRIDGE_VERSION);
         }
     }
 
     /* Home-screen tile that opens the control page in the browser. */
     home_tile(0);
+
+    /* Diagnostics: audio libraries and every USB device (read-only). */
+    (void)avcap2_probe();
+    (void)hci_usb_survey();
+    (void)diag_save();
 
     if (!headset_ini_load(&ini) && !ini.have_addr)
         log_line("select: no headset.ini — will discover a new device");
@@ -1563,7 +1598,9 @@ int main(void)
     memset(&hci, 0, sizeof hci);
     if (!hci_usb_open(&hci)) {
         log_line("hearbridge: HCI open failed");
+        (void)diag_save();
         notify("HearBridge: HCI open failed");
+        bt_failed_wait("error hci-open-failed");
         goto out;
     }
 
@@ -1573,7 +1610,10 @@ int main(void)
     asess = a2dp_open(hci, &opts);
     if (!asess) {
         log_line("hearbridge: controller setup failed");
+        diag_set("bt setup", "FAILED (a2dp_open)");
+        (void)diag_save();
         notify("HearBridge: controller setup failed");
+        bt_failed_wait("error controller-setup-failed");
         goto close_hci;
     }
 

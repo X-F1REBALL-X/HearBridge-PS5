@@ -206,6 +206,30 @@ static const char *yn(int v) { return v ? "yes" : "no"; }
 
 #define ADD(...) do { if ((size_t)n < cap) n += snprintf(out + n, cap - (size_t)n, __VA_ARGS__); } while (0)
 
+int tile_register_fallback(const tile_ops *ops, tile_report *r,
+                           unsigned long long (*raise)(void *ctx),
+                           void (*lower)(void *ctx), void *ctx)
+{
+    tile_report first;
+
+    if (tile_register(ops, r) == 0 || !raise) return r->result;
+    first = *r;
+    /* Start the second attempt with a clean step record; keep what
+     * happened before registering (files, marker, original authid). */
+    memset(r, 0, sizeof *r);
+    r->files_errno = first.files_errno;
+    r->files_failed = first.files_failed;
+    r->legacy_marker = first.legacy_marker;
+    r->authid_before = first.authid_before;
+    r->plain_failed = 1;
+    r->plain_code = first.code;
+    r->plain_at = first.failed;
+    r->authid_used = raise(ctx);
+    (void)tile_register(ops, r);
+    if (lower) lower(ctx);
+    return r->result;
+}
+
 int tile_report_line(const tile_report *r, char *out, size_t cap)
 {
     int n = 0;
@@ -218,6 +242,9 @@ int tile_report_line(const tile_report *r, char *out, size_t cap)
         ADD("files rewritten");
         if (r->legacy_marker) ADD(" (old marker removed)");
         ADD("; appmeta before %s", yn(r->meta_before));
+        if (r->plain_failed)
+            ADD("; own rights failed at %s (%#x), retried with raised rights",
+                r->plain_at ? r->plain_at : "?", (unsigned)r->plain_code);
         if (r->authid_used) ADD("; authid %#llx -> %#llx", r->authid_before, r->authid_used);
         if (r->init_called) ADD("; init %#x (errno %d)", (unsigned)r->init_rc, r->init_errno);
         if (!r->init_rc) {
