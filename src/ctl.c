@@ -89,6 +89,7 @@ void ctl_clear_link(hb_ctl *c, int drop_device)
     c->avrcp = 0;
     c->pkts = c->frames = c->empty_reads = c->dropped = 0;
     c->peak_milli = c->out_peak_milli = 0;
+    c->codec[0] = 0;
     c->sample_rate = c->bitpool = c->backlog = 0;
     c->per_packet = c->bitpool_lo = c->bitpool_hi = 0;
 }

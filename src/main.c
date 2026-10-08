@@ -1123,8 +1123,9 @@ static void tune_link(packer *p, long now)
         jitter_s = 0;
     }
     /* Bitpool: only step up while the link returns credits with headroom. */
-    if (cred_pps < need_pps * 1.15 && btlink_tx_backlog(p->link) > 1)
-        p->rate.t_calm = now;
+    /* (Paced packets waiting for their due time are not a backlog.) */
+    if (cred_pps < need_pps * 1.15 && btlink_tx_backlog(p->link) > HB_RATE_SLACK)
+        hb_rate_not_calm(&p->rate, now);
     l_sent = sent; l_cred = cred; l_drop = drops; l_t = now;
 }
 
@@ -1350,6 +1351,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     tone = g_ctl.tone || tone_file;
     g_ctl.sample_rate = scfg.sample_rate;
     g_ctl.bitpool = av.bitpool;
+    snprintf(g_ctl.codec, sizeof g_ctl.codec, "SBC");
     CTL_UNLOCK(&g_ctl);
     log_line("stream: base gain %d%%%s%s", gain_pct, muted ? ", muted" : "",
              tone ? ", TEST TONE 1 kHz -6 dB" : "");

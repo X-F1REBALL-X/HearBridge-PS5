@@ -353,7 +353,7 @@ static const char HB_WEBPAGE[] =
     "drawSaved();\n"
     "$('pk').textContent=S.pkts+' / '+S.frames+(S.backlog?' ('+t('queue')+' '+S.backlog+')':'');\n"
     "\n"
-    "setHtml('fmt',S.sample_rate?chips([['SBC','hi n'],[S.sample_rate+' Hz','n'],['bitpool '+S.bitpool+(S.bitpool_max>S.bitpool_min?' ('+S.bitpool_min+'–'+S.bitpool_max+')':''),'n'],[S.per_packet+' '+t('perPkt')]]):'-');\n"
+    "setHtml('fmt',S.sample_rate?chips([[S.codec||'SBC','hi n'],[S.sample_rate+' Hz','n'],['bitpool '+S.bitpool+(S.bitpool_max>S.bitpool_min?' ('+S.bitpool_min+'–'+S.bitpool_max+')':''),'n'],[S.per_packet+' '+t('perPkt')]]):'-');\n"
     "setHtml('av',!S.avrcp.connected?chips([[t('avrcpNone'),'off']]):chips([[S.avrcp.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(S.avrcp.notifications?[[t('notif')]]:[])));\n"
     "$('pkv').textContent=S.peak.toFixed(3);$('m1').style.width=Math.min(100,S.peak*100)+'%';\n"
     "$('opv').textContent=S.out_peak.toFixed(3);$('m2').style.width=Math.min(100,S.out_peak*100)+'%';\n"
