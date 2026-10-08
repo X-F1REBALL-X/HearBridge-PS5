@@ -5,6 +5,7 @@
  * Endpoint bmAttributes bits 1..0: 2 = bulk, 3 = interrupt. */
 #include "usb_hci_desc.h"
 
+#include <stdio.h>
 #include <string.h>
 
 enum { DT_INTERFACE = 4, DT_ENDPOINT = 5 };
@@ -66,4 +67,41 @@ int usbhci_scan(const uint8_t *d, int len, struct usbhci_iface *found)
     if (inside && complete(&cur) && count < USBHCI_MAX_IFACES)
         found[count++] = cur;
     return count;
+}
+
+int usbhci_describe(const uint8_t *d, int len, char *out, size_t cap)
+{
+    static const char *const xfer[] = { "ctrl", "iso", "bulk", "int" };
+    size_t n = 0;
+    int pos = 0, ifaces = 0;
+
+#define PUT(...) do {                                              \
+        if (n < cap) {                                                 \
+            int w_ = snprintf(out + n, cap - n, __VA_ARGS__);          \
+            if (w_ > 0) n += (size_t)w_;                               \
+            if (n >= cap) n = cap - 1;                                 \
+        }                                                              \
+    } while (0)
+    if (!cap) return 0;
+    out[0] = 0;
+    while (pos + 2 <= len) {
+        int blen = d[pos];
+        int type = d[pos + 1];
+
+        if (blen < 2 || pos + blen > len)
+            break;
+        if (type == DT_INTERFACE && blen >= 9) {
+            PUT("%sif%u.%u %02x/%02x/%02x%s", ifaces ? "; " : "", d[pos + 2], d[pos + 3],
+                d[pos + 5], d[pos + 6], d[pos + 7],
+                (d[pos + 5] == 0xE0 && d[pos + 6] == 0x01 && d[pos + 7] == 0x01) ? " (BT HCI)" : "");
+            ifaces++;
+        } else if (type == DT_ENDPOINT && blen >= 7) {
+            PUT(" ep%02x %s/%u", d[pos + 2], xfer[d[pos + 3] & 3u],
+                (unsigned)((d[pos + 4] | d[pos + 5] << 8) & 0x7FF));
+        }
+        pos += blen;
+    }
+    if (!ifaces) PUT("no interfaces");
+#undef PUT
+    return (int)n;
 }
