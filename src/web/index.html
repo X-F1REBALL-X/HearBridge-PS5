@@ -43,8 +43,8 @@ text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;transform:skewX(
 .msg:empty{display:none}
 /* dashboard: phone = one column (devices, volume, status, connection) */
 .grid{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:var(--gap);
-grid-template-areas:"dev" "vol" "st" "conn"}
-.hero{grid-area:dev}.vol{grid-area:vol}.status{grid-area:st}.conn{grid-area:conn}
+grid-template-areas:"dev" "vol" "eq" "st" "conn"}
+.hero{grid-area:dev}.vol{grid-area:vol}.status{grid-area:st}.conn{grid-area:conn}.eqp{grid-area:eq}
 .panel{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;padding:var(--s3) var(--s5) var(--s4);
 background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0) 6rem),var(--deck);
 border:1px solid var(--edge);border-inline-start:4px solid var(--ember);
@@ -142,6 +142,30 @@ input[type=range]::-moz-range-track{height:1.6rem;background:var(--void)}
 input[type=range]::-moz-range-progress{height:1.6rem;background:var(--lime)}
 input[type=range]::-moz-range-thumb{width:.6rem;height:1.6rem;border:0;border-radius:0;background:#fff}
 .vol .btns{margin-top:var(--s1)}
+/* equalizer: colour per band, live response curve */
+.eqp{--b0:#ff6a2b;--b1:#ffb23d;--b2:#c8ff3d;--b3:#3dd6ff;--b4:#b06bff;border-inline-start-color:var(--b3)}
+.eqp .label{color:var(--b3)}
+.eqhead{display:flex;align-items:center;justify-content:space-between;margin:0 0 var(--s2)}
+.eqhead button{min-height:2.3rem;min-width:6rem;font-size:.9rem}
+.curve{position:relative;height:5.2rem;margin:0 0 var(--s2);background:
+linear-gradient(0deg,transparent calc(50% - 1px),rgba(255,255,255,.18) calc(50% - 1px) 50%,transparent 50%),
+repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.05) calc(20% - 1px) 20%),var(--void);border:1px solid var(--edge)}
+.curve svg{position:absolute;top:0;left:0;width:100%;height:100%}
+.eqp.off .curve,.eqp.off .bands{opacity:.4;filter:saturate(.3)}
+.bands{display:grid;grid-gap:.35rem}
+.band{display:grid;grid-template-columns:5.6rem minmax(0,1fr) 3.4rem;grid-gap:var(--s2);align-items:center}
+.band .bn{font-size:.82rem;font-weight:800;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.band .bn i{display:inline-block;width:.55rem;height:.55rem;margin-inline-end:.4rem;transform:rotate(45deg);background:var(--c)}
+.band .bv{font-weight:900;text-align:end;color:var(--c);direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.band input[type=range]{margin:0;height:1.3rem;accent-color:var(--c)}
+.band input[type=range]::-webkit-slider-runnable-track{height:1.3rem;background:var(--trk,var(--void))}
+.band input[type=range]::-webkit-slider-thumb{height:1.3rem;width:.55rem;background:var(--c);box-shadow:0 0 .6rem var(--c)}
+.band input[type=range]::-moz-range-track{height:1.3rem;background:var(--trk,var(--void))}
+.band input[type=range]::-moz-range-progress{background:none}
+.band input[type=range]::-moz-range-thumb{height:1.3rem;width:.55rem;background:var(--c)}
+.presets{display:flex;flex-wrap:wrap;margin:var(--s2) calc(var(--s1)*-1) 0}
+.presets button{min-height:2.2rem;padding:.1rem .8rem;font-size:.84rem;margin:var(--s1) 0}
+.presets button.act{color:var(--void)}.presets button.act:before{background:var(--b3);border-color:var(--b3)}
 /* codec picker: segmented row */
 .seg{display:grid;grid-template-columns:repeat(4,1fr);grid-gap:var(--s1);margin:0 0 var(--s2)}
 .seg button{min-height:2.5rem;padding:.2rem .4rem;font-size:.88rem}
@@ -185,14 +209,16 @@ background:linear-gradient(90deg,rgba(255,255,255,.07) 0 85%,rgba(255,61,90,.3) 
 background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25% - 1px) 25%,transparent 25% calc(50% - 1px),var(--deck) calc(50% - 1px) 50%,transparent 50% calc(75% - 1px),var(--deck) calc(75% - 1px) 75%,transparent 75%)}
 /* mid widths: two columns, page may scroll */
 @media(min-width:760px){
-.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "dev vol" "dev conn";grid-template-rows:auto auto 1fr}
+.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "dev vol" "dev eq" "dev conn";grid-template-rows:auto auto auto 1fr}
 .conn{align-self:start}
 }
 /* TV: one screen, no page scroll. Everything is rem, rem follows the viewport. */
 @media(min-width:1180px) and (min-height:600px){
 html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 .wrap{height:100vh}
-.grid{flex:1;min-height:0;grid-template-rows:minmax(0,1fr) auto auto}
+.grid{flex:1;min-height:0;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr);
+grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) auto}
+.eqp{min-height:0}
 .conn{align-self:stretch}
 #savedlist{flex:0 1 auto;max-height:34%}
 #devlist{flex:1 1 0;min-height:4rem}
@@ -258,6 +284,20 @@ html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 <div class="ctl"><div class="row"><span class="cl" data-i18n="headset">Headset volume (AVRCP)</span><span class="big" id="hv">-</span></div>
 <input type="range" id="hs" min="0" max="127" step="1"></div>
 <div class="btns"><button id="mute" data-i18n="mute">Mute</button><button id="tone" data-i18n="tone">Test tone</button></div>
+</section>
+<section class="panel eqp" id="eqp"><p class="label" data-i18n="equalizer">Equalizer</p>
+<div class="eqhead"><span class="k note" data-i18n="eqHint">Saved for this headset.</span><button id="eqon" data-i18n="eqOff">Off</button></div>
+<div class="curve"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eqg" x1="0" x2="1" y1="0" y2="0">
+<stop offset="0" stop-color="#ff6a2b"/><stop offset=".3" stop-color="#ffb23d"/><stop offset=".5" stop-color="#c8ff3d"/><stop offset=".72" stop-color="#3dd6ff"/><stop offset="1" stop-color="#b06bff"/></linearGradient></defs>
+<path id="eqfill" fill="url(#eqg)" fill-opacity=".18" d=""/><path id="eqline" fill="none" stroke="url(#eqg)" stroke-width="2.5" vector-effect="non-scaling-stroke" d=""/></svg></div>
+<div class="bands">
+<div class="band" style="--c:var(--b0)"><span class="bn"><i></i><span data-i18n="eqBass">Bass</span></span><input type="range" id="eq0" min="-12" max="12" step="1"><span class="bv" id="eqv0">0</span></div>
+<div class="band" style="--c:var(--b1)"><span class="bn"><i></i><span data-i18n="eqLowMid">Low mid</span></span><input type="range" id="eq1" min="-12" max="12" step="1"><span class="bv" id="eqv1">0</span></div>
+<div class="band" style="--c:var(--b2)"><span class="bn"><i></i><span data-i18n="eqMid">Mid</span></span><input type="range" id="eq2" min="-12" max="12" step="1"><span class="bv" id="eqv2">0</span></div>
+<div class="band" style="--c:var(--b3)"><span class="bn"><i></i><span data-i18n="eqPresence">Presence</span></span><input type="range" id="eq3" min="-12" max="12" step="1"><span class="bv" id="eqv3">0</span></div>
+<div class="band" style="--c:var(--b4)"><span class="bn"><i></i><span data-i18n="eqTreble">Treble</span></span><input type="range" id="eq4" min="-12" max="12" step="1"><span class="bv" id="eqv4">0</span></div>
+</div>
+<div class="presets"><button id="pr0" data-i18n="prFlat">Flat</button><button id="pr1" data-i18n="prBassBoost">Bass boost</button><button id="pr2" data-i18n="prBassCut">Bass cut</button><button id="pr3" data-i18n="prTreble">Treble boost</button><button id="pr4" data-i18n="prVoice">Voice / footsteps</button></div>
 </section>
 <section class="panel conn"><p class="label" data-i18n="connection">Connection</p>
 <p class="sub" data-i18n="codec">Codec</p>
@@ -368,7 +408,35 @@ $('mute').className=S.muted?'ember':'';$('mute').textContent=t(S.muted?'unmute':
 $('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone');
 for(var ci=0;ci<4;ci++){var cb=$('cd'+ci);cb.className=(S.codec_pref|0)==ci?'act':'';
 cb.disabled=!!(ci&&S.codec_avail&&!(S.codec_avail&(1<<ci)));cb.title=cb.disabled?t('codecNo'):''}
+drawEq();
 $('lat').className=S.stable?'':'act';$('lat').textContent=t(S.stable?'stableMode':'lowLatency')}
+/* equalizer: same RBJ filters as src/a2dp/eq.c, drawn as a curve */
+var EQHZ=[80,250,1000,3500,10000],EQQ=[.707,1,1,1,.707],EQCOL=['#ff6a2b','#ffb23d','#c8ff3d','#3dd6ff','#b06bff'],
+PRESETS=[[0,0,0,0,0],[6,3,0,0,0],[-6,-3,0,0,0],[0,0,0,3,6],[-3,-1,2,5,2]],EQ=null,busyE=0,eqT=0;
+function biq(b,g){var A=Math.pow(10,g/40),w=2*Math.PI*EQHZ[b]/48000,c=Math.cos(w),s=Math.sin(w),q=EQQ[b],r;
+if(b==0||b==4){var sa=2*Math.sqrt(A)*s/(2*q);r=b==0?[A*((A+1)-(A-1)*c+sa),2*A*((A-1)-(A+1)*c),A*((A+1)-(A-1)*c-sa),(A+1)+(A-1)*c+sa,-2*((A-1)+(A+1)*c),(A+1)+(A-1)*c-sa]
+:[A*((A+1)+(A-1)*c+sa),-2*A*((A-1)+(A+1)*c),A*((A+1)+(A-1)*c-sa),(A+1)-(A-1)*c+sa,2*((A-1)-(A+1)*c),(A+1)-(A-1)*c-sa]}
+else{var al=s/(2*q);r=[1+al*A,-2*c,1-al*A,1+al/A,-2*c,1-al/A]}return r}
+function eqResp(db,hz){var w=2*Math.PI*hz/48000,t=0,b;for(b=0;b<5;b++){if(!db[b])continue;var k=biq(b,db[b]),
+nr=k[0]+k[1]*Math.cos(w)+k[2]*Math.cos(2*w),ni=-(k[1]*Math.sin(w)+k[2]*Math.sin(2*w)),dr=k[3]+k[4]*Math.cos(w)+k[5]*Math.cos(2*w),di=-(k[4]*Math.sin(w)+k[5]*Math.sin(2*w));
+t+=10*Math.log((nr*nr+ni*ni)/(dr*dr+di*di))/Math.LN10}return t}
+function eqVals(){var v=[],i;for(i=0;i<5;i++)v.push(parseInt($('eq'+i).value,10)||0);return v}
+function eqPaint(db,on){var d='',i,x,y,n=60;for(i=0;i<=n;i++){x=i*300/n;var hz=20*Math.pow(1000,i/n);
+y=50-eqResp(db,hz)*50/14;if(y<1)y=1;if(y>99)y=99;d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}
+$('eqline').setAttribute('d',d);$('eqfill').setAttribute('d',d+'L300 50L0 50Z');
+for(i=0;i<5;i++){var v=db[i],p=(v+12)/24*100,lo=Math.min(50,p),hi=Math.max(50,p);
+$('eqv'+i).textContent=(v>0?'+':'')+v+' dB';
+$('eq'+i).style.setProperty('--trk','linear-gradient(90deg,#0c0b0f '+lo+'%,'+EQCOL[i]+'aa '+lo+'%,'+EQCOL[i]+'aa '+hi+'%,#0c0b0f '+hi+'%)')}
+for(i=0;i<PRESETS.length;i++)$('pr'+i).className=PRESETS[i].join()==db.join()?'act':'';
+$('eqp').className='panel eqp'+(on?'':' off');$('eqon').className=on?'act':'';$('eqon').textContent=t(on?'eqOn':'eqOff')}
+function drawEq(){if(!S.eq)return;if(!busyE&&Date.now()-eqT>1500){var i;for(i=0;i<5;i++)$('eq'+i).value=S.eq.db[i];EQ=S.eq}
+eqPaint(busyE?eqVals():S.eq.db,S.eq.on)}
+function eqSend(db,on){var q='/api/eq?on='+(on?1:0),i;for(i=0;i<5;i++)q+='&b'+i+'='+db[i];eqT=Date.now();act(q,function(){busyE=0})}
+for(var ei=0;ei<5;ei++){$('eq'+ei).oninput=function(){busyE=1;eqPaint(eqVals(),S&&S.eq&&S.eq.on)};
+$('eq'+ei).onchange=function(){eqSend(eqVals(),1)}}
+for(var pi=0;pi<5;pi++)$('pr'+pi).onclick=(function(p){return function(){var i;for(i=0;i<5;i++)$('eq'+i).value=PRESETS[p][i];
+busyE=1;eqPaint(PRESETS[p],1);eqSend(PRESETS[p],1)}})(pi);
+$('eqon').onclick=function(){var on=!(S&&S.eq&&S.eq.on);eqSend(eqVals(),on)};
 $('gain').oninput=function(){busyG=1;$('gv').textContent=pct(this.value)};
 $('gain').onchange=function(){act('/api/volume?pct='+this.value,function(){busyG=0})};
 $('hs').oninput=function(){busyH=1;$('hv').textContent=pct(this.value*100/127)};

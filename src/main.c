@@ -35,6 +35,7 @@
 #include "ctl.h"
 #include "gain.h"
 #include "hsprefs.h"
+#include "eq.h"
 #include "http.h"
 
 #include <sys/stat.h>
@@ -1008,19 +1009,26 @@ static int g_prefs_have;
 static void prefs_from_ctl(void)
 {
     g_prefs.codec = g_ctl.codec_pref;
+    g_prefs.eq_on = g_ctl.eq_on;
+    memcpy(g_prefs.eq_db, g_ctl.eq_db, sizeof g_prefs.eq_db);
 }
 
 /* Page values <- g_prefs. Caller holds the lock. */
 static void prefs_to_ctl(void)
 {
     g_ctl.codec_pref = g_prefs.codec;
+    g_ctl.eq_on = g_prefs.eq_on;
+    memcpy(g_ctl.eq_db, g_prefs.eq_db, sizeof g_ctl.eq_db);
+    g_ctl.eq_seq++;
 }
 
 static void prefs_save(void)
 {
     if (!g_prefs_have) return;
     if (hb_prefs_save(HB_PREFS_DIR, g_prefs_addr, &g_prefs))
-        log_line("prefs: saved for this headset (codec %s)", hb_codec_key(g_prefs.codec));
+        log_line("prefs: saved for this headset (codec %s, EQ %s %d/%d/%d/%d/%d dB)", hb_codec_key(g_prefs.codec),
+                 g_prefs.eq_on ? "on" : "off", g_prefs.eq_db[0], g_prefs.eq_db[1], g_prefs.eq_db[2],
+                 g_prefs.eq_db[3], g_prefs.eq_db[4]);
     else
         log_line("prefs: cannot write %s", HB_PREFS_DIR);
 }
@@ -1236,6 +1244,8 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     float peak_seen = 0.f;
     int tone = 0, tone_file = 0, gain_milli = 1000, out_peak = 0, gain_pct, muted;
     int hs_vol = -1, avst = 0, want_codec = HB_CODEC_AUTO, xq_bad_s = 0;
+    static hb_eq eq;
+    unsigned eq_seq = 0;
     long xq_drops = 0;
 
     memset(&av, 0, sizeof av);
@@ -1408,7 +1418,10 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         }
     }
 
+    hb_eq_init(&eq);
     CTL_LOCK(&g_ctl);
+    eq_seq = g_ctl.eq_seq;
+    hb_eq_set(&eq, g_ctl.eq_on, g_ctl.eq_db, scfg.sample_rate);
     gain_pct = g_ctl.gain_pct;
     muted = g_ctl.muted;
     tone = g_ctl.tone || tone_file;
@@ -1474,6 +1487,12 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             tone = g_ctl.tone || tone_file;
             pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
             if (g_ctl.codec_pref != want_codec) req_codec = g_ctl.codec_pref;
+            if (g_ctl.eq_seq != eq_seq) {
+                int on = g_ctl.eq_on, db[HB_EQ_NB];
+                memcpy(db, g_ctl.eq_db, sizeof db);
+                eq_seq = g_ctl.eq_seq;
+                hb_eq_set(&eq, on, db, scfg.sample_rate);
+            }
             g_ctl.avrcp = avst;
             CTL_UNLOCK(&g_ctl);
             if (changed) log_line("stream: headset volume %d/127 -> gain", v);
@@ -1525,7 +1544,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             if (muted) memset(pcm, 0, (size_t)nframes * 4);
             out_peak = muted ? 0 : 500;
         } else {
-            int op = gain_apply_soft(pcm, nframes * 2, gain_milli);
+            int op = gain_apply_soft_eq(pcm, nframes * 2, gain_milli, &eq);
             if (op > out_peak) out_peak = op;
         }
         if (!packer_feed(&pk, pcm, nframes)) break;

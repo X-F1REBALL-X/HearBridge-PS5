@@ -8,8 +8,8 @@ let js = html.match(/<script>([\s\S]*)<\/script>/)[1].replace('/*I18N*/', i18n);
 js = js.replace(/HBTOKENx{25}/, 'deadbeefdeadbeefdeadbeefdeadbeef');
 const els = {};
 function el(id) {
-  if (!els[id]) els[id] = { id, style: {}, className: '', textContent: '', innerHTML: '', value: 0,
-    getAttribute: () => null, getElementsByTagName: () => [] };
+  if (!els[id]) els[id] = { id, style: { setProperty(k, v) { this[k] = v; } }, className: '', textContent: '', innerHTML: '', value: 0,
+    attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute: () => null, getElementsByTagName: () => [] };
   return els[id];
 }
 const calls = [];
@@ -22,7 +22,7 @@ class XHR {
 const STATUS = { version: '1.0.2', state: 'streaming', connected: 1, device: 'X', gain_pct: 500, muted: 0, tone: 0,
   paused: 0, headset_volume: 64, avrcp: { connected: 1 }, pkts: 1, frames: 1, peak: 0, out_peak: 0, sample_rate: 48000,
   bitpool: 35, bitpool_min: 2, bitpool_max: 53, per_packet: 8, backlog: 0, stable: 0, queue_ms: 200, detail: '',
-  codec: 'SBC-XQ', codec_pref: 0, codec_avail: 10 };
+  codec: 'SBC-XQ', codec_pref: 0, codec_avail: 10, eq: { on: 1, db: [6, 3, 0, 0, 0] } };
 const ctx = {
   document: { getElementById: el, querySelectorAll: () => [], documentElement: {} },
   XMLHttpRequest: XHR, localStorage: { getItem: () => 'en', setItem() {} }, navigator: { language: 'en' },
@@ -47,6 +47,13 @@ check(el('lat').textContent === 'Low latency', 'page: latency button shows the m
 check(el('cd0').className === 'act' && el('cd2').disabled && !el('cd3').disabled, 'page: codec picker shows auto, greys out what the sink lacks');
 calls.length = 0; el('cd3').onclick.call(el('cd3'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/codec?mode=3' && calls[0].h['X-HB-Token'], 'page: codec -> POST with token');
+check(el('pr1').className === 'act' && el('eqv0').textContent === '+6 dB' && /^M0\.0 /.test(el('eqline').attrs.d || ''),
+  'page: EQ shows the bass boost preset, values and a curve');
+calls.length = 0; el('pr4').onclick();
+check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/eq?on=1&b0=-3&b1=-1&b2=2&b3=5&b4=2' && calls[0].h['X-HB-Token'],
+  'page: voice/footsteps preset -> POST /api/eq with token');
+calls.length = 0; el('eqon').onclick();
+check(calls[0] && /^\/api\/eq\?on=0&/.test(calls[0].p), 'page: EQ toggle -> on=0');
 // 403 (HearBridge restarted with a new token) -> reload hint
 XHR.prototype.send = function () { calls.push({}); this.status = 403; this.responseText = '{"error":"token"}'; this.onload(); };
 el('mute').onclick();

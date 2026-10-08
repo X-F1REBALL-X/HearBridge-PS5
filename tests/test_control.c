@@ -18,7 +18,7 @@ static int fails;
 #define CHECK(c, what) do { if (c) printf("ok   %s\n", what); \
     else { printf("FAIL %s\n", what); fails++; } } while (0)
 
-static char out[65536];
+static char out[196608];
 
 static int get(hb_ctl *c, const char *path)
 {
@@ -100,6 +100,11 @@ int main(int argc, char **argv)
     post(&c, "/api/codec?mode=7");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12) && c.codec_pref == 3, "codec: unknown mode -> 400");
     c.prefs_dirty = 0;
+    post(&c, "/api/eq?on=1&b0=6&b4=-40");
+    CHECK(c.eq_on && c.eq_db[0] == 6 && c.eq_db[4] == -12 && c.prefs_dirty && c.eq_seq &&
+          strstr(out, "\"eq\":{\"on\":1,\"db\":[6,0,0,0,-12]}"), "eq: bands set (clamped), saved per headset");
+    post(&c, "/api/eq");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "eq: no parameter -> 400");
     diag_init(NULL);
     get(&c, "/api/diag");
     CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/plain") &&
