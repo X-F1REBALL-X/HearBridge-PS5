@@ -77,12 +77,12 @@ typedef struct {
  * when the sink cannot take that. Pure (avdtp_media.c, host tested). */
 int avdtp_sbc_pick_mode(unsigned char caps0, int *joint, const char **why);
 
-/* want = HB_CODEC_AUTO (best: XQ > HQ > SBC, XQ skipped when no_xq) or a
- * codec id (falls back to SBC when the sink cannot take it). caps = the
- * sink's SBC capability IE (bitpool min/max in octets 2-3). Returns 0 (and
- * *why) when the sink takes no 48 kHz two-channel SBC. Pure. */
-/* held_codec/held_bp: what actually held last time (0 = none). Auto starts
- * there instead of always trying SBC-XQ at bitpool 35. */
+/* want = HB_CODEC_AUTO (always plain SBC) or a codec id (falls back to
+ * SBC when the sink cannot take it). caps = the sink's SBC capability IE
+ * (bitpool min/max in octets 2-3). Returns 0 (and *why) when the sink takes
+ * no 48 kHz two-channel SBC. Pure. */
+/* held_codec/held_bp: what actually held last time (0 = none). Used only
+ * when it is the same codec we are starting. Auto does not start on XQ. */
 int avdtp_sbc_pick(const uint8_t caps[4], int want, int no_xq, avdtp_codec_pick *out,
                    const char **why, int held_codec, int held_bp);
 
