@@ -122,3 +122,47 @@ void tile_files_drop(const char *root)
     rmdir(sys);
     rmdir(app);
 }
+
+int tile_need_register(int files_changed, int marker_exists, int appmeta_exists)
+{
+    return files_changed || !marker_exists || !appmeta_exists;
+}
+
+static const char *yn(int v) { return v ? "yes" : "no"; }
+
+#define ADD(...) do { if ((size_t)n < cap) n += snprintf(out + n, cap - (size_t)n, __VA_ARGS__); } while (0)
+
+int tile_report_line(const tile_report *r, char *out, size_t cap)
+{
+    int n = 0;
+
+    if (!cap) return 0;
+    out[0] = 0;
+    ADD("files %s (errno %d); marker %s; appmeta before %s",
+        r->files < 0 ? "ERROR" : r->files ? "written" : "unchanged",
+        r->files_errno, yn(r->marker), yn(r->appmeta_before));
+    if (r->files >= 0 && r->skipped) {
+        ADD("; already registered, skipped");
+    } else if (r->files >= 0) {
+        ADD("; authid %#llx -> %#llx", r->authid_before, r->authid_used);
+        ADD("; init %#x (errno %d)", (unsigned)r->init_rc, r->init_errno);
+        if (!r->init_rc) {
+            ADD("; TitleDir %s", r->titledir_found ? "found" : "NOT FOUND");
+            if (r->titledir_called)
+                ADD(" -> %#x (errno %d)", (unsigned)r->titledir_rc, r->titledir_errno);
+            if (r->all_called)
+                ADD("; InstallAll -> %#x (errno %d)", (unsigned)r->all_rc, r->all_errno);
+            else if (!r->all_found)
+                ADD("; InstallAll NOT FOUND");
+            ADD("; appmeta after %s", yn(r->appmeta_after));
+        }
+    }
+    if (r->result)
+        ADD("; RESULT failed at %s (%#x)", r->failed ? r->failed : "?", (unsigned)r->code);
+    else
+        ADD("; RESULT ok");
+    if ((size_t)n >= cap) n = (int)cap - 1;
+    return n;
+}
+
+#undef ADD

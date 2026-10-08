@@ -5,6 +5,8 @@
  * buflen=0x2000, no authid elevate by default, restart on sticky 0x81950001.
  */
 #include "avcap2.h"
+#include "creds.h"
+#include "diag.h"
 #include "log.h"
 #include "util.h"
 
@@ -83,10 +85,12 @@ static int load_sprx(fn_LoadStart LoadStart, const char *basename)
 
     if (kernel_dynlib_handle(-1, basename, &handle) == 0 && handle) {
         log_line("avcap2: %s already loaded (handle %#x)", basename, handle);
+        diag_set(basename, "already loaded (handle %#x)", handle);
         return 0;
     }
     if (!LoadStart) {
         log_line("avcap2: no sceKernelLoadStartModule");
+        diag_set(basename, "FAILED: sceKernelLoadStartModule not resolved");
         return -1;
     }
     for (i = 0; roots[i]; i++) {
@@ -99,27 +103,19 @@ static int load_sprx(fn_LoadStart LoadStart, const char *basename)
         log_line("avcap2: LoadStart %s -> rv=%d res=%d", path, rv, res);
         if (kernel_dynlib_handle(-1, basename, &handle) == 0 && handle) {
             log_line("avcap2: %s handle %#x", basename, handle);
+            diag_set(basename, "loaded from %s (rv %d, res %d, handle %#x)", path, rv, res, handle);
             return 0;
         }
     }
     log_line("avcap2: failed to load %s", basename);
+    diag_set(basename, "FAILED to load (last try %s: rv %d res %d)", path, rv, res);
     return -1;
 }
 
+/* Same switch as before 1.0.1-fw13.60 (no restore): see creds.c. */
 static void elevate(uint64_t authid)
 {
-    uint8_t caps[16];
-    uint64_t before;
-    int i;
-
-    for (i = 0; i < 16; i++) caps[i] = 0xff;
-    before = kernel_get_ucred_authid(-1);
-    kernel_set_ucred_authid(-1, authid);
-    kernel_set_ucred_caps(-1, caps);
-    log_line("avcap2: authid %#llx -> %#llx (wanted %#llx)",
-             (unsigned long long)before,
-             (unsigned long long)kernel_get_ucred_authid(-1),
-             (unsigned long long)authid);
+    (void)creds_elevate(authid, NULL, "avcap2");
 }
 
 static void fill_open_param(unsigned char *p)
@@ -196,8 +192,10 @@ static int open_and_start(fn_Init Init, fn_Term Term, fn_Open Open, fn_Close Clo
         log_line("avcap2: before Initialize (retry)");
         rv = Init();
         log_line("avcap2: Initialize (retry) -> %#x", (unsigned)rv);
-        if (rv != 0)
+        if (rv != 0) {
+            diag_set("audio open", "auth_mode %d: sceAvcap2Initialize failed %#x", auth_mode, (unsigned)rv);
             return rv;
+        }
     }
 
     fill_open_param(open_param);
@@ -208,6 +206,8 @@ static int open_and_start(fn_Init Init, fn_Term Term, fn_Open Open, fn_Close Clo
     rv = Open(&handle, open_param, 0);
     log_line("avcap2: Open -> rv=%#x handle=%#llx",
              (unsigned)rv, (unsigned long long)handle);
+    diag_set("audio open", "auth_mode %d: Initialize ok, OpenAudio rv %#x handle %#llx",
+             auth_mode, (unsigned)rv, (unsigned long long)handle);
     if (rv != 0 || handle == 0) {
         if (Term) {
             log_line("avcap2: before Terminate (Open failed)");
@@ -220,6 +220,7 @@ static int open_and_start(fn_Init Init, fn_Term Term, fn_Open Open, fn_Close Clo
     rv = Start(handle);
     log_line("avcap2: Start -> %#x", (unsigned)rv);
     if (rv != 0) {
+        diag_set("audio open", "auth_mode %d: Start failed %#x", auth_mode, (unsigned)rv);
         Close(handle);
         if (Term) {
             log_line("avcap2: before Terminate (Start failed)");
@@ -514,6 +515,39 @@ struct avcap2_session {
     uint64_t nonfinite;
 };
 
+int avcap2_probe(void)
+{
+    static const char *const nids[] = {
+        NID_Avcap2Initialize, NID_Avcap2OpenAudio, NID_Avcap2Start,
+        NID_Avcap2ReadAudio, NID_Avcap2Stop, NID_Avcap2Close,
+    };
+    uint32_t kh = 0, ah = 0;
+    fn_LoadStart LoadStart;
+    int i, missing = 0;
+
+    if (resolve_libkernel(&kh) != 0) {
+        diag_set("audio libs", "FAILED: libkernel handle not found");
+        return -1;
+    }
+    LoadStart = (fn_LoadStart)kernel_dynlib_resolve(-1, kh, NID_LoadStartModule);
+    if (load_sprx(LoadStart, "libSceIpmi.sprx") != 0 ||
+        load_sprx(LoadStart, "libSceAvcap2.sprx") != 0) {
+        diag_set("audio libs", "FAILED: see the libSce*.sprx lines");
+        return -1;
+    }
+    if (kernel_dynlib_handle(-1, "libSceAvcap2.sprx", &ah) != 0 || !ah) {
+        diag_set("audio libs", "FAILED: no libSceAvcap2 handle");
+        return -1;
+    }
+    for (i = 0; i < (int)(sizeof nids / sizeof nids[0]); i++)
+        if (!kernel_dynlib_resolve(-1, ah, nids[i])) missing++;
+    if (missing) diag_set("audio libs", "loaded, %d Avcap2 function(s) missing", missing);
+    else diag_set("audio libs", "loaded, all Avcap2 functions resolved");
+    log_line("avcap2: probe: %d of %d functions missing", missing,
+             (int)(sizeof nids / sizeof nids[0]));
+    return missing ? -1 : 0;
+}
+
 avcap2_session *avcap2_session_open(void)
 {
     avcap2_session *s;
@@ -548,6 +582,8 @@ avcap2_session *avcap2_session_open(void)
     s->Read  = (fn_Read)kernel_dynlib_resolve(-1, ah, NID_Avcap2ReadAudio);
     if (!s->Init || !s->Open || !s->Start || !s->Read || !s->Stop || !s->Close) {
         log_line("avcap2: missing NIDs");
+        diag_set("audio session", "FAILED: Avcap2 functions missing");
+        (void)diag_save();
         free(s);
         return NULL;
     }
@@ -565,6 +601,8 @@ avcap2_session *avcap2_session_open(void)
     }
     if (!opened) {
         log_line("avcap2: session Open/Start failed");
+        diag_set("audio session", "FAILED: Open/Start failed in every auth mode");
+        (void)diag_save();
         free(s->buf);
         free(s);
         return NULL;
@@ -575,6 +613,8 @@ avcap2_session *avcap2_session_open(void)
     s->last_restart_ms = s->last_ok_ms;
     usleep(100000);
     log_line("avcap2: session open for streaming");
+    diag_set("audio session", "ok (auth_mode %d)", s->auth_mode);
+    (void)diag_save();
     return s;
 }
 
