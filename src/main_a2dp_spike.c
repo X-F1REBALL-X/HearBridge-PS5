@@ -36,6 +36,8 @@
 
 #include <sys/stat.h>
 
+#include <errno.h>
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1462,23 +1464,59 @@ done:
     return rc;
 }
 
+/* Home-screen tile: rewritten and registered again on every run, so an
+ * icon deleted from the home screen comes back by running the ELF again.
+ * second = another instance is already running: only (re)register, never
+ * process remove_tile (the running instance did that). */
+static void home_tile(int second)
+{
+    if (!second && access(RM_TILE_PATH, F_OK) == 0) {
+        tile_uninstall();
+        unlink(RM_TILE_PATH);
+        { FILE *f = fopen(NO_TILE_PATH, "w"); if (f) fclose(f); }
+    } else if (access(NO_TILE_PATH, F_OK) != 0 && access(RM_TILE_PATH, F_OK) != 0) {
+        char u[200] = "";
+        tile_report tr;
+        FILE *f = fopen(TILE_URL_PATH, "r");
+        if (f) {
+            if (!fgets(u, sizeof u, f)) u[0] = 0;
+            fclose(f);
+            u[strcspn(u, "\r\n ")] = 0;
+            if (!strcmp(u, "start")) snprintf(u, sizeof u, "%s", HB_TILE_START_URL);
+        }
+        if (tile_install(u, &tr) != 0)
+            notify("HearBridge: home-screen icon not added (%s, code %#x). Details: %s",
+                   tr.failed ? tr.failed : "?", (unsigned)tr.code, LOG_PATH);
+    }
+}
+
 int main(void)
 {
     hci_t hci;
     a2dp_session *asess = NULL;
     a2dp_open_opts opts;
     headset_ini ini;
-    int rc = 2;
+    int rc = 2, lock_rc, lock_errno = 0;
 
     mkdir(STATE_DIR, 0755);
     unlink(DEVICES_JSON);      /* a list from an older run or build is stale */
 
-    if (!lock_take(LOCK_PATH)) {
+    /* Log first so a lock problem is written down too. */
+    log_open(LOG_PATH);
+    lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
+    if (lock_rc == LOCK_BUSY) {
+        /* Running the ELF again still brings back a deleted icon. */
+        log_line("HearBridge PS5 %s: another instance is running; refreshing the home-screen icon only",
+                 HEARBRIDGE_VERSION);
+        home_tile(1);
         notify("HearBridge: already running");
+        log_close();
         return 1;
     }
+    if (lock_rc == LOCK_NO_WRITE)      /* not "already running": /data not writable */
+        notify("HearBridge: cannot write %s (errno %d). Continuing; settings and logs may not be saved.",
+               STATE_DIR, lock_errno);
 
-    log_open(LOG_PATH);
     hb_stop_init();
     log_line("HearBridge PS5 %s", HEARBRIDGE_VERSION);
     log_line("attach to running controller (no reset); stop file %s", HB_STOP_PATH);
@@ -1509,21 +1547,7 @@ int main(void)
     }
 
     /* Home-screen tile that opens the control page in the browser. */
-    if (access(RM_TILE_PATH, F_OK) == 0) {
-        tile_uninstall();
-        unlink(RM_TILE_PATH);
-        { FILE *f = fopen(NO_TILE_PATH, "w"); if (f) fclose(f); }
-    } else if (access(NO_TILE_PATH, F_OK) != 0) {
-        char u[200] = "";
-        FILE *f = fopen(TILE_URL_PATH, "r");
-        if (f) {
-            if (!fgets(u, sizeof u, f)) u[0] = 0;
-            fclose(f);
-            u[strcspn(u, "\r\n ")] = 0;
-            if (!strcmp(u, "start")) snprintf(u, sizeof u, "%s", HB_TILE_START_URL);
-        }
-        tile_install(u);
-    }
+    home_tile(0);
 
     if (!headset_ini_load(&ini) && !ini.have_addr)
         log_line("select: no headset.ini — will discover a new device");
