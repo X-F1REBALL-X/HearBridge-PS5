@@ -37,7 +37,9 @@ HearBridge PS5 is a payload (ELF) for a jailbroken PS5. It captures the console'
 - **Disconnect:** drops the link; the device stays saved. If the headphones go back in their case or out of range, the page shows **Not connected** until you press Connect again.
 - **Forget:** removes the device and its pairing key.
 - **Volume:** the boost slider (software gain, up to 500 %) and the headset volume (AVRCP absolute volume, also follows the headphones' own buttons). **Mute** and **Test tone** help with checks.
-- **Low latency / Stable** (builds after 1.0.2): how much audio HearBridge may queue when the radio falls behind. See *Latency* below.
+- **Equalizer** (builds after 1.0.2): bass, low mid, mid, presence and treble (±12 dB) with presets (Flat, Bass boost, Bass cut, Treble boost, Voice / footsteps). Saved per headset. It runs before the encoder with automatic headroom and a soft limiter, so boosts don't clip.
+- **Codec** (builds after 1.0.2): **Auto** picks the best SBC flavour the headphones accept (SBC-XQ, then SBC HQ, then SBC); you can also pick one. Changing it reconnects. Saved per headset.
+- **Latency** (builds after 1.0.2): a buffer target from 60 ms to 1 s (default 200 ms) and a live **estimate** of the delay to your ears. See *Latency* below.
 - **Stop HearBridge** ends the payload cleanly. Use it before loading the ELF again.
 
 The page is available in 11 languages, including Hebrew and Arabic (right to left).
@@ -45,7 +47,7 @@ The page is available in 11 languages, including Hebrew and Arabic (right to lef
 ## Notes
 
 - Uses the PS5's built-in Bluetooth; the DualSense keeps working. Run only one payload that uses Bluetooth at a time.
-- SBC codec only, one device at a time, no microphone. The TV keeps playing sound too.
+- SBC only (including SBC HQ and SBC-XQ), one device at a time, no microphone. The TV keeps playing sound too.
 - The console audio is captured at 48 kHz stereo and there is no resampler or downmix, so the headphones must accept **SBC at 48 kHz in a stereo mode**. Builds after 1.0.2 refuse other devices with a clear message ("device needs 48 kHz stereo") instead of playing distorted sound. A2DP requires headphones to support 48 kHz stereo, so this should be rare.
 - Tested with Sony WF-1000XM6, OnePlus Buds Ace 2 and Xbox Wireless Headset.
 - Settings, saved devices and the log are in `/data/hearbridge/` (`hearbridge.log` records every step).
@@ -56,7 +58,8 @@ What HearBridge itself adds (the headphones add their own buffering on top, whic
 
 - Each media packet carries about 13 to 40 ms of audio, depending on the bitpool and the headphones' packet size.
 - The encoder runs at most about 40 ms ahead of real time.
-- When the radio falls behind, packets queue up. **Low latency** (default in builds after 1.0.2) keeps at most about **200 ms** queued and drops the oldest audio beyond that. **Stable** allows about **1 s** (the 1.0.x behaviour): fewer dropouts on a busy radio, more delay. The SBC bitpool also steps down automatically while the radio is behind and back up (to the headphones' maximum, usually 53) when it is calm.
+- When the radio falls behind, packets queue up. The **buffer target** on the page (60 ms to 1 s, default 200 ms) caps the queue and the oldest audio beyond it is dropped. Higher: fewer dropouts on a busy radio, more delay. Below 200 ms packets get shorter so the queue still fits. 1 s is the 1.0.x behaviour.
+- The page shows an **estimate** of the total delay: capture, packet, queue, radio and the headphones' own buffer. If the headphones send an AVDTP delay report that value is used; otherwise a typical 150 ms is assumed for them. The console's own audio path before capture is not included. The SBC bitpool also steps down automatically while the radio is behind and back up (to the headphones' maximum, usually 53) when it is calm.
 
 ### Files in `/data/hearbridge/`
 
@@ -67,7 +70,8 @@ What HearBridge itself adds (the headphones add their own buffering on top, whic
 | `headset.ini`, `paired.ini` | Current and saved headphones with their pairing keys |
 | `saved.json`, `devices.json`, `status.txt`, `select.txt` | Saved list, scan results, status and commands between the page and the stream loop |
 | `gain` | Boost level (written by the page) |
-| `latency` | `low` or `stable` (written by the page, builds after 1.0.2) |
+| `latency` | `low` or `stable`: default for headphones without their own setting yet |
+| `prefs/<address>.txt` | Per-headset settings: codec, latency target, equalizer (builds after 1.0.2) |
 | `hearbridge.lock` | Single-instance lock |
 | `stop` | Create it to stop HearBridge (same as **Stop HearBridge**) |
 | `tone` | Create it to play the 1 kHz test tone |
