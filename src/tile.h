@@ -30,31 +30,57 @@ int tile_files_put(const char *root, const char *url,
 /* Delete exactly what tile_files_put created. */
 void tile_files_drop(const char *root);
 
-/* Where the console keeps the metadata of registered titles. A folder for
- * our id there means the registration really happened. */
+/* Write param.json, icon0.png and (when html is given) start.html every
+ * time, even when they are already identical. 0 on success, -1 on error. */
+int tile_files_write(const char *root, const char *url,
+                     const unsigned char *png, size_t png_len,
+                     const unsigned char *html, size_t html_len);
+
+/* Where the console keeps the metadata of registered titles. */
 #define HB_TILE_APPMETA "/user/appmeta/" HB_TILE_ID
 
-/* Should the folder be (re)registered? Only skip when nothing changed, our
- * marker says an earlier registration worked AND the console's own
- * metadata folder for the id exists (a marker alone can be stale). */
-int tile_need_register(int files_changed, int marker_exists, int appmeta_exists);
+/* Legacy marker written by 1.0.1 and the first fw13.60 build. It is no
+ * longer consulted (it survives a delete from the home screen) and is
+ * removed on start. */
+#define HB_TILE_LEGACY_MARK HB_TILE_ROOT "/" HB_TILE_ID "/sce_sys/.hb_registered"
 
-/* What tile_install() did, step by step (for the diagnostics report). */
+/* The installer calls tile_register() needs. Any pointer may be NULL
+ * (= not available on this firmware). */
 typedef struct {
-    int files;              /* tile_files_put: 1 written, 0 same, -1 error */
-    int files_errno;
-    int marker, appmeta_before, appmeta_after;
-    int skipped;            /* trusted the earlier registration */
+    int (*init)(void);
+    int (*term)(void);
+    int (*title_dir)(const char *title_id, const char *dir, void *opt);
+    int (*install_all)(void *opt);
+    int (*app_exists)(const char *title_id, int *exists);
+    int (*meta_exists)(const char *title_id);   /* 1 if /user/appmeta/<id> exists */
+} tile_ops;
+
+/* What tile_install() did, step by step (log line / diagnostics). */
+typedef struct {
+    int files_errno;        /* tile_files_write failed with this errno */
+    int files_failed;
+    int legacy_marker;      /* the old marker was present (and removed) */
     unsigned long long authid_before, authid_used;
-    int init_rc, init_errno;
+    int meta_before, meta_after;     /* /user/appmeta/<id> before / after */
+    int init_called, init_rc, init_errno;
     int titledir_found, titledir_called, titledir_rc, titledir_errno;
     int all_found, all_called, all_rc, all_errno;
-    int result;             /* 0 = registered (or already registered) */
+    int exists_found, exists_rc, exists;   /* exists: 1 yes, 0 no, -1 unknown */
+    int already;            /* install returned an error but the title is installed */
+    int result;             /* 0 = icon registered */
     int code;               /* failing return code for the toast */
     const char *failed;     /* failing step for the toast, or NULL */
 } tile_report;
 
-/* One-line summary of the steps ("files written; init 0; TitleDir 0 ..."). */
+/* Register HB_TILE_ID from HB_TILE_ROOT on every call (no "already
+ * installed" shortcut): per-title install first, InstallAll(0) if that is
+ * missing or fails. A non-zero code counts as success when the console
+ * says the title is installed afterwards (AppExists = 1; if AppExists is
+ * unavailable, when /user/appmeta/<id> exists), so re-registering an
+ * installed title never reports a failure. Fills *r; returns r->result. */
+int tile_register(const tile_ops *ops, tile_report *r);
+
+/* One-line summary of the steps ("init 0; TitleDir 0 ..."). */
 int tile_report_line(const tile_report *r, char *out, size_t cap);
 
 /* Console side (tile_sys.c). url NULL = HB_TILE_URL. 0 on success.
