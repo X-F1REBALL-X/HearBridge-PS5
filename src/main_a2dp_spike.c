@@ -1514,6 +1514,12 @@ int main(void)
     headset_ini ini;
     int rc = 2, mk_errno = 0, lock_rc, lock_errno = 0, log_ok;
 
+    /* First sign of life, before any file, lock or library work: if this
+     * toast shows but nothing else happens, the payload did start and the
+     * log/diag.txt say where it stopped; if it does not show, the loader
+     * never ran it. */
+    notify("HearBridge %s: starting", HEARBRIDGE_VERSION);
+
     if (mkdir(STATE_DIR, 0755) != 0 && errno != EEXIST) mk_errno = errno;
     unlink(DEVICES_JSON);      /* a list from an older run or build is stale */
 
