@@ -1610,7 +1610,6 @@ int main(void)
     log_line("HearBridge PS5 %s", HEARBRIDGE_VERSION);
     diag_set("state dir", "%s: mkdir errno %d; lock %s (errno %d); log %s", STATE_DIR, mk_errno,
              lock_rc == LOCK_OK ? "ok" : "NOT WRITABLE", lock_errno, log_ok ? "ok" : "NOT WRITABLE");
-    sysinfo_collect();
     (void)diag_save();
     log_line("attach to running controller (no reset); stop file %s", HB_STOP_PATH);
     ctl_init(&g_ctl, HEARBRIDGE_VERSION);
@@ -1646,7 +1645,10 @@ int main(void)
     /* Home-screen tile that opens the control page in the browser. */
     home_tile(0);
 
-    /* Diagnostics: audio libraries and every USB device (read-only). */
+    /* Diagnostics: firmware, audio libraries and every USB device
+     * (read-only). They run only after the page and the icon are up, so
+     * everything before this point is the 1.0.2 startup path. */
+    sysinfo_collect();
     (void)avcap2_probe();
     (void)hci_usb_survey();
     (void)diag_save();

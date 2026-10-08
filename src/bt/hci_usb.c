@@ -21,6 +21,8 @@
 #include <unistd.h>
 #include <dirent.h>
 
+#include <ps5/kernel.h>
+
 #include <dev/usb/usb.h>
 #include <dev/usb/usb_ioctl.h>
 
@@ -551,22 +553,59 @@ static void survey_one(const char *path, int *count)
     (*count)++;
 }
 
+/* opendir/readdir/closedir were not imported by 1.0.2. Every import is
+ * bound by the payload runtime before main() runs, and one that does not
+ * bind ends the payload silently (no notification, no log). So these are
+ * looked up here, at run time, and the survey falls back to known node
+ * names when they are missing. */
+typedef DIR *(*opendir_fn)(const char *);
+typedef struct dirent *(*readdir_fn)(DIR *);
+typedef int (*closedir_fn)(DIR *);
+
+static intptr_t libc_sym(const char *name)
+{
+    static const char *const libs[] = { "libSceLibcInternal.sprx", "libc.sprx" };
+    size_t i;
+
+    for (i = 0; i < sizeof libs / sizeof libs[0]; i++) {
+        uint32_t h = 0;
+        intptr_t a;
+        if (kernel_dynlib_handle(-1, libs[i], &h) != 0 || !h) continue;
+        if ((a = kernel_dynlib_dlsym(-1, h, name))) return a;
+    }
+    return 0;
+}
+
+static int list_ugen(char names[][32], int max)
+{
+    opendir_fn od = (opendir_fn)libc_sym("opendir");
+    readdir_fn rd = (readdir_fn)libc_sym("readdir");
+    closedir_fn cd = (closedir_fn)libc_sym("closedir");
+    struct dirent *e;
+    DIR *dir;
+    int n = 0;
+
+    if (!od || !rd || !cd) {
+        log_line("usb: directory listing unavailable (opendir %p readdir %p closedir %p)",
+                 (void *)od, (void *)rd, (void *)cd);
+        return 0;
+    }
+    if (!(dir = od("/dev"))) return 0;
+    while ((e = rd(dir)) && n < max)
+        if (!strncmp(e->d_name, "ugen", 4))
+            snprintf(names[n++], 32, "/dev/%.24s", e->d_name);
+    cd(dir);
+    return n;
+}
+
 int hci_usb_survey(void)
 {
     static const char *const fallback[] = {
         "/dev/ugen0.1", "/dev/ugen0.2", "/dev/ugen0.3", "/dev/ugen1.1", "/dev/ugen1.2",
     };
     char names[24][32];
-    int n = 0, count = 0, i, j;
-    DIR *dir = opendir("/dev");
+    int n = list_ugen(names, 24), count = 0, i, j;
 
-    if (dir) {
-        struct dirent *e;
-        while ((e = readdir(dir)) && n < 24)
-            if (!strncmp(e->d_name, "ugen", 4))
-                snprintf(names[n++], sizeof names[0], "/dev/%.24s", e->d_name);
-        closedir(dir);
-    }
     if (!n) {
         log_line("usb: no ugen entries listed in /dev (errno %d); trying known names", errno);
         for (i = 0; i < (int)(sizeof fallback / sizeof fallback[0]); i++)
