@@ -13,6 +13,14 @@ long lock_boot_time(void);
 /* 1: this process now owns the lock at `lockfile`. 0: another live
  * instance owns it, or the file could not be written. */
 int  lock_take(const char *lockfile);
+
+/* Same, but tells the cases apart: LOCK_OK, LOCK_BUSY (another live
+ * instance) or LOCK_NO_WRITE (the file could not be written; *err gets
+ * errno). */
+#define LOCK_OK        1
+#define LOCK_BUSY      0
+#define LOCK_NO_WRITE (-1)
+int  lock_take_ex(const char *lockfile, int *err);
 void lock_release(void);
 
 #endif

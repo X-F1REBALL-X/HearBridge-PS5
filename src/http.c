@@ -3,6 +3,7 @@
  * stream loop applies the requests. Developed by X-F1REBALL-X. */
 #include "http.h"
 #include "webpage.h"
+#include "diag.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,6 +104,16 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
     is_api = !strncmp(path, "/api/", 5);
     if (!is_api) return respond(out, max, 404, "text/plain", "not found\n", 10);
 
+    if (!strcmp(path, "/api/diag")) {
+        /* Plain-text diagnostics report (see diag.h), also in diag.txt. */
+        static char dt[60000];
+        int n = diag_text(dt, sizeof dt);
+        if (n <= 0) {
+            strcpy(dt, "no diagnostics collected yet\n");
+            n = (int)strlen(dt);
+        }
+        return respond(out, max, 200, "text/plain; charset=utf-8", dt, n);
+    }
     if (!strcmp(path, "/api/devices") || !strcmp(path, "/api/saved")) {
         /* devices.json from the scan, or saved.json (paired list, no keys). */
         static char dj[8192];
