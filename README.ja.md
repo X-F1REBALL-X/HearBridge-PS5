@@ -45,6 +45,36 @@ HearBridge PS5 は脱獄済み PS5 用のペイロード（ELF）です。本体
 - Sony WF-1000XM6、OnePlus Buds Ace 2、Xbox Wireless Headset で動作確認済み。
 - 設定、保存済みデバイス、ログは `/data/hearbridge/` にあります（`hearbridge.log` に各手順が記録されます）。
 
+## トラブルシューティング / 問題の報告
+
+**動作確認環境:** HearBridge は PS5 初期型（オリジナルモデル、CFI-10xx）、ファームウェア 10.20 で開発・テストされています。ほかのモデル（Slim、Pro、後期の初期型リビジョン）やほかのファームウェアは未テストで、別の Bluetooth チップを使っている可能性があります。それらでの報告を歓迎します。
+
+よくある問題:
+
+- ELF を実行しても **ホーム画面に HearBridge のアイコンが出ない**。
+- **ページが開かない**（http://&lt;console-ip&gt;:8090）。
+- **デバイスを検索** を押しても **ヘッドホンが見つからない**。
+- ヘッドホンは接続されているのに **音が出ない**。
+
+**ファームウェア 13.60:** [v1.0.1 リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1)の **HearBridge-PS5-1.0.1-fw13.60.elf** を試してください。ホーム画面のアイコンが出ない問題の修正を目的とし、診断情報を追加した実験的なビルドです。まだ実機ではテストされていません。
+
+**ログの取得:**
+
+1. HearBridge と同じローダーで FTP サーバーのペイロード（例: [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)）を送信します。
+2. FileZilla で、サーバーが表示するポートを使って本体の IP に接続します（ftpsrv は通常 **2121**）。
+3. `/data/hearbridge/hearbridge.log` と、fw13.60 ビルドの場合は `/data/hearbridge/diag.txt` もダウンロードします。
+
+fw13.60 ビルドでは **http://&lt;console-ip&gt;:8090/api/diag** を開いてテキストをコピーすることもできます。
+
+**[GitHub の Issue](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose) を作成し**、次の情報を含めてください:
+
+- 本体のモデル（CFI 番号、例: CFI-1016A）
+- ファームウェアのバージョン
+- 使用したローダー
+- **「HearBridge 1.0.1: http://…」** の通知が表示されたか
+- ページが開くか
+- ログファイル（`hearbridge.log`、`diag.txt`）
+
 ## ビルド
 
 ```sh

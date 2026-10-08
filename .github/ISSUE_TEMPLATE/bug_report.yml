@@ -1,0 +1,88 @@
+name: Bug report
+description: HearBridge does not work as expected (no icon, page does not open, headphones not found, no sound)
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. HearBridge was developed and tested on a **PS5 fat (original model, CFI-10xx) on firmware 10.20**. Other models (Slim, Pro, later fat revisions) and other firmwares are untested and may use a different Bluetooth chip, so your report helps.
+
+        **On firmware 13.60**, please try `HearBridge-PS5-1.0.1-fw13.60.elf` from the [v1.0.1 release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1) first; it writes extra diagnostics (`diag.txt`).
+
+        How to get the log files: see [Troubleshooting / reporting a problem](https://github.com/X-F1REBALL-X/HearBridge-PS5#troubleshooting--reporting-a-problem).
+  - type: input
+    id: model
+    attributes:
+      label: Console model (CFI number)
+      description: For example CFI-1016A, CFI-2016, CFI-7016.
+      placeholder: CFI-xxxx
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware version
+      placeholder: e.g. 13.60
+    validations:
+      required: true
+  - type: input
+    id: loader
+    attributes:
+      label: Loader / jailbreak used
+      description: The exploit and ELF loader you used to send HearBridge (and any other payloads running, e.g. etaHEN, kstuff).
+      placeholder: e.g. Relapse + elfldr (port 9021)
+    validations:
+      required: true
+  - type: dropdown
+    id: elf
+    attributes:
+      label: Which HearBridge file did you run?
+      options:
+        - HearBridge-PS5-1.0.1.elf
+        - HearBridge-PS5-1.0.1-fw13.60.elf
+        - Other / older version (say which below)
+    validations:
+      required: true
+  - type: dropdown
+    id: toast
+    attributes:
+      label: 'Did the "HearBridge 1.0.1: http://…" notification appear?'
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: page
+    attributes:
+      label: Does the page open (http://<console-ip>:8090)?
+      options:
+        - "Yes"
+        - "No"
+        - Did not try
+    validations:
+      required: true
+  - type: dropdown
+    id: icon
+    attributes:
+      label: Is the HearBridge icon on the home screen?
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what you saw (headphones not found, no sound, error notification text, ...). Include the headphone model if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log files
+      description: |
+        Attach (drag and drop) or paste `/data/hearbridge/hearbridge.log` and, with the fw13.60 build, `/data/hearbridge/diag.txt` (or the text of http://<console-ip>:8090/api/diag).
+        The log contains your headphones' Bluetooth address and name; remove them if you prefer.
