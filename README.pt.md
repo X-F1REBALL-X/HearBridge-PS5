@@ -22,9 +22,9 @@ HearBridge PS5 é um payload (ELF) para um PS5 desbloqueado. Ele captura o áudi
 
 ## Instalação e execução
 
-1. Baixe **HearBridge-PS5-1.0.1.elf** na [versão](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
+1. Baixe **HearBridge-PS5-1.0.2.elf** na [versão](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2).
 2. Envie-o ao carregador do console, por exemplo:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. Abra **http://&lt;console-ip&gt;:8090** (ou o bloco **HearBridge** adicionado à tela inicial na primeira execução).
 
 ## Uso
@@ -44,6 +44,36 @@ A página está disponível em 11 idiomas, incluindo hebraico e árabe (da direi
 - Apenas codec SBC, um dispositivo por vez, sem microfone. A TV também continua tocando o som.
 - Testado com Sony WF-1000XM6, OnePlus Buds Ace 2 e Xbox Wireless Headset.
 - As configurações, os dispositivos salvos e o log ficam em `/data/hearbridge/` (`hearbridge.log` registra cada etapa).
+
+## Solução de problemas / relatar um problema
+
+**Testado em:** o HearBridge foi desenvolvido e testado em um PS5 fat (modelo original, CFI-10xx) com firmware 10.20. Outros modelos (Slim, Pro, revisões fat posteriores) e outros firmwares não foram testados e podem usar outro chip Bluetooth, então relatos deles são bem-vindos.
+
+Problemas comuns:
+
+- **O ícone do HearBridge não aparece na tela inicial** depois de executar o ELF.
+- **A página não abre** (http://&lt;console-ip&gt;:8090).
+- **Os fones não são encontrados** ao tocar em Procurar dispositivos.
+- **Não há som** mesmo com os fones conectados.
+
+**Firmware 13.60:** experimente **HearBridge-PS5-1.0.2-fw13.60.elf** da [versão v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). É uma versão experimental feita para corrigir o ícone que falta na tela inicial e adiciona diagnósticos. Ela ainda não foi testada em um console real.
+
+**Como obter o log:**
+
+1. Envie um payload de servidor FTP (por exemplo [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)) pelo mesmo carregador que você usa para o HearBridge.
+2. Conecte-se com o FileZilla ao IP do console, na porta que o servidor mostra (o ftpsrv normalmente usa a **2121**).
+3. Baixe `/data/hearbridge/hearbridge.log` e, com a versão fw13.60, também `/data/hearbridge/diag.txt`.
+
+Com a versão fw13.60 você também pode abrir **http://&lt;console-ip&gt;:8090/api/diag** e copiar o texto.
+
+**Abra uma [issue no GitHub](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose)** e inclua:
+
+- o modelo do console (número CFI, ex.: CFI-1016A)
+- a versão do firmware
+- o carregador que você usou
+- se a notificação **"HearBridge 1.0.2: http://…"** apareceu
+- se a página abre
+- os arquivos de log (`hearbridge.log`, `diag.txt`)
 
 ## Compilação
 

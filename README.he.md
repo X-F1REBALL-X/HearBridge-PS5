@@ -24,9 +24,9 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא לוכד את הש�
 
 ## התקנה והפעלה
 
-1. הורידו את **HearBridge-PS5-1.0.1.elf** מה[גרסה](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
+1. הורידו את **HearBridge-PS5-1.0.2.elf** מה[גרסה](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2).
 2. שלחו אותו לטוען של הקונסולה, למשל:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. פתחו **http://&lt;console-ip&gt;:8090** (או את האריח **HearBridge** שנוסף למסך הבית בהפעלה הראשונה).
 
 ## שימוש
@@ -46,6 +46,36 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא לוכד את הש�
 - קודק SBC בלבד, מכשיר אחד בכל פעם, בלי מיקרופון. גם הטלוויזיה ממשיכה להשמיע קול.
 - נבדק עם Sony WF-1000XM6, OnePlus Buds Ace 2 ו-Xbox Wireless Headset.
 - ההגדרות, המכשירים השמורים והיומן נמצאים ב-‎`/data/hearbridge/`‎ (‏`hearbridge.log` מתעד כל שלב).
+
+## פתרון בעיות ודיווח על תקלה
+
+**נבדק על:** HearBridge פותח ונבדק על PS5 פאט (הדגם המקורי, CFI-10xx) עם קושחה 10.20. דגמים אחרים (Slim,‏ Pro, גרסאות פאט מאוחרות יותר) וקושחות אחרות לא נבדקו, ויכול להיות שיש בהם שבב בלוטות' אחר, לכן נשמח לדיווחים מהם.
+
+בעיות נפוצות:
+
+- **אין אייקון של HearBridge במסך הבית** אחרי הרצת ה-ELF.
+- **הדף לא נפתח** (‎http://&lt;console-ip&gt;:8090‎).
+- **האוזניות לא נמצאות** כשלוחצים על חיפוש מכשירים.
+- **אין צליל** למרות שהאוזניות מחוברות.
+
+**קושחה 13.60:** נסו את **HearBridge-PS5-1.0.2-fw13.60.elf** מה[גרסה v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). זו גרסה ניסיונית שאמורה לתקן את האייקון החסר במסך הבית ומוסיפה מידע לאבחון. היא עוד לא נבדקה על קונסולה אמיתית.
+
+**איך משיגים את היומן:**
+
+1. שלחו מטען של שרת FTP (למשל [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)) דרך אותו טוען שבו אתם מריצים את HearBridge.
+2. התחברו עם FileZilla לכתובת ה-IP של הקונסולה, בפורט שהשרת מציג (ב-ftpsrv בדרך כלל **2121**).
+3. הורידו את ‎`/data/hearbridge/hearbridge.log`‎, ובגרסת fw13.60 גם את ‎`/data/hearbridge/diag.txt`‎.
+
+בגרסת fw13.60 אפשר גם לפתוח את ‎**http://&lt;console-ip&gt;:8090/api/diag**‎ ולהעתיק את הטקסט.
+
+**פתחו [issue ב-GitHub](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose)** וצרפו:
+
+- דגם הקונסולה (מספר CFI, למשל CFI-1016A)
+- גרסת הקושחה
+- הטוען שבו השתמשתם
+- האם הופיעה ההודעה **"HearBridge 1.0.2: http://…"**
+- האם הדף נפתח
+- קובצי היומן (‏`hearbridge.log`,‏ `diag.txt`)
 
 </div>
 
