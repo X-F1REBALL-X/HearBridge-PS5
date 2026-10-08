@@ -214,6 +214,12 @@ static void fetch_names(a2dp_session *s, a2dp_inq_dev *devs, int n)
         while (now_ms() < deadline && !got) {
             int nEv, pr;
 
+            if (INQ_ABORTED()) {
+                /* A connect/reconnect is waiting. Drop this name lookup so the page can start. */
+                (void)hci.ops->cmd(hci.ctx, 0x041A, d->addr, 6);
+                log_line("inquiry: name request cancelled for a page command");
+                return;
+            }
             pr = hci.ops->pump(hci.ctx, 50);
             if (pr < 0) return;
             while ((nEv = hci.ops->next_event(hci.ctx, ev, (int)sizeof ev)) > 0) {

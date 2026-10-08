@@ -190,7 +190,7 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .lt .v{text-align:end}
 .latm .lt input[type=range]{margin:0}
 /* connection */
-.conn .cbox{display:grid;grid-template-columns:auto minmax(0,1fr);grid-gap:var(--s4);align-items:center}
+.conn .cbox{display:grid;grid-template-columns:1fr;grid-gap:var(--s2);align-items:center}
 .conn .note{margin:0;font-size:.8rem;line-height:1.3}
 #stop{min-width:13rem}
 /* status: name, compact key/value list, slim level meters */
@@ -280,6 +280,8 @@ grid-template-areas:"dev st log" "dev vol conn";grid-template-rows:minmax(0,1fr)
 <main class="grid">
 <section class="panel hero" id="devpanel"><p class="label" data-i18n="devices">Devices</p>
 <button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
+<button id="reconnect" class="act xl" data-i18n="reconnect">Reconnect</button>
+<button id="reset" class="xl" data-i18n="reset">Reset link</button>
 <p class="k hint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p>
 <p class="sub" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div>
 <p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div>
@@ -334,7 +336,7 @@ grid-template-areas:"dev st log" "dev vol conn";grid-template-rows:minmax(0,1fr)
 <div class="lkeys" id="lkeys"></div>
 <div class="lt"><span class="cl" data-i18n="latTarget">Buffer target</span><input type="range" id="lat" min="60" max="200" step="1"><span class="v" id="latt">-</span></div></div>
 <p class="k note" id="latnote" data-i18n="latHint">Lower: less delay. Higher: fewer dropouts when the radio is busy. Saved for this headset.</p>
-<div class="cbox"><button id="reset" data-i18n="reset">Reset link</button><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
+<div class="cbox"><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
 <p class="k note" data-i18n="footer">Closing this page leaves HearBridge running.</p></div>
 </section>
 </main>
@@ -396,7 +398,7 @@ function drawSaved(){if(!SAVL)return;var h='',i,d,on=linked(),st=stOf(),busy=st=
 for(i=0;i<SAVL.length;i++){d=SAVL[i];
 h+=row(icon(d.kind),d.name||d.addr,badge(d.current)+'<span class="addr">'+esc(d.addr)+'</span>',
 (d.current&&on?'<button type="button" data-disc="1">'+esc(t('disconnect'))+'</button>'
-:d.current&&busy?'':'<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('connect'))+'</button>')
+:d.current&&busy?'':'<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('reconnect'))+'</button>')
 +'<button type="button" class="red" data-forget="1" data-addr="'+esc(d.addr)+'">'+esc(t('forget'))+'</button>',
 d.current&&on?'on':d.current&&busy?'busy':'')}
 var k=h+'|'+LANG;if(k==drawSaved.last)return;drawSaved.last=k;
@@ -452,11 +454,15 @@ cb.className=!ok?'no':(S.codec_pref|0)==ci?'act':'';if(!ok)nos.push(CN[ci])}
 setHtml('codecno',!nos.length?'':S.codec_avail?esc(t('codecNo')+': '+nos.join(', ')):esc(t('codecWait')))
 drawEq();drawLat()}
 /* latency: estimate from the stream loop (see hb_latency_estimate) */
-var busyL=0,latT=0,LATCOL=['var(--b0)','var(--b2)','var(--b3)','var(--b4)'];
+var busyL=0,latT=0,latAck=-1,latTouch=0,LATCOL=['var(--b0)','var(--b2)','var(--b3)','var(--b4)'];
+function pushLat(v){v=parseInt(v,10);if(!(v>=60&&v<=200)||v===latAck)return;latAck=v;latTouch=0;busyL=1;
+$('latt').textContent=v+' ms';act('/api/latency?ms='+v,function(){busyL=0})}
 function drawLat(){var L=S.latency;if(!L)return;
 var ms=L.target_ms;if(ms>200)ms=200;if(ms<60)ms=60;
-if(!busyL){if(L.target_ms!=ms){busyL=1;act('/api/latency?ms='+ms,function(){busyL=0})}
-$('lat').value=ms}$('latt').textContent=(busyL?$('lat').value:ms)+' ms';
+var cur=parseInt($('lat').value,10);
+if(latTouch&&cur>=60&&cur<=200&&cur!==ms)pushLat(cur);
+else if(!busyL){$('lat').value=ms;latAck=ms}
+$('latt').textContent=(latTouch||busyL?$('lat').value:ms)+' ms';
 var on=S.connected&&L.estimate_ms>0;$('latv').textContent=on?'≈ '+L.estimate_ms+' ms':'-';
 var parts=[L.capture_ms+L.packet_ms,L.queue_ms,L.radio_ms,L.sink_ms],names=['latPipe','latQueue','latRadio',L.sink_reported?'latSink':'latSinkTyp'],tot=0,i,h='';
 for(i=0;i<4;i++)tot+=parts[i];
@@ -497,12 +503,13 @@ $('hs').onchange=function(){act('/api/headset?vol='+this.value,function(){busyH=
 $('mute').onclick=function(){act('/api/mute?on='+(S&&S.muted?0:1))};
 $('tone').onclick=function(){act('/api/tone?on='+(S&&S.tone?0:1))};
 $('clean').onclick=function(){act('/api/clean')};
-function sendLat(v){clearTimeout(latT);latT=setTimeout(function(){act('/api/latency?ms='+v,function(){busyL=0})},120)}
-$('lat').oninput=function(){busyL=1;$('latt').textContent=this.value+' ms';sendLat(this.value)};
-$('lat').onchange=function(){busyL=1;clearTimeout(latT);act('/api/latency?ms='+this.value,function(){busyL=0})};
+function markLat(){latTouch=1;$('latt').textContent=$('lat').value+' ms';pushLat($('lat').value)}
+$('lat').oninput=markLat;$('lat').onchange=markLat;
+$('lat').onmouseup=markLat;$('lat').ontouchend=markLat;$('lat').onpointerup=markLat;
 for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!this.disabled)act('/api/codec?mode='+m)}})(cj);
 function armScan(){scanLive=Date.now()+12000;$('scanning').style.display='';devices()}
 $('scan').onclick=function(){act('/api/scan');armScan()};
+$('reconnect').onclick=function(){act('/api/reconnect')};
 $('reset').onclick=function(){act('/api/reset')};
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();
@@ -510,5 +517,6 @@ buildLangs();
 if(!c){var n=(navigator.language||'en').slice(0,2).toLowerCase();c=info(n).code==n?n:'en'}setLang(c)})();
 req('/api/status');act('/api/scan');armScan();setInterval(function(){req('/api/status')},1000);
 setInterval(function(){if(scanLive&&Date.now()<scanLive)devices()},300);
+setInterval(function(){var v=parseInt($('lat').value,10);if(latAck>=0&&v!==latAck){latTouch=1;pushLat(v)}},200);
 hbTest={req:req};
 </script></body></html>

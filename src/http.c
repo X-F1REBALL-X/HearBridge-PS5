@@ -256,6 +256,21 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         CTL_LOCK(c);
         snprintf(sp, sizeof sp, "%s", c->select_path);
         CTL_UNLOCK(c);
+        if (!strcmp(line, "scan") && sp[0]) {
+            /* A refresh starts a scan, but it must not erase a reconnect
+             * or a device pick that has not been read yet. */
+            FILE *oldf = fopen(sp, "r");
+            char prev[40];
+            prev[0] = 0;
+            if (oldf) {
+                if (!fgets(prev, sizeof prev, oldf)) prev[0] = 0;
+                fclose(oldf);
+                prev[strcspn(prev, "\r\n")] = 0;
+                if (!strcmp(prev, "reconnect") ||
+                    (strchr(prev, ':') && strncmp(prev, "forget ", 7)))
+                    return respond(out, max, 200, "application/json", "{\"ok\":1}", 8);
+            }
+        }
         {
             char tp[104];
             snprintf(tp, sizeof tp, "%s.tmp", sp);

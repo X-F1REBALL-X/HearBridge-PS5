@@ -503,8 +503,10 @@ static int connect_abort(const unsigned char addr[6])
         line[strcspn(line, "\r\n")] = 0;
         if (!strncmp(line, "forget ", 7))
             stop = headset_parse_addr(line + 7, a) && !memcmp(a, addr, 6);
-        else if (!strcmp(line, "scan") || !strcmp(line, "reconnect"))
+        else if (!strcmp(line, "reconnect"))
             stop = 1;
+        else if (!strcmp(line, "scan"))
+            stop = 0;                    /* a refresh scan must not cancel this page */
         else if (headset_parse_addr(line, a))
             stop = 1;                    /* a new press starts again, same headset too */
     }
@@ -758,8 +760,11 @@ static int try_all_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *
         hb_cmd c;
         cand.ok = cand.have_addr = 1;
         if (held(cand.addr)) {
-            log_line("rotation: skip \"%s\" (disconnected by hand)", cand.name);
-            continue;
+            if (!g_user_connect) {
+                log_line("rotation: skip \"%s\" (disconnected by hand)", cand.name);
+                continue;
+            }
+            hold_clear(cand.addr);       /* Reconnect was pressed: page it anyway */
         }
         if (want_blocks(cand.addr)) {
             log_line("rotation: skip \"%s\" (another device was just picked)", cand.name);
