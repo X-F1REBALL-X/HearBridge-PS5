@@ -34,6 +34,7 @@
 #include "version.h"
 #include "ctl.h"
 #include "gain.h"
+#include "hsprefs.h"
 #include "http.h"
 
 #include <sys/stat.h>
@@ -998,14 +999,68 @@ static void write_stable(int stable)
     rename(LATENCY_PATH ".tmp", LATENCY_PATH);
 }
 
-/* Gain and latency mode changed from the page: write them down. */
+/* Per-headset settings (hsprefs.h) of the headset in use. */
+static hb_prefs g_prefs;
+static unsigned char g_prefs_addr[6];
+static int g_prefs_have;
+
+/* Page values -> g_prefs. Caller holds the lock. */
+static void prefs_from_ctl(void)
+{
+    g_prefs.codec = g_ctl.codec_pref;
+}
+
+/* Page values <- g_prefs. Caller holds the lock. */
+static void prefs_to_ctl(void)
+{
+    g_ctl.codec_pref = g_prefs.codec;
+}
+
+static void prefs_save(void)
+{
+    if (!g_prefs_have) return;
+    if (hb_prefs_save(HB_PREFS_DIR, g_prefs_addr, &g_prefs))
+        log_line("prefs: saved for this headset (codec %s)", hb_codec_key(g_prefs.codec));
+    else
+        log_line("prefs: cannot write %s", HB_PREFS_DIR);
+}
+
+/* A headset is connecting: its own settings, or (first time) what the page
+ * shows now, which then becomes its settings. */
+static void prefs_attach(const unsigned char addr[6])
+{
+    hb_prefs p;
+    hb_prefs_default(&p);
+    if (g_prefs_have && !memcmp(addr, g_prefs_addr, 6)) return;
+    memcpy(g_prefs_addr, addr, 6);
+    g_prefs_have = 1;
+    if (hb_prefs_load(HB_PREFS_DIR, addr, &p)) {
+        g_prefs = p;
+        CTL_LOCK(&g_ctl);
+        prefs_to_ctl();
+        g_ctl.prefs_dirty = 0;
+        CTL_UNLOCK(&g_ctl);
+        log_line("prefs: loaded for this headset (codec %s)", hb_codec_key(g_prefs.codec));
+    } else {
+        g_prefs = p;
+        CTL_LOCK(&g_ctl);
+        prefs_from_ctl();
+        CTL_UNLOCK(&g_ctl);
+        prefs_save();
+    }
+}
+
+/* Gain, latency mode and per-headset settings changed from the page:
+ * write them down. */
 static void persist_gain_if_dirty(void)
 {
-    int pct = -1, stable = -1;
+    int pct = -1, stable = -1, prefs = 0;
     CTL_LOCK(&g_ctl);
     if (g_ctl.gain_dirty) { pct = g_ctl.gain_pct; g_ctl.gain_dirty = 0; }
     if (g_ctl.stable_dirty) { stable = g_ctl.stable; g_ctl.stable_dirty = 0; }
+    if (g_ctl.prefs_dirty) { prefs_from_ctl(); prefs = 1; g_ctl.prefs_dirty = 0; }
     CTL_UNLOCK(&g_ctl);
+    if (prefs) prefs_save();
     if (pct >= 0) {
         write_gain_pct(pct);
         log_line("volume: base gain %d%% saved", pct);
@@ -1180,7 +1235,8 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     double tone_phase = 0.0, sine_phase = 0.0;
     float peak_seen = 0.f;
     int tone = 0, tone_file = 0, gain_milli = 1000, out_peak = 0, gain_pct, muted;
-    int hs_vol = -1, avst = 0;
+    int hs_vol = -1, avst = 0, want_codec = HB_CODEC_AUTO, xq_bad_s = 0;
+    long xq_drops = 0;
 
     memset(&av, 0, sizeof av);
     {
@@ -1227,8 +1283,12 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     }
     log_line("stream: encrypted ACL ready, AVDTP PSM %#x", av_psm);
 
+    prefs_attach(ini->addr);
+    CTL_LOCK(&g_ctl);
+    want_codec = g_ctl.codec_pref;
+    CTL_UNLOCK(&g_ctl);
     {
-        int av_ok = avdtp_setup(&av, link, av_psm);
+        int av_ok = avdtp_setup(&av, link, av_psm, want_codec, g_prefs.auto_no_xq);
         if (!av_ok && av.unsupported_format) {
             /* Retrying cannot help: the sink cannot take 48 kHz stereo. */
             g_kept_link = 0;
@@ -1253,7 +1313,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             g_user_connect = 1;
             g_av_fail_ms = now_ms();
             av_ok = connect_and_probe(hci, ini, &link, &av_psm, 30000) == 1 &&
-                    avdtp_setup(&av, link, av_psm);
+                    avdtp_setup(&av, link, av_psm, want_codec, g_prefs.auto_no_xq);
             g_user_connect = 0;
         }
         g_kept_link = 0;
@@ -1318,6 +1378,9 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     }
     hb_rate_init(&pk.rate, av.bitpool_lo ? av.bitpool_lo : av.bitpool,
                  av.bitpool_hi ? av.bitpool_hi : av.bitpool, sbc_encoder_bitpool(enc), now_ms());
+    /* SBC HQ may climb above 53 (to the sink's maximum); SBC-XQ (dual
+     * channel) stops at its own ceiling. */
+    hb_rate_set_ceiling(&pk.rate, av.bitpool_hi ? av.bitpool_hi : av.bitpool, av.codec.ceil);
     log_line("stream: media MTU %u, SBC frame %d bytes, %d frames/packet, bitpool %d "
              "(adapts %d-%d)", mtu, pk.fsz, pk.per_pkt, sbc_encoder_bitpool(enc),
              pk.rate.lo, pk.rate.hi);
@@ -1351,7 +1414,8 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     tone = g_ctl.tone || tone_file;
     g_ctl.sample_rate = scfg.sample_rate;
     g_ctl.bitpool = av.bitpool;
-    snprintf(g_ctl.codec, sizeof g_ctl.codec, "SBC");
+    snprintf(g_ctl.codec, sizeof g_ctl.codec, "%s", av.codec.name ? av.codec.name : "SBC");
+    g_ctl.codec_avail = av.codec.avail;
     CTL_UNLOCK(&g_ctl);
     log_line("stream: base gain %d%%%s%s", gain_pct, muted ? ", muted" : "",
              tone ? ", TEST TONE 1 kHz -6 dB" : "");
@@ -1363,7 +1427,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
 
     t_start = t_stat = now_ms();
     for (;;) {
-        int nframes, req_vol = -1, req_disc = 0, changed = 0;
+        int nframes, req_vol = -1, req_disc = 0, changed = 0, req_codec = -1;
         float peak = 0.f;
         long now, ahead_ms;
 
@@ -1409,11 +1473,21 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             muted = g_ctl.muted;
             tone = g_ctl.tone || tone_file;
             pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+            if (g_ctl.codec_pref != want_codec) req_codec = g_ctl.codec_pref;
             g_ctl.avrcp = avst;
             CTL_UNLOCK(&g_ctl);
             if (changed) log_line("stream: headset volume %d/127 -> gain", v);
             if (req_vol >= 0) btlink_avrcp_set_volume(link, req_vol);
             gain_milli = ctl_effective_gain_milli(gain_pct, muted, hs_vol);
+        }
+        if (req_codec >= 0) {
+            /* A new codec needs a new AVDTP configuration: reconnect. */
+            log_line("stream: codec %s picked on the page — reconnecting the headset", hb_codec_key(req_codec));
+            persist_gain_if_dirty();
+            memset(&g_pending, 0, sizeof g_pending);
+            g_pending.kind = CMD_RECONNECT;
+            rc = RUN_SWITCH;
+            break;
         }
         if (req_disc) {
             log_line("stream: Disconnect requested from the web page");
@@ -1479,6 +1553,23 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             g_ctl.uptime_s = (now - t_start) / 1000;
             CTL_UNLOCK(&g_ctl);
             tune_link(&pk, now);
+            if (want_codec == HB_CODEC_AUTO && av.codec.codec == HB_CODEC_SBC_XQ) {
+                /* Auto picked SBC-XQ but the link cannot carry it: still
+                 * dropping at the bottom of the range for 10 s. Remember that
+                 * for this headset and reconnect with plain SBC. */
+                long d = btlink_tx_dropped(link);
+                xq_bad_s = (d > xq_drops && pk.rate.cur <= pk.rate.lo + 2) ? xq_bad_s + 1 : 0;
+                xq_drops = d;
+                if (xq_bad_s >= 10) {
+                    log_line("codec: SBC-XQ does not hold on this link — auto uses SBC for this headset from now on");
+                    g_prefs.auto_no_xq = 1;
+                    prefs_save();
+                    memset(&g_pending, 0, sizeof g_pending);
+                    g_pending.kind = CMD_RECONNECT;
+                    rc = RUN_SWITCH;
+                    break;
+                }
+            }
             peak_seen = 0.f;
             out_peak = 0;
             t_stat = now;

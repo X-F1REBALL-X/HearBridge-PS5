@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs
 
 all: ps5
 
@@ -45,6 +45,8 @@ test-dump:
 	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/a2dp -Isrc/bt tests/test_media_dump.c src/a2dp/avdtp_media.c src/a2dp/sbc_enc.c -lm -o $(BUILD)/host/test_media_dump
 	$(BUILD)/host/test_media_dump $(BUILD)/host/media_dump.bin 200
 	python3 tests/decode_dump $(BUILD)/host/media_dump.bin $(BUILD)/host/media_dump.wav --expect-hz 1000
+	$(BUILD)/host/test_media_dump $(BUILD)/host/media_dump_xq.bin 200 xq
+	python3 tests/decode_dump $(BUILD)/host/media_dump_xq.bin $(BUILD)/host/media_dump_xq.wav --expect-hz 1000
 
 test-crypto:
 	@mkdir -p $(BUILD)/host
@@ -89,7 +91,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -117,6 +119,12 @@ test-pace:
 	@mkdir -p $(BUILD)/host
 	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_pace.c src/a2dp/acl_pool.c src/a2dp/rate.c -o $(BUILD)/host/test_pace
 	$(BUILD)/host/test_pace
+
+# Per-headset settings file (codec, latency, equalizer).
+test-prefs:
+	@mkdir -p $(BUILD)/host/prefs
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc tests/test_prefs.c src/hsprefs.c -o $(BUILD)/host/test_prefs
+	$(BUILD)/host/test_prefs $(BUILD)/host/prefs
 
 # Diagnostics report (/api/diag, diag.txt), USB descriptor summary.
 test-diag:

@@ -24,6 +24,9 @@ typedef struct {
     int paused;            /* user pressed Disconnect: stay idle */
     int stable;            /* 0 = low latency (~200 ms queue), 1 = stable (~1 s) */
     int stable_dirty;      /* persist `stable` to the latency file */
+    int codec_pref;        /* HB_CODEC_* picked on the page (per headset) */
+    int prefs_dirty;       /* per-headset settings changed: save them */
+    int codec_avail;       /* bit per HB_CODEC_* the current sink takes (0 = unknown) */
     /* status (stream loop → web) */
     char token[HB_TOKEN_LEN + 1];  /* hex, set once by ctl_init() */
     char version[16];

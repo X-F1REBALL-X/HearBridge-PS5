@@ -21,7 +21,8 @@ class XHR {
 }
 const STATUS = { version: '1.0.2', state: 'streaming', connected: 1, device: 'X', gain_pct: 500, muted: 0, tone: 0,
   paused: 0, headset_volume: 64, avrcp: { connected: 1 }, pkts: 1, frames: 1, peak: 0, out_peak: 0, sample_rate: 48000,
-  bitpool: 35, bitpool_min: 2, bitpool_max: 53, per_packet: 8, backlog: 0, stable: 0, queue_ms: 200, detail: '' };
+  bitpool: 35, bitpool_min: 2, bitpool_max: 53, per_packet: 8, backlog: 0, stable: 0, queue_ms: 200, detail: '',
+  codec: 'SBC-XQ', codec_pref: 0, codec_avail: 10 };
 const ctx = {
   document: { getElementById: el, querySelectorAll: () => [], documentElement: {} },
   XMLHttpRequest: XHR, localStorage: { getItem: () => 'en', setItem() {} }, navigator: { language: 'en' },
@@ -43,6 +44,9 @@ check(calls[0].m === 'POST' && calls[0].p === '/api/volume?pct=250' && calls[0].
 calls.length = 0; el('hs').value = 100; el('hs').onchange.call(el('hs'));
 check(calls[0].m === 'POST' && calls[0].p === '/api/headset?vol=100' && calls[0].h['X-HB-Token'], 'page: headset volume -> POST with token');
 check(el('lat').textContent === 'Low latency', 'page: latency button shows the mode');
+check(el('cd0').className === 'act' && el('cd2').disabled && !el('cd3').disabled, 'page: codec picker shows auto, greys out what the sink lacks');
+calls.length = 0; el('cd3').onclick.call(el('cd3'));
+check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/codec?mode=3' && calls[0].h['X-HB-Token'], 'page: codec -> POST with token');
 // 403 (HearBridge restarted with a new token) -> reload hint
 XHR.prototype.send = function () { calls.push({}); this.status = 403; this.responseText = '{"error":"token"}'; this.onload(); };
 el('mute').onclick();
