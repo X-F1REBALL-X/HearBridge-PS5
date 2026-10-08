@@ -27,6 +27,9 @@ typedef struct {
     int codec_pref;        /* HB_CODEC_* picked on the page (per headset) */
     int prefs_dirty;       /* per-headset settings changed: save them */
     int codec_avail;       /* bit per HB_CODEC_* the current sink takes (0 = unknown) */
+    int eq_on;             /* equalizer (per headset) */
+    int eq_db[5];          /* -12..12 dB: 80 Hz shelf, 250, 1k, 3.5k, 10 kHz shelf */
+    unsigned eq_seq;       /* bumped on every change (stream loop re-designs) */
     /* status (stream loop → web) */
     char token[HB_TOKEN_LEN + 1];  /* hex, set once by ctl_init() */
     char version[16];

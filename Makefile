@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq
 
 all: ps5
 
@@ -58,7 +58,7 @@ test-control:
 	@mkdir -p $(BUILD)/host
 	python3 scripts/gen_webpage.py src/web/index.html $(BUILD)/host/webpage.h src/web/i18n.json
 	cmp -s $(BUILD)/host/webpage.h src/webpage.h || (echo "src/webpage.h is stale: make webpage"; false)
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp tests/test_control.c src/http.c src/diag.c src/ctl.c src/gain.c src/a2dp/avrcp.c src/a2dp/sdp_server.c -lpthread -o $(BUILD)/host/test_control
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp tests/test_control.c src/http.c src/diag.c src/ctl.c src/gain.c src/a2dp/eq.c src/a2dp/avrcp.c src/a2dp/sdp_server.c -lpthread -o $(BUILD)/host/test_control
 	$(BUILD)/host/test_control $(BUILD)/host/status.json
 	python3 -c "import json;d=json.load(open('$(BUILD)/host/status.json'));print('ok   status JSON parses,', len(d), 'keys')"
 
@@ -91,7 +91,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -119,6 +119,12 @@ test-pace:
 	@mkdir -p $(BUILD)/host
 	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_pace.c src/a2dp/acl_pool.c src/a2dp/rate.c -o $(BUILD)/host/test_pace
 	$(BUILD)/host/test_pace
+
+# Equalizer: flat = bit-exact, band gains, headroom/limiter, cost.
+test-eq:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/a2dp tests/test_eq.c src/a2dp/eq.c src/gain.c -lm -lpthread -o $(BUILD)/host/test_eq
+	$(BUILD)/host/test_eq
 
 # Per-headset settings file (codec, latency, equalizer).
 test-prefs:
