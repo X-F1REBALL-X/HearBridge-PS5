@@ -17,6 +17,7 @@
  *           and a bitpool of at least 35. */
 #define HB_XQ_MIN_BP  35
 #define HB_XQ_CEIL    38
+#define HB_XQ_LOW_BP  30   /* auto drops XQ when it cannot get above this */
 #define HB_HQ_MAX_BP  64
 typedef struct {
     uint8_t cfg[4];         /* SBC codec IE to configure */
@@ -92,6 +93,13 @@ int avdtp_send_media(avdtp_session *s, const unsigned char *sbc_frames, int len,
                      int samples_in_packet, int n_sbc_frames);
 
 void avdtp_teardown(avdtp_session *s);
+
+/* Codec change without dropping the headset: CLOSE the stream, release
+ * the media channel, then SET_CONFIGURATION (plain SBC if the sink refuses
+ * the flavour) + OPEN + media channel + START on the same signalling
+ * channel and ACL. 1 = streaming with the new codec; 0 = failed (the caller
+ * falls back, see hb_cswitch). */
+int avdtp_switch_codec(avdtp_session *s, int want_codec, int no_xq);
 
 /* Build RTP + media header + SBC into pkt; advances seq/ts. Returns bytes. */
 int  avdtp_build_media(avdtp_session *s, const unsigned char *sbc_frames, int len,

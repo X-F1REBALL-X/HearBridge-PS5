@@ -63,7 +63,16 @@ int main(int argc, char **argv)
         if (!avdtp_sbc_pick(lowbp, HB_CODEC_AUTO, 0, &c, &why) || c.codec != HB_CODEC_SBC || c.ceil != 32 ||
             c.start_bp != 32) bad |= 32;                  /* bitpool max 32: too low for XQ */
         if (avdtp_sbc_pick((const uint8_t[4]){ 0x18, 0xff, 2, 53 }, HB_CODEC_AUTO, 0, &c, &why)) bad |= 64;
-        printf("%s   codec pick: auto -> SBC-XQ on the Xbox caps, HQ/SBC fallbacks, refuse mono%s\n",
+        /* HQ / XQ need 16 blocks + 8 subbands advertised */
+        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xef, 2, 60 }, HB_CODEC_SBC_XQ, 0, &c, &why) ||
+            c.avail != 0x02 || c.codec != HB_CODEC_SBC) bad |= 128;          /* no 16 blocks */
+        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xfb, 2, 60 }, HB_CODEC_SBC_HQ, 0, &c, &why) ||
+            c.avail != 0x02 || c.codec != HB_CODEC_SBC) bad |= 256;          /* 4 subbands only */
+        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x15, 0x15, 2, 60 }, HB_CODEC_AUTO, 0, &c, &why) ||
+            c.avail != 0x0E) bad |= 512;          /* 48k joint+dual, 16/8 loudness: all three */
+        if (!avdtp_sbc_pick((const uint8_t[4]){ 0x3f, 0xff, 2, 34 }, HB_CODEC_SBC_XQ, 0, &c, &why) ||
+            (c.avail & 0x08) || c.codec != HB_CODEC_SBC) bad |= 1024;     /* max 34 < 35: no XQ */
+        printf("%s   codec pick: auto -> SBC-XQ on the Xbox caps, HQ/SBC fallbacks, HQ/XQ only with 16 blocks/8 subbands, refuse mono%s\n",
                bad ? "FAIL" : "ok", bad ? " (see bits)" : "");
         if (bad) { printf("FAIL bits %#x\n", bad); return 1; }
     }

@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch
 
 all: ps5
 
@@ -91,7 +91,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -121,6 +121,11 @@ test-pace:
 	$(BUILD)/host/test_pace
 
 # Equalizer: flat = bit-exact, band gains, headroom/limiter, cost.
+test-cswitch:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_cswitch.c src/a2dp/cswitch.c -o $(BUILD)/host/test_cswitch
+	$(BUILD)/host/test_cswitch
+
 test-eq:
 	@mkdir -p $(BUILD)/host
 	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/a2dp tests/test_eq.c src/a2dp/eq.c src/gain.c -lm -lpthread -o $(BUILD)/host/test_eq

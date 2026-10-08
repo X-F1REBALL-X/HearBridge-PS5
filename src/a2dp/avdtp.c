@@ -350,9 +350,11 @@ static int pick_sbc_config(avdtp_session *s, int want)
     return 1;
 }
 
+static int configure_and_start(avdtp_session *s);
+
 int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm, int want_codec, int no_xq)
 {
-    unsigned char body[64], rsp[256];
+    unsigned char rsp[256];
     int rsp_len = 0;
     int i, nseid;
     int msg;
@@ -513,6 +515,18 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm, int want_cod
         return 0;
     }
 
+    return configure_and_start(s);
+}
+
+/* SET_CONFIGURATION (with fallbacks) + OPEN + media channel + START on the
+ * open signalling channel, for the codec already picked in s->codec. */
+static int configure_and_start(avdtp_session *s)
+{
+    btlink *link = s->link;
+    unsigned char body[64], rsp[256];
+    int rsp_len = 0;
+    int msg;
+
     /* SetConfiguration: ACP SEID, INT SEID, Media Transport + Media Codec */
     {
         int n = 0, co;
@@ -668,4 +682,52 @@ void avdtp_teardown(avdtp_session *s)
     if (s->media_scid) btlink_chan_close(s->link, s->media_scid);
     if (s->sig_scid) btlink_chan_close(s->link, s->sig_scid);
     s->media_scid = s->sig_scid = 0;
+}
+
+int avdtp_switch_codec(avdtp_session *s, int want_codec, int no_xq)
+{
+    unsigned char body[1], rsp[64];
+    int rsp_len = 0, msg;
+
+    if (!s || !s->link || !s->sig_scid) return 0;
+    if (!btlink_chan_is_open(s->link, s->sig_scid)) {
+        log_line("avdtp: switch: signalling channel is gone");
+        return 0;
+    }
+    log_line("avdtp: switching codec in place (%s -> %s), the link stays up",
+             s->codec.name ? s->codec.name : "?", hb_codec_key(want_codec));
+    avdtp_dump_close(s);
+    if (s->configured && !s->remote_closed) {
+        /* CLOSE releases the stream; the SEP is idle again and takes a
+         * new SET_CONFIGURATION. Signalling and the ACL stay up. */
+        body[0] = (unsigned char)(s->sink.seid << 2);
+        msg = avdtp_cmd(s, AV_CLOSE, body, 1, rsp, (int)sizeof rsp, &rsp_len);
+        if (msg != AV_MSG_ACCEPT) {
+            log_line("avdtp: switch: CLOSE answered %d — aborting the stream", msg);
+            (void)avdtp_cmd(s, AV_ABORT, body, 1, rsp, (int)sizeof rsp, &rsp_len);
+        }
+    }
+    s->streaming = 0;
+    s->configured = 0;
+    s->remote_closed = 0;
+    if (s->media_scid) {
+        btlink_chan_close(s->link, s->media_scid);
+        s->media_scid = 0;
+    }
+    {
+        long w = now_ms() + 200;      /* let DISC_RSP and the sink settle */
+        while (now_ms() < w)
+            if (btlink_pump(s->link, 20) < 0) return 0;
+    }
+    if (!btlink_chan_is_open(s->link, s->sig_scid)) {
+        log_line("avdtp: switch: the headset closed signalling after CLOSE");
+        return 0;
+    }
+    s->want_codec = want_codec;
+    s->no_xq = no_xq;
+    s->rtp_seq = 1;
+    s->rtp_ts = 0;
+    if (!pick_sbc_config(s, want_codec) && !pick_sbc_config(s, HB_CODEC_SBC))
+        return 0;
+    return configure_and_start(s);
 }
