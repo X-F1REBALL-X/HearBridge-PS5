@@ -23,7 +23,7 @@ SRCS := \
 	src/a2dp/a2dp.c src/a2dp/btlink.c src/a2dp/acl_pool.c src/a2dp/sdp_a2dp.c src/a2dp/avdtp.c src/a2dp/avdtp_media.c \
 	src/a2dp/avrcp.c src/a2dp/sdp_server.c src/ctl.c src/gain.c src/http.c \
 	src/a2dp/headset_ini.c src/a2dp/sbc_enc.c src/a2dp/rate.c src/tile.c src/tile_sys.c src/utf8.c src/a2dp/devclass.c src/a2dp/paired.c \
-	src/main_a2dp_spike.c
+	src/main.c
 
 OBJS := $(patsubst src/%.c,$(BUILD)/%.o,$(SRCS))
 

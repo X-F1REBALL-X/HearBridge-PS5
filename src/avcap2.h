@@ -8,10 +8,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Capture roughly CAPTURE_SECONDS of audio into out_path (raw float32 LE stereo).
- * Logs rate/frames/amplitude stats. Returns 0 on success, non-zero on failure. */
-int avcap2_capture_to_file(const char *out_path, int capture_seconds);
-
 /* Streaming session for A2DP encode path (48 kHz stereo). */
 typedef struct avcap2_session avcap2_session;
 
