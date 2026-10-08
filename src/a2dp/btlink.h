@@ -112,6 +112,7 @@ unsigned btlink_chan_peer_mtu(const btlink *l, unsigned scid);
 int      btlink_l2_send_media(btlink *l, unsigned scid, const unsigned char *d, int len);
 /* Media packets dropped so far on this link. */
 long     btlink_tx_dropped(const btlink *l);
+long     btlink_acl_gap_avg(const btlink *l);   /* ms between ACL completions while busy */
 /* ms since the controller last returned a credit for our packets while some
  * are outstanding (0 if none outstanding): a link that died quietly. */
 long     btlink_ms_since_credit(const btlink *l);

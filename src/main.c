@@ -991,15 +991,6 @@ static int read_stable(void)
     return !strncmp(buf, "stable", 6);
 }
 
-static void write_stable(int stable)
-{
-    FILE *f = fopen(LATENCY_PATH ".tmp", "w");
-    if (!f) return;
-    fputs(stable ? "stable\n" : "low\n", f);
-    fclose(f);
-    rename(LATENCY_PATH ".tmp", LATENCY_PATH);
-}
-
 /* Per-headset settings (hsprefs.h) of the headset in use. */
 static hb_prefs g_prefs;
 static unsigned char g_prefs_addr[6];
@@ -1009,6 +1000,7 @@ static int g_prefs_have;
 static void prefs_from_ctl(void)
 {
     g_prefs.codec = g_ctl.codec_pref;
+    g_prefs.latency_ms = g_ctl.latency_ms;
     g_prefs.eq_on = g_ctl.eq_on;
     memcpy(g_prefs.eq_db, g_ctl.eq_db, sizeof g_prefs.eq_db);
 }
@@ -1017,6 +1009,7 @@ static void prefs_from_ctl(void)
 static void prefs_to_ctl(void)
 {
     g_ctl.codec_pref = g_prefs.codec;
+    g_ctl.latency_ms = hb_latency_clamp(g_prefs.latency_ms);
     g_ctl.eq_on = g_prefs.eq_on;
     memcpy(g_ctl.eq_db, g_prefs.eq_db, sizeof g_ctl.eq_db);
     g_ctl.eq_seq++;
@@ -1026,8 +1019,8 @@ static void prefs_save(void)
 {
     if (!g_prefs_have) return;
     if (hb_prefs_save(HB_PREFS_DIR, g_prefs_addr, &g_prefs))
-        log_line("prefs: saved for this headset (codec %s, EQ %s %d/%d/%d/%d/%d dB)", hb_codec_key(g_prefs.codec),
-                 g_prefs.eq_on ? "on" : "off", g_prefs.eq_db[0], g_prefs.eq_db[1], g_prefs.eq_db[2],
+        log_line("prefs: saved for this headset (codec %s, latency %d ms, EQ %s %d/%d/%d/%d/%d dB)",
+                 hb_codec_key(g_prefs.codec), g_prefs.latency_ms, g_prefs.eq_on ? "on" : "off", g_prefs.eq_db[0], g_prefs.eq_db[1], g_prefs.eq_db[2],
                  g_prefs.eq_db[3], g_prefs.eq_db[4]);
     else
         log_line("prefs: cannot write %s", HB_PREFS_DIR);
@@ -1048,7 +1041,8 @@ static void prefs_attach(const unsigned char addr[6])
         prefs_to_ctl();
         g_ctl.prefs_dirty = 0;
         CTL_UNLOCK(&g_ctl);
-        log_line("prefs: loaded for this headset (codec %s)", hb_codec_key(g_prefs.codec));
+        log_line("prefs: loaded for this headset (codec %s, latency %d ms)", hb_codec_key(g_prefs.codec),
+                 g_prefs.latency_ms);
     } else {
         g_prefs = p;
         CTL_LOCK(&g_ctl);
@@ -1058,25 +1052,19 @@ static void prefs_attach(const unsigned char addr[6])
     }
 }
 
-/* Gain, latency mode and per-headset settings changed from the page:
+/* Gain and per-headset settings (codec, latency, EQ) changed from the page:
  * write them down. */
 static void persist_gain_if_dirty(void)
 {
-    int pct = -1, stable = -1, prefs = 0;
+    int pct = -1, prefs = 0;
     CTL_LOCK(&g_ctl);
     if (g_ctl.gain_dirty) { pct = g_ctl.gain_pct; g_ctl.gain_dirty = 0; }
-    if (g_ctl.stable_dirty) { stable = g_ctl.stable; g_ctl.stable_dirty = 0; }
     if (g_ctl.prefs_dirty) { prefs_from_ctl(); prefs = 1; g_ctl.prefs_dirty = 0; }
     CTL_UNLOCK(&g_ctl);
     if (prefs) prefs_save();
     if (pct >= 0) {
         write_gain_pct(pct);
         log_line("volume: base gain %d%% saved", pct);
-    }
-    if (stable >= 0) {
-        write_stable(stable);
-        log_line("latency: %s mode saved (media queue ~%d ms)", stable ? "stable" : "low-latency",
-                 stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS);
     }
 }
 
@@ -1089,7 +1077,8 @@ typedef struct {
     hb_rate rate;
     int fsz, samples_per, per_pkt, mtu;
     int max_pp;          /* tuned frames/packet ceiling (0 = MTU fit) */
-    int queue_ms;        /* media queue target: HB_QUEUE_LOW_MS or HB_QUEUE_STABLE_MS */
+    int queue_ms;        /* media queue target (latency slider), ms */
+    long bl_sum, bl_n;   /* backlog samples since the last status (latency estimate) */
     int rate_hz;
     unsigned char buf[HCI_PKT_MAX];
     int nbytes, nframes;
@@ -1107,6 +1096,10 @@ static void packer_size(packer *p)
     if (p->per_pkt * p->fsz > (int)sizeof p->buf) p->per_pkt = (int)sizeof p->buf / p->fsz;
     if (p->per_pkt < 1) p->per_pkt = 1;
     if (p->max_pp > 0 && p->per_pkt > p->max_pp) p->per_pkt = p->max_pp;
+    {
+        int lat_pp = hb_latency_frames_cap(p->queue_ms, p->rate_hz, p->samples_per);
+        if (lat_pp > 0 && p->per_pkt > lat_pp) p->per_pkt = lat_pp;
+    }
     if (p->link && p->rate_hz > 0)
         btlink_set_media_pace(p->link, (long)p->per_pkt * p->samples_per * 1000L / p->rate_hz);
 }
@@ -1121,6 +1114,8 @@ static void packer_flush(packer *p)
         p->frames += p->nframes;
     }
     p->nbytes = p->nframes = 0;
+    p->bl_sum += btlink_tx_backlog(p->link);
+    p->bl_n++;
     /* Between packets: adapt the bitpool to what the radio delivers. */
     bp = hb_rate_update(&p->rate, now_ms(), btlink_tx_backlog(p->link),
                         btlink_media_cap(p->link), btlink_tx_dropped(p->link));
@@ -1247,6 +1242,8 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     static hb_eq eq;
     unsigned eq_seq = 0;
     long xq_drops = 0;
+    int lat_changed = 0;
+    hb_latency lat;
 
     memset(&av, 0, sizeof av);
     {
@@ -1375,16 +1372,15 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     pk.mtu = (int)mtu;
     pk.rate_hz = scfg.sample_rate;
     CTL_LOCK(&g_ctl);
-    pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+    pk.queue_ms = hb_latency_clamp(g_ctl.latency_ms);
     CTL_UNLOCK(&g_ctl);
     packer_size(&pk);
     {
         /* Media queue from the first packet (tune_link() keeps it in step). */
         int pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
         btlink_set_media_cap(link, hb_media_queue_cap(pkt_ms, pk.queue_ms));
-        log_line("stream: %s mode, media queue %d packets (~%d ms)",
-                 pk.queue_ms == HB_QUEUE_STABLE_MS ? "stable" : "low-latency",
-                 btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
+        log_line("stream: latency target %d ms, media queue %d packets (~%d ms)",
+                 pk.queue_ms, btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
     }
     hb_rate_init(&pk.rate, av.bitpool_lo ? av.bitpool_lo : av.bitpool,
                  av.bitpool_hi ? av.bitpool_hi : av.bitpool, sbc_encoder_bitpool(enc), now_ms());
@@ -1485,7 +1481,10 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             gain_pct = g_ctl.gain_pct;
             muted = g_ctl.muted;
             tone = g_ctl.tone || tone_file;
-            pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+            if (hb_latency_clamp(g_ctl.latency_ms) != pk.queue_ms) {
+                pk.queue_ms = hb_latency_clamp(g_ctl.latency_ms);
+                lat_changed = 1;
+            }
             if (g_ctl.codec_pref != want_codec) req_codec = g_ctl.codec_pref;
             if (g_ctl.eq_seq != eq_seq) {
                 int on = g_ctl.eq_on, db[HB_EQ_NB];
@@ -1498,6 +1497,16 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             if (changed) log_line("stream: headset volume %d/127 -> gain", v);
             if (req_vol >= 0) btlink_avrcp_set_volume(link, req_vol);
             gain_milli = ctl_effective_gain_milli(gain_pct, muted, hs_vol);
+            if (lat_changed) {
+                /* New latency target: packet size and queue follow now. */
+                int pkt_ms;
+                lat_changed = 0;
+                packer_size(&pk);
+                pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
+                btlink_set_media_cap(link, hb_media_queue_cap(pkt_ms, pk.queue_ms));
+                log_line("stream: latency target %d ms — %d frames/packet, media queue %d packets (~%d ms)",
+                         pk.queue_ms, pk.per_pkt, btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
+            }
         }
         if (req_codec >= 0) {
             /* A new codec needs a new AVDTP configuration: reconnect. */
@@ -1551,6 +1560,13 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         samples += nframes;
 
         if (now - t_stat >= 1000) {
+            {
+                int pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
+                int q10 = pk.bl_n > 0 ? (int)(pk.bl_sum * 10 / pk.bl_n) : 0;
+                hb_latency_estimate(&lat, pkt_ms, q10, (int)btlink_acl_gap_avg(link),
+                                    av.delay_on ? av.sink_delay_x10 : 0);
+                pk.bl_sum = pk.bl_n = 0;
+            }
             log_line("stream: pkts=%ld sbc=%ld reads ok=%ld empty=%ld peak=%.4f "
                      "out=%.3f gain=%.2f hs=%d backlog=%d bitpool=%d frames/pkt=%d (mtu %d, frame %d B) dropped=%ld",
                      pk.pkts, pk.frames,
@@ -1570,6 +1586,13 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             g_ctl.bitpool_lo = pk.rate.lo;
             g_ctl.bitpool_hi = pk.rate.hi;
             g_ctl.uptime_s = (now - t_start) / 1000;
+            g_ctl.lat_total = lat.total_ms;
+            g_ctl.lat_capture = lat.capture_ms;
+            g_ctl.lat_packet = lat.packet_ms;
+            g_ctl.lat_queue = lat.queue_ms;
+            g_ctl.lat_radio = lat.radio_ms;
+            g_ctl.lat_sink = lat.sink_ms;
+            g_ctl.lat_sink_reported = lat.sink_reported;
             CTL_UNLOCK(&g_ctl);
             tune_link(&pk, now);
             if (want_codec == HB_CODEC_AUTO && av.codec.codec == HB_CODEC_SBC_XQ) {
@@ -1734,8 +1757,10 @@ int main(void)
     snprintf(g_ctl.saved_path, sizeof g_ctl.saved_path, "%s", SAVED_JSON);
     g_ctl.gain_pct = read_gain_pct();
     log_line("volume: base gain %d%% (%s)", g_ctl.gain_pct, GAIN_PATH);
-    g_ctl.stable = read_stable();
-    log_line("latency: %s mode (%s)", g_ctl.stable ? "stable" : "low-latency", LATENCY_PATH);
+    /* The old global mode file is the default for headsets without
+     * their own setting yet. */
+    g_ctl.latency_ms = read_stable() ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+    log_line("latency: default target %d ms (%s), per headset after that", g_ctl.latency_ms, LATENCY_PATH);
     {
         char url[64];
         int port;

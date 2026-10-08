@@ -1,5 +1,6 @@
 /* Developed by X-F1REBALL-X. */
 #include "ctl.h"
+#include "rate.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -63,6 +64,7 @@ void ctl_init(hb_ctl *c, const char *version)
     c->gain_pct = HB_GAIN_DEFAULT_PCT;
     c->req_hs_volume = -1;
     c->hs_volume = -1;
+    c->latency_ms = HB_QUEUE_LOW_MS;
     strncpy(c->version, version, sizeof c->version - 1);
     strcpy(c->state, "starting");
     c->t0_s = mono_s();

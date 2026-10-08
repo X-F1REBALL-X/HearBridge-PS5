@@ -111,3 +111,29 @@ int hb_rate_update(hb_rate *r, long now, int queue, int qmax, long drops)
     }
     return r->cur;
 }
+
+int hb_latency_clamp(int ms)
+{
+    return ms < HB_LAT_MIN_MS ? HB_LAT_MIN_MS : ms > HB_LAT_MAX_MS ? HB_LAT_MAX_MS : ms;
+}
+
+int hb_latency_frames_cap(int target_ms, int rate_hz, int samples_per)
+{
+    int n;
+    if (target_ms >= HB_QUEUE_LOW_MS || rate_hz <= 0 || samples_per <= 0) return 0;
+    n = (int)((long)target_ms * rate_hz / ((long)HB_QUEUE_FLOOR_PKTS * samples_per * 1000L));
+    return n < 2 ? 2 : n;
+}
+
+void hb_latency_estimate(hb_latency *o, int pkt_ms, int queue_x10, int radio_gap_ms,
+                         int sink_x10)
+{
+    o->capture_ms = HB_CAPTURE_MS;
+    o->packet_ms = pkt_ms > 0 ? pkt_ms : 0;               /* filling one packet */
+    o->queue_ms = queue_x10 > 0 ? (queue_x10 * o->packet_ms + 5) / 10 : 0;
+    /* One completion gap on average before the controller has sent it. */
+    o->radio_ms = radio_gap_ms > 0 ? (radio_gap_ms > 500 ? 500 : radio_gap_ms) : 0;
+    o->sink_reported = sink_x10 > 0;
+    o->sink_ms = sink_x10 > 0 ? (sink_x10 + 5) / 10 : HB_SINK_TYPICAL_MS;
+    o->total_ms = o->capture_ms + o->packet_ms + o->queue_ms + o->radio_ms + o->sink_ms;
+}

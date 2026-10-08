@@ -104,12 +104,15 @@ static void avdtp_answer_remote(avdtp_session *s, unsigned scid,
         log_line("avdtp: sink sent CLOSE");
         s->remote_closed = 1;
         break;
-    case 0x0D: /* DELAY_REPORT: just acknowledge */
+    case 0x0D: /* DELAY_REPORT: remember it for the latency estimate */
         r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_ACCEPT);
-        if (len >= 5)
-            log_line("avdtp: sink delay report %u.%u ms",
-                     (unsigned)((cmd[3] << 8) | cmd[4]) / 10,
-                     (unsigned)((cmd[3] << 8) | cmd[4]) % 10);
+        if (len >= 5) {
+            unsigned d = (unsigned)((cmd[3] << 8) | cmd[4]);
+            if (!s->delay_reports || (int)d != s->sink_delay_x10)
+                log_line("avdtp: sink delay report %u.%u ms", d / 10, d % 10);
+            s->sink_delay_x10 = (int)d;
+            s->delay_reports++;
+        }
         break;
     case AV_SET_CONFIGURATION:
         r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_REJECT);
@@ -268,7 +271,8 @@ static void log_hex_prefix(const char *tag, const unsigned char *p, int n, int m
 /* Media Codec service category (0x07): look for Audio + SBC (0x00). */
 static int parse_sbc_caps(const unsigned char *caps, int len, avdtp_sink_info *sink)
 {
-    int i = 0;
+    int i = 0, found = 0;
+    sink->delay_report = 0;
     while (i + 1 < len) {
         unsigned char cat = caps[i];
         unsigned char clen = caps[i + 1];
@@ -284,12 +288,14 @@ static int parse_sbc_caps(const unsigned char *caps, int len, avdtp_sink_info *s
                 sink->have_sbc = 1;
                 sink->bitpool_min = caps[i + 6];
                 sink->bitpool_max = caps[i + 7];
-                return 1;
+                found = 1;
             }
+        } else if (cat == 0x08) {   /* Delay Reporting (AVDTP 1.3) */
+            sink->delay_report = 1;
         }
         i += 2 + clen;
     }
-    return 0;
+    return found;
 }
 
 /* AVDTP Discover SEP (2 octets), Spec:
@@ -509,15 +515,24 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm, int want_cod
 
     /* SetConfiguration: ACP SEID, INT SEID, Media Transport + Media Codec */
     {
-        int n = 0;
+        int n = 0, co;
         body[n++] = (unsigned char)(s->sink.seid << 2);
         body[n++] = (unsigned char)(s->int_seid << 2);
         body[n++] = 0x01; body[n++] = 0x00; /* Media Transport */
         body[n++] = 0x07; body[n++] = 0x06; /* Media Codec len 6 */
         body[n++] = 0x00; /* Audio << 4 */
         body[n++] = 0x00; /* SBC */
+        co = n;
         memcpy(body + n, s->sbc_cfg, 4);
         n += 4;
+        s->delay_on = 0;
+        s->sink_delay_x10 = 0;
+        s->delay_reports = 0;
+        if (s->sink.delay_report) {
+            /* The sink can tell us how much it buffers: ask for it. */
+            body[n++] = 0x08; body[n++] = 0x00;
+            s->delay_on = 1;
+        }
         log_hex_prefix("avdtp: SET_CONFIGURATION body", body, n, 32);
         log_line("avdtp: SBC config %02x %02x bitpool %u-%u (freq %s, mode %s, "
                  "blocks %s, subbands %s, alloc %s)",
@@ -530,10 +545,16 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm, int want_cod
                  (s->sbc_cfg[1] & 0x04) ? "8" : "4",
                  (s->sbc_cfg[1] & 0x01) ? "loudness" : "snr");
         msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
+        if (msg != AV_MSG_ACCEPT && s->delay_on) {
+            log_line("avdtp: configuration with delay reporting refused — retrying without");
+            n -= 2;
+            s->delay_on = 0;
+            msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
+        }
         if (msg != AV_MSG_ACCEPT && s->codec.codec != HB_CODEC_SBC && pick_sbc_config(s, HB_CODEC_SBC)) {
             /* The sink refused the high-quality flavour: plain SBC. */
             log_line("avdtp: %s refused — falling back to SBC", s->want_codec == HB_CODEC_AUTO ? "auto pick" : "requested codec");
-            memcpy(body + n - 4, s->sbc_cfg, 4);
+            memcpy(body + co, s->sbc_cfg, 4);
             msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
         }
         if (msg != AV_MSG_ACCEPT && s->sbc_cfg[2] != s->sbc_cfg[3]) {
@@ -541,7 +562,7 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm, int want_cod
             log_line("avdtp: bitpool range %u-%u refused — retrying with fixed bitpool %d",
                      s->sbc_cfg[2], s->sbc_cfg[3], s->bitpool);
             s->sbc_cfg[2] = s->sbc_cfg[3] = (unsigned char)s->bitpool;
-            memcpy(body + n - 4, s->sbc_cfg, 4);
+            memcpy(body + co, s->sbc_cfg, 4);
             msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
         }
         if (msg != AV_MSG_ACCEPT) {

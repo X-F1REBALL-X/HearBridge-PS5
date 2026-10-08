@@ -67,4 +67,28 @@ int hb_frames_per_packet(int mtu, int frame_len);
  * (rounded to nearest), at least HB_QUEUE_MIN_PKTS. */
 int hb_media_queue_cap(int pkt_ms, int target_ms);
 
+/* Latency target picked on the page (per headset), ms. */
+#define HB_LAT_MIN_MS        60
+#define HB_LAT_MAX_MS      1000
+#define HB_QUEUE_FLOOR_PKTS   8   /* btlink never queues fewer packets */
+int hb_latency_clamp(int ms);
+/* Below the default target the packets get shorter, so the queue floor
+ * (HB_QUEUE_FLOOR_PKTS) still fits in target_ms. Frames/packet ceiling,
+ * 0 = no ceiling (MTU fit). */
+int hb_latency_frames_cap(int target_ms, int rate_hz, int samples_per);
+
+/* Rough end-to-end delay, PS5 capture to the headset's speaker. Only an
+ * estimate: the console's own audio path before capture is not counted,
+ * and without a sink delay report the headset's buffer is a typical value. */
+#define HB_CAPTURE_MS      21   /* one 1024-frame capture read at 48 kHz */
+#define HB_SINK_TYPICAL_MS 150  /* A2DP sink jitter buffer when it reports nothing */
+typedef struct {
+    int total_ms, capture_ms, packet_ms, queue_ms, radio_ms, sink_ms;
+    int sink_reported;          /* sink_ms came from an AVDTP delay report */
+} hb_latency;
+/* queue_x10 = average backlog in packets x10; sink_x10 = delay report
+ * (1/10 ms, 0 = none). */
+void hb_latency_estimate(hb_latency *o, int pkt_ms, int queue_x10, int radio_gap_ms,
+                         int sink_x10);
+
 #endif
