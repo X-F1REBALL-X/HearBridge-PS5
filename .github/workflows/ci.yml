@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Host tests (make test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential ffmpeg python3 python3-numpy
+      - name: make test
+        run: make test
+
+  ps5-build:
+    name: Console build (ps5-payload-sdk)
+    runs-on: ubuntu-latest
+    env:
+      # Official SDK release, pinned so builds are reproducible
+      # (v0.43 rebuilds the released 1.0.2 ELF byte for byte).
+      SDK_VERSION: v0.43
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18 unzip
+      - name: Download ps5-payload-sdk
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/ps5-payload-sdk.zip" \
+            "https://github.com/ps5-payload-dev/sdk/releases/download/${SDK_VERSION}/ps5-payload-sdk.zip"
+          unzip -q "$RUNNER_TEMP/ps5-payload-sdk.zip" -d "$RUNNER_TEMP"
+          echo "PS5_PAYLOAD_SDK=$RUNNER_TEMP/ps5-payload-sdk" >> "$GITHUB_ENV"
+      - name: make ps5
+        run: |
+          make ps5 2>&1 | tee build.log
+          if grep -q "warning:" build.log; then echo "::warning::compiler warnings in the console build"; fi
+          sha256sum dist/*.elf | tee dist/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HearBridge-PS5-elf
+          path: dist/
+          if-no-files-found: error

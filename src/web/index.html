@@ -28,6 +28,8 @@ background:var(--lime);transform:skewX(var(--sk));box-shadow:0 0 1.2rem rgba(200
 .meta{display:flex;align-items:center;margin-top:.2rem}
 .ver{color:var(--void);background:var(--ember);font-size:.72rem;font-weight:800;padding:0 .5em;margin-inline-end:.6em;letter-spacing:.06em;transform:skewX(var(--sk))}
 .by{color:var(--mute);font-size:.75rem;direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+.diag{color:var(--mute);font-size:.7rem;margin-inline-start:.8em;direction:ltr;unicode-bidi:isolate;white-space:nowrap;text-decoration:underline;opacity:.75}
+.diag:hover,.diag:focus{color:var(--ember);opacity:1}
 .live{display:flex;align-items:center;padding:.45rem 1.1rem;background:var(--deck);border:2px solid var(--edge);font-size:.9rem;font-weight:800;
 text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;transform:skewX(var(--sk))}
 .live i,.live span{transform:skewX(calc(var(--sk)*-1))}
@@ -218,7 +220,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 <body><div class="wrap">
 <header class="bar">
 <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span>
-<div><h1>Hear<b>Bridge</b> PS5</h1><div class="meta"><span class="ver" id="ver">-</span><span class="by">Developed by X-F1REBALL-X</span></div></div></div>
+<div><h1>Hear<b>Bridge</b> PS5</h1><div class="meta"><span class="ver" id="ver">-</span><span class="by">Developed by X-F1REBALL-X</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div></div></div>
 <div class="live" id="live"><i></i><span id="state">-</span></div>
 <div id="langbox"><button type="button" id="langbtn" aria-haspopup="true"><span data-i18n="language">Language</span></button><div id="langlist" role="menu"></div></div>
 </header>
@@ -253,6 +255,8 @@ html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 <div class="btns"><button id="mute" data-i18n="mute">Mute</button><button id="tone" data-i18n="tone">Test tone</button></div>
 </section>
 <section class="panel conn"><p class="label" data-i18n="connection">Connection</p>
+<div class="btns"><button id="lat" data-i18n="lowLatency">Low latency</button></div>
+<p class="k note" id="latnote" data-i18n="latHint">Low latency: about 0.2 s of buffering. Stable: about 1 s, fewer dropouts on a busy radio.</p>
 <div class="cbox"><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
 <p class="k note" data-i18n="footer">Closing this page leaves HearBridge running.</p></div>
 </section>
@@ -260,7 +264,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 </div>
 <script>
 var I18N=/*I18N*/;
-var S=null,busyG=0,busyH=0,LANG='en';
+var S=null,busyG=0,busyH=0,LANG='en',TOKEN='HBTOKENxxxxxxxxxxxxxxxxxxxxxxxxx';
 function $(i){return document.getElementById(i)}
 function t(k){var d=I18N.strings[LANG]||I18N.strings.en;return d[k]||I18N.strings.en[k]||k}
 function info(c){for(var i=0;i<I18N.langs.length;i++)if(I18N.langs[i].code==c)return I18N.langs[i];return I18N.langs[0]}
@@ -273,10 +277,12 @@ h+='<button type="button" class="langopt" role="menuitem" data-code="'+L.code+'"
 $('langlist').innerHTML=h;var b=$('langlist').getElementsByTagName('button');
 for(i=0;i<b.length;i++)b[i].onclick=function(){setLang(this.getAttribute('data-code'))};
 $('langbtn').onclick=function(){$('langlist').className=$('langlist').className?'':'show'}}
-function req(p,cb){var x=new XMLHttpRequest();x.open('GET',p,true);x.timeout=4000;
-x.onload=function(){if(x.status==200){try{S=JSON.parse(x.responseText);draw()}catch(e){}}if(cb)cb()};
+function xhr(m,p,cb){var x=new XMLHttpRequest();x.open(m,p,true);x.timeout=4000;if(m=='POST')x.setRequestHeader('X-HB-Token',TOKEN);
+x.onload=function(){if(x.status==200){try{S=JSON.parse(x.responseText);draw()}catch(e){}}else if(x.status==403)$('msg').textContent=t('reload');if(cb)cb()};
 x.onerror=x.ontimeout=function(){$('msg').textContent=t('unreachable');$('live').className='live bad';if(cb)cb()};
 x.send()}
+function req(p,cb){xhr('GET',p,cb)}
+function act(p,cb){xhr('POST',p,cb)}
 var devT=0;
 function esc(x){return String(x).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 var ICON={
@@ -296,9 +302,9 @@ function getj(p,cb){var x=new XMLHttpRequest();x.open('GET',p,true);x.timeout=40
 function row(icon,name,meta,btns,cls,sig){return '<div class="dl'+(cls?' '+cls:'')+'"><span class="ico">'+icon+'</span><span class="nm"><b>'+esc(name)+'</b><span class="k meta">'+meta+'</span></span><span class="sig">'+(sig||'')+'</span><span class="acts">'+btns+'</span></div>'}
 function wire(id){var b=$(id).getElementsByTagName('button');for(var i=0;i<b.length;i++)b[i].onclick=function(){
 var a=this.getAttribute('data-addr'),f=this.getAttribute('data-forget');
-if(this.getAttribute('data-disc')){req('/api/disconnect');return}
-if(f){if(confirm(t('forgetConfirm')))req('/api/forget?addr='+a,saved);return}
-req('/api/select?addr='+a);this.textContent=t('connecting')+'…'}}
+if(this.getAttribute('data-disc')){act('/api/disconnect');return}
+if(f){if(confirm(t('forgetConfirm')))act('/api/forget?addr='+a,saved);return}
+act('/api/select?addr='+a);this.textContent=t('connecting')+'…'}}
 var SAVL=null;
 function stOf(){return S?(S.paused?'paused':S.state):''}
 function linked(){var st=stOf();return st=='streaming'||st=='connected'}
@@ -331,7 +337,8 @@ function draw(){
 $('msg').textContent='';
 $('ver').textContent=S.version;
 var st=S.paused?'paused':S.state;
-$('state').textContent={reconnecting:1,disconnected:1,paused:1,error:1,idle:1,'waiting-selection':1}[st]?t('notConnected')+(st=='error'&&S.detail?' ('+S.detail.replace(/^error\s*/,'')+')':''):(t(st)==st?st:t(st));
+var det=st=='error'&&S.detail?S.detail.replace(/^error\s*/,''):'';if(/^unsupported-format/.test(det))det=t('unsupportedFmt');
+$('state').textContent={reconnecting:1,disconnected:1,paused:1,error:1,idle:1,'waiting-selection':1}[st]?t('notConnected')+(det?' ('+det+')':''):(t(st)==st?st:t(st));
 $('live').className='live '+(st=='streaming'||st=='connected'?'ok':(st=='paused'||st=='disconnected'||st=='error'?'bad':'wait'));
 var on=!!S.connected,link=on||((st=='connecting'||st=='pairing')&&S.device);
 $('dev').textContent=link?(S.device||'-'):t('notConnected');$('stats').style.display=on?'':'none';
@@ -350,15 +357,17 @@ if(!busyH&&S.headset_volume>=0)$('hs').value=S.headset_volume;
 $('hv').textContent=S.headset_volume<0?'-':pct(S.headset_volume*100/127);
 
 $('mute').className=S.muted?'ember':'';$('mute').textContent=t(S.muted?'unmute':'mute');
-$('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone')}
+$('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone');
+$('lat').className=S.stable?'':'act';$('lat').textContent=t(S.stable?'stableMode':'lowLatency')}
 $('gain').oninput=function(){busyG=1;$('gv').textContent=pct(this.value)};
-$('gain').onchange=function(){req('/api/volume?pct='+this.value,function(){busyG=0})};
+$('gain').onchange=function(){act('/api/volume?pct='+this.value,function(){busyG=0})};
 $('hs').oninput=function(){busyH=1;$('hv').textContent=pct(this.value*100/127)};
-$('hs').onchange=function(){req('/api/headset?vol='+this.value,function(){busyH=0})};
-$('mute').onclick=function(){req('/api/mute?on='+(S&&S.muted?0:1))};
-$('tone').onclick=function(){req('/api/tone?on='+(S&&S.tone?0:1))};
-$('scan').onclick=function(){req('/api/scan');$('scanning').style.display=''};
-$('stop').onclick=function(){if(confirm(t('stopConfirm')))req('/api/stop')};
+$('hs').onchange=function(){act('/api/headset?vol='+this.value,function(){busyH=0})};
+$('mute').onclick=function(){act('/api/mute?on='+(S&&S.muted?0:1))};
+$('tone').onclick=function(){act('/api/tone?on='+(S&&S.tone?0:1))};
+$('lat').onclick=function(){act('/api/latency?stable='+(S&&S.stable?0:1))};
+$('scan').onclick=function(){act('/api/scan');$('scanning').style.display=''};
+$('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();
 (function(){var c=null,m=/[?&]lang=([a-z]{2})/.exec(location.search);if(m)c=m[1];else try{c=localStorage.getItem('hb_lang')}catch(e){}
 if(!c){var n=(navigator.language||'en').slice(0,2).toLowerCase();c=info(n).code==n?n:'en'}setLang(c)})();

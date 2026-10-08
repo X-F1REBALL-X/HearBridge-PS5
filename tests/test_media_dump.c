@@ -23,6 +23,20 @@ int main(int argc, char **argv)
     int per_pkt = 10, fsz, i, t = 0, npk = argc > 2 ? atoi(argv[2]) : 200;
 
     if (argc < 2) return 2;
+    {
+        /* Format choice: 48 kHz two-channel only; refuse the rest. */
+        int joint, bad = 0;
+        const char *why;
+        if (avdtp_sbc_pick_mode(0x3f, &joint, &why) != 0x11 || !joint) bad |= 1;     /* everything: 48k joint */
+        if (avdtp_sbc_pick_mode(0x12, &joint, &why) != 0x12 || joint) bad |= 2;      /* 48k stereo */
+        if (avdtp_sbc_pick_mode(0x14, &joint, &why) != 0x14 || joint) bad |= 4;      /* 48k dual */
+        if (avdtp_sbc_pick_mode(0x2f, &joint, &why) != 0 || !why || !strstr(why, "44.1")) bad |= 8;  /* 44.1k only */
+        if (avdtp_sbc_pick_mode(0x18, &joint, &why) != 0 || !why || !strstr(why, "mono")) bad |= 16; /* mono only */
+        if (avdtp_sbc_pick_mode(0xc3, &joint, &why) != 0 || !why) bad |= 32;         /* 16/32 kHz only */
+        printf("%s   SBC format: 48 kHz stereo accepted, 44.1 kHz-only / mono-only / other refused%s\n",
+               bad ? "FAIL" : "ok", bad ? " (see bits)" : "");
+        if (bad) { printf("FAIL bits %#x\n", bad); return 1; }
+    }
     memset(&s, 0, sizeof s);
     memcpy(s.sbc_cfg, ie, 4);
     s.rtp_ssrc = 0x48524247; s.rtp_seq = 1;

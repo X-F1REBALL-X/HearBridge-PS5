@@ -15,6 +15,15 @@ int hb_frames_per_packet(int mtu, int frame_len)
     return n;
 }
 
+int hb_media_queue_cap(int pkt_ms, int target_ms)
+{
+    int n;
+    if (pkt_ms < 1) pkt_ms = 1;
+    if (target_ms < 0) target_ms = 0;
+    n = (target_ms + pkt_ms / 2) / pkt_ms;
+    return n < HB_QUEUE_MIN_PKTS ? HB_QUEUE_MIN_PKTS : n;
+}
+
 void hb_rate_init(hb_rate *r, int lo, int hi, int start, long now_ms)
 {
     r->lo = lo > HB_RATE_FLOOR ? lo : HB_RATE_FLOOR;

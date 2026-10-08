@@ -5,6 +5,29 @@
 #include <stdio.h>
 #include <string.h>
 
+int avdtp_sbc_pick_mode(unsigned char caps0, int *joint, const char **why)
+{
+    unsigned char out = 0x10;                     /* 48 kHz */
+    *joint = 0;
+    *why = NULL;
+    /* freq: bit7=16k bit6=32k bit5=44.1 bit4=48 */
+    if (!(caps0 & 0x10)) {
+        *why = (caps0 & 0x20) ? "the headset takes 44.1 kHz but not 48 kHz (no resampler)"
+                              : "the headset takes neither 44.1 nor 48 kHz";
+        return 0;
+    }
+    /* channel: bit3=mono bit2=dual bit1=stereo bit0=joint */
+    if (caps0 & 0x01) { out |= 0x01; *joint = 1; }
+    else if (caps0 & 0x02) out |= 0x02;
+    else if (caps0 & 0x04) out |= 0x04;
+    else {
+        *why = (caps0 & 0x08) ? "the headset takes mono only (no downmix)"
+                              : "the headset takes no stereo mode";
+        return 0;
+    }
+    return out;
+}
+
 int avdtp_build_media(avdtp_session *s, const unsigned char *sbc_frames, int len,
                       int samples_in_packet, int n_sbc_frames,
                       unsigned char *pkt, int pkt_max)

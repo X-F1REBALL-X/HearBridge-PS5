@@ -19,6 +19,9 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <dirent.h>
+
+#include <ps5/kernel.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usb_ioctl.h>
@@ -27,6 +30,7 @@
 #include "hci_usb.h"
 #include "usb_hci_desc.h"
 #include "log.h"
+#include "diag.h"
 #include "util.h"
 #include "stop.h"
 
@@ -426,13 +430,39 @@ static void pick_endpoints(int fd, struct usbhci_iface *ifc)
              k > 0 ? "using" : "fallback, no", k, ifc->evt_ep, ifc->in_ep, ifc->out_ep);
 }
 
+/* "1286:2059 \"product\" by \"vendor\"" for an open ugen fd (read-only
+ * ioctls: nothing is sent to the device). */
+static void device_id(int fd, char *out, size_t cap)
+{
+    struct usb_device_descriptor dd;
+    struct usb_device_info di;
+    int n = 0;
+
+    memset(&dd, 0, sizeof dd);
+    memset(&di, 0, sizeof di);
+    if (ioctl(fd, USB_GET_DEVICE_DESC, &dd) == 0)
+        n = snprintf(out, cap, "%04x:%04x class %02x", UGETW(dd.idVendor),
+                     UGETW(dd.idProduct), dd.bDeviceClass);
+    else
+        n = snprintf(out, cap, "????:???? (device descriptor errno %d)", errno);
+    if (n > 0 && (size_t)n < cap && ioctl(fd, USB_GET_DEVICEINFO, &di) == 0)
+        snprintf(out + n, cap - (size_t)n, " \"%.40s\" by \"%.40s\"",
+                 di.udi_product, di.udi_vendor);
+}
+
 static int try_node(struct usb_hci *u, const char *path)
 {
     struct usb_fs_init in;
+    char id[128];
     int i;
     u->fd = open(path, O_RDWR);
-    if (u->fd < 0) return 0;
+    if (u->fd < 0) {
+        log_line("hci_usb: open %s: errno %d", path, errno);
+        return 0;
+    }
     snprintf(u->node, sizeof u->node, "%s", path);
+    device_id(u->fd, id, sizeof id);
+    log_line("usb: %s is %s", path, id);
     pick_endpoints(u->fd, &u->ifc);
 
     memset(&in, 0, sizeof in);
@@ -451,9 +481,12 @@ static int try_node(struct usb_hci *u, const char *path)
     u->tx_slot = SLOT_OUT;
     log_line("hci_usb: opened %s (%d event / %d ACL reads in flight)", path,
              READS_EVT, READS_ACL);
+    diag_set("bt controller", "%s %s; HCI iface %d evt 0x%02x in 0x%02x out 0x%02x", path, id,
+             u->ifc.number, u->ifc.evt_ep, u->ifc.in_ep, u->ifc.out_ep);
     return 1;
 fail:
     log_line("hci_usb: %s unusable: %s", path, strerror(errno));
+    diag_set("bt controller", "%s %s unusable (errno %d)", path, id, errno);
     close(u->fd);
     u->fd = -1;
     memset(u->sl, 0, sizeof u->sl);
@@ -484,5 +517,108 @@ int hci_usb_open(hci_t *out)
         }
     }
     free(u);
+    diag_set("bt controller", "NOT FOUND: none of /dev/ugen0.2, 0.3, 1.2, 0.1 could be used");
     return 0;
+}
+
+/* ---- diagnostics: list every ugen device ---------------------------------- */
+
+static void survey_one(const char *path, int *count)
+{
+    static uint8_t cfg[1024];
+    char id[128], desc[DIAG_VAL_MAX - 160], key[40];
+    struct usb_gen_descriptor gd;
+    int fd = open(path, O_RDONLY), n;
+
+    if (fd < 0) fd = open(path, O_RDWR);
+    snprintf(key, sizeof key, "usb %s", path);
+    if (fd < 0) {
+        log_line("usb: %s: open errno %d", path, errno);
+        diag_set(key, "cannot open (errno %d)", errno);
+        (*count)++;
+        return;
+    }
+    device_id(fd, id, sizeof id);
+    memset(&gd, 0, sizeof gd);
+    gd.ugd_data = cfg;
+    gd.ugd_maxlen = (uint16_t)sizeof cfg;
+    gd.ugd_config_index = 0xFF;                 /* the current configuration */
+    n = ioctl(fd, USB_GET_FULL_DESC, &gd) == 0 ? gd.ugd_actlen : 0;
+    if (n > (int)sizeof cfg) n = (int)sizeof cfg;
+    if (n > 0) usbhci_describe(cfg, n, desc, sizeof desc);
+    else snprintf(desc, sizeof desc, "configuration descriptor unavailable (errno %d)", errno);
+    close(fd);
+    log_line("usb: %s is %s: %s", path, id, desc);
+    diag_set(key, "%s: %s", id, desc);
+    (*count)++;
+}
+
+/* opendir/readdir/closedir were not imported by 1.0.2. Every import is
+ * bound by the payload runtime before main() runs, and one that does not
+ * bind ends the payload silently (no notification, no log). So these are
+ * looked up here, at run time, and the survey falls back to known node
+ * names when they are missing. */
+typedef DIR *(*opendir_fn)(const char *);
+typedef struct dirent *(*readdir_fn)(DIR *);
+typedef int (*closedir_fn)(DIR *);
+
+static intptr_t libc_sym(const char *name)
+{
+    static const char *const libs[] = { "libSceLibcInternal.sprx", "libc.sprx" };
+    size_t i;
+
+    for (i = 0; i < sizeof libs / sizeof libs[0]; i++) {
+        uint32_t h = 0;
+        intptr_t a;
+        if (kernel_dynlib_handle(-1, libs[i], &h) != 0 || !h) continue;
+        if ((a = kernel_dynlib_dlsym(-1, h, name))) return a;
+    }
+    return 0;
+}
+
+static int list_ugen(char names[][32], int max)
+{
+    opendir_fn od = (opendir_fn)libc_sym("opendir");
+    readdir_fn rd = (readdir_fn)libc_sym("readdir");
+    closedir_fn cd = (closedir_fn)libc_sym("closedir");
+    struct dirent *e;
+    DIR *dir;
+    int n = 0;
+
+    if (!od || !rd || !cd) {
+        log_line("usb: directory listing unavailable (opendir %p readdir %p closedir %p)",
+                 (void *)od, (void *)rd, (void *)cd);
+        return 0;
+    }
+    if (!(dir = od("/dev"))) return 0;
+    while ((e = rd(dir)) && n < max)
+        if (!strncmp(e->d_name, "ugen", 4))
+            snprintf(names[n++], 32, "/dev/%.24s", e->d_name);
+    cd(dir);
+    return n;
+}
+
+int hci_usb_survey(void)
+{
+    static const char *const fallback[] = {
+        "/dev/ugen0.1", "/dev/ugen0.2", "/dev/ugen0.3", "/dev/ugen1.1", "/dev/ugen1.2",
+    };
+    char names[24][32];
+    int n = list_ugen(names, 24), count = 0, i, j;
+
+    if (!n) {
+        log_line("usb: no ugen entries listed in /dev (errno %d); trying known names", errno);
+        for (i = 0; i < (int)(sizeof fallback / sizeof fallback[0]); i++)
+            snprintf(names[n++], sizeof names[0], "%s", fallback[i]);
+    }
+    for (i = 1; i < n; i++)                       /* sort: stable report order */
+        for (j = i; j > 0 && strcmp(names[j - 1], names[j]) > 0; j--) {
+            char t[32];
+            memcpy(t, names[j], sizeof t);
+            memcpy(names[j], names[j - 1], sizeof t);
+            memcpy(names[j - 1], t, sizeof t);
+        }
+    for (i = 0; i < n; i++) survey_one(names[i], &count);
+    diag_set("usb devices", "%d ugen node(s)", count);
+    return count;
 }

@@ -324,25 +324,16 @@ static int pick_sbc_config(avdtp_sink_info *sink, uint8_t cfg[4], int *bitpool)
 {
     unsigned char c0 = sink->sbc_caps[0];
     unsigned char c1 = sink->sbc_caps[1];
-    int rate = 0, ch = 0, joint = 0;
-    unsigned char out0 = 0, out1 = 0;
+    int rate = 48000, ch = 2, joint = 0;
+    unsigned char out0, out1 = 0;
+    const char *why = NULL;
     int bp;
 
-    /* freq: bit7=16k bit6=32k bit5=44.1 bit4=48 — pick 48 then 44.1 */
-    if (c0 & 0x10) { out0 |= 0x10; rate = 48000; }
-    else if (c0 & 0x20) { out0 |= 0x20; rate = 44100; }
-    else {
-        log_line("sbc: the headset takes neither 44.1 nor 48 kHz");
-        return 0;
-    }
-
-    /* channel: bit3=mono bit2=dual bit1=stereo bit0=joint */
-    if (c0 & 0x01) { out0 |= 0x01; ch = 2; joint = 1; }
-    else if (c0 & 0x02) { out0 |= 0x02; ch = 2; }
-    else if (c0 & 0x04) { out0 |= 0x04; ch = 2; }
-    else if (c0 & 0x08) { out0 |= 0x08; ch = 1; }
-    else {
-        log_line("sbc: the headset takes no stereo mode");
+    /* 48 kHz, two channels (joint > stereo > dual): what the capture
+     * delivers. Anything else is refused instead of streamed wrong. */
+    out0 = (unsigned char)avdtp_sbc_pick_mode(c0, &joint, &why);
+    if (!out0) {
+        log_line("sbc: NOT SUPPORTED: %s (capabilities %02x)", why ? why : "?", c0);
         return 0;
     }
 
@@ -544,8 +535,10 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
              s->sink.seid, s->sink.sbc_caps[0], s->sink.sbc_caps[1],
              (unsigned)s->sink.bitpool_min, (unsigned)s->sink.bitpool_max);
 
-    if (!pick_sbc_config(&s->sink, s->sbc_cfg, &s->bitpool))
+    if (!pick_sbc_config(&s->sink, s->sbc_cfg, &s->bitpool)) {
+        s->unsupported_format = 1;
         return 0;
+    }
     memcpy(s->sink.sbc_caps, s->sbc_cfg, 4); /* store chosen */
 
     /* SetConfiguration: ACP SEID, INT SEID, Media Transport + Media Codec */

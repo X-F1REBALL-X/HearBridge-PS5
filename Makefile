@@ -1,17 +1,21 @@
 # HearBridge PS5: Bluetooth headphones (A2DP) on a jailbroken PS5.
 #
-#   make ps5                  builds the payload (needs PS5_PAYLOAD_SDK)
-#   make send PS5_HOST=ip     sends it (ask the user first)
+#   make test                 host tests (cc, ffmpeg, python3 + numpy)
+#   make ps5                  builds dist/HearBridge-PS5-<version>.elf
+#   make send PS5_HOST=ip     builds and sends it to the console's ELF loader
 #
-# Default PS5_PAYLOAD_SDK points at the box SDK at the configured path.
+# PS5_PAYLOAD_SDK must point at an unpacked ps5-payload-sdk release
+# (https://github.com/ps5-payload-dev/sdk/releases), e.g.
+#   export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
+# There is no default, so a missing SDK is reported instead of guessed.
 
 PS5_HOST ?= ps5
 PS5_PORT ?= 9021
-PS5_PAYLOAD_SDK ?= /tmp/sdkx/ps5-payload-sdk
+VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/version.h)
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-reinstall
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page
 
 all: ps5
 
@@ -22,12 +26,10 @@ endif
 	$(MAKE) -f ps5.mk PS5_PAYLOAD_SDK=$(PS5_PAYLOAD_SDK)
 
 send: ps5
-	@echo "Refusing auto-send: ask the user before deploying to the console."
-	@echo "When approved: $(PS5_PAYLOAD_SDK)/bin/prospero-deploy -h $(PS5_HOST) -p $(PS5_PORT) dist/HearBridge-PS5-*.elf"
-	@false
+	$(PS5_PAYLOAD_SDK)/bin/prospero-deploy -h $(PS5_HOST) -p $(PS5_PORT) dist/HearBridge-PS5-$(VERSION).elf
 
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) dist
 
 # Host test for the SBC encoder (needs cc, ffmpeg, python3+numpy).
 test-sbc:
@@ -54,7 +56,7 @@ test-control:
 	@mkdir -p $(BUILD)/host
 	python3 scripts/gen_webpage.py src/web/index.html $(BUILD)/host/webpage.h src/web/i18n.json
 	cmp -s $(BUILD)/host/webpage.h src/webpage.h || (echo "src/webpage.h is stale: make webpage"; false)
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp tests/test_control.c src/http.c src/ctl.c src/gain.c src/a2dp/avrcp.c src/a2dp/sdp_server.c -lpthread -o $(BUILD)/host/test_control
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp tests/test_control.c src/http.c src/diag.c src/ctl.c src/gain.c src/a2dp/avrcp.c src/a2dp/sdp_server.c -lpthread -o $(BUILD)/host/test_control
 	$(BUILD)/host/test_control $(BUILD)/host/status.json
 	python3 -c "import json;d=json.load(open('$(BUILD)/host/status.json'));print('ok   status JSON parses,', len(d), 'keys')"
 
@@ -87,7 +89,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-reinstall
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -106,11 +108,23 @@ test-track:
 
 test-pace:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_pace.c src/a2dp/acl_pool.c -o $(BUILD)/host/test_pace
+	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_pace.c src/a2dp/acl_pool.c src/a2dp/rate.c -o $(BUILD)/host/test_pace
 	$(BUILD)/host/test_pace
+
+# Diagnostics report (/api/diag, diag.txt), USB descriptor summary.
+test-diag:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt tests/test_diag.c src/diag.c src/bt/usb_hci_desc.c -lpthread -o $(BUILD)/host/test_diag
+	$(BUILD)/host/test_diag
 
 # Re-install: icon registered on every run (fake installer), lock cases.
 test-reinstall:
 	@mkdir -p $(BUILD)/host
 	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_LOCK_HOST_TEST -Isrc tests/test_reinstall.c src/tile.c src/lock.c src/log.c src/util.c -o $(BUILD)/host/test_reinstall
 	$(BUILD)/host/test_reinstall
+
+# Control page script: GET for reads, POST + token for actions (needs node;
+# skipped when node is not installed).
+test-page:
+	@if command -v node >/dev/null 2>&1; then node tests/test_page.js src/web/index.html src/web/i18n.json; \
+	else echo "skip test-page: node not installed"; fi
