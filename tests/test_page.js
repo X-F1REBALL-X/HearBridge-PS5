@@ -37,7 +37,7 @@ check(calls.some(function(c,i){return i>0 && c.m==='POST' && c.p==='/api/scan' &
 check(/setInterval\(function\(\)\{if\(scanLive/.test(html), 'page: devices are polled during the scan, not after it');
 check(/Nothing yet/.test(el('evlog').innerHTML), 'page: empty log says nothing yet');
 const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], 
-  ['scan', '/api/scan'], ['reset', '/api/reset'], ['stop', '/api/stop'], ['clean', '/api/clean']];
+  ['scan', '/api/scan'], ['reconnect', '/api/reconnect'], ['reset', '/api/reset'], ['stop', '/api/stop'], ['clean', '/api/clean']];
 for (const [id, path] of actions) {
   calls.length = 0; el(id).onclick();
   const c = calls[0];
@@ -58,6 +58,9 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150',
 check(html.indexOf('class="panel logp"') > html.indexOf('id="devlist"') && html.indexOf('id="evbox"') < 0 &&
   html.indexOf('data-i18n="log"') > 0 && html.indexOf('data-i18n="logEmpty"') > 0,
   'page: log is its own panel, not inside devices');
+check(html.indexOf('id="reset"') > html.indexOf('id="scan"') && html.indexOf('id="reset"') < html.indexOf('id="savedlist"') &&
+  html.indexOf('id="reconnect"') > html.indexOf('id="scan"') && html.indexOf('id="reconnect"') < html.indexOf('id="savedlist"'),
+  'page: reconnect and reset sit with Scan, not off the bottom');
 check(el('cd0').className === 'act' && el('cd2').disabled && el('cd2').className === 'no' && !el('cd3').disabled && el('cd3').className !== 'no',
   'page: auto is on, a supported codec stays clickable, an unsupported one is grey');
 check(/\.seg button\[disabled\],\.seg button\.no\{color:var\(--mute\)/.test(html) && !/\.seg button\[disabled\],\.seg button\.no\{display:none\}/.test(html),
