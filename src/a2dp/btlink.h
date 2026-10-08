@@ -45,6 +45,9 @@ int  btlink_own_acl_pending(void);
 /* HCI status of the last failed btlink_connect page (0x04 = page timeout),
  * 0 when it failed for another reason (auth, transport, 0x0b). */
 int  btlink_last_connect_fail(void);
+/* HCI reason of the last drop of a link this app owned (0x13 case / remote
+ * user, 0x08 supervision timeout). 0 if none yet. */
+int  btlink_last_disc_reason(void);
 /* HCI Disconnect (0x13) one known handle and wait for Disconnection
  * Complete. Only for handles seen in Connection Complete events. */
 /* Take over an encrypted ACL left up by a2dp_pair (fresh L2CAP state). */

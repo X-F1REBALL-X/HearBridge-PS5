@@ -83,7 +83,7 @@ static int is_write_path(const char *path)
     static const char *const w[] = {
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
-        "/api/stop", "/api/latency", "/api/codec", "/api/eq", "/api/clean",
+        "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -350,6 +350,9 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->paused = 1;
     } else if (!strcmp(path, "/api/stop")) {
         c->req_stop = 1;
+    } else if (!strcmp(path, "/api/reset")) {
+        /* Our page and our headset ACL only. Not an HCI reset. */
+        c->req_reset = 1;
     } else {
         CTL_UNLOCK(c);
         return respond(out, max, 404, "application/json", "{\"error\":\"unknown\"}", 19);

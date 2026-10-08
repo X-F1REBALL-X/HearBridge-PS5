@@ -87,6 +87,8 @@ int main(int argc, char **argv)
     CHECK(c.req_connect && !c.paused, "connect");
     post(&c, "/api/stop");
     CHECK(c.req_stop, "stop");
+    post(&c, "/api/reset");
+    CHECK(c.req_reset, "reset");
     n = get(&c, "/api/status");
     CHECK(strstr(out, "\"stable\":0") && strstr(out, "\"queue_ms\":200") &&
           strstr(out, "\"latency\":{\"target_ms\":200,"), "latency: 200 ms target by default");

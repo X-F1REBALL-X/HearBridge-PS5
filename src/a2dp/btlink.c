@@ -130,6 +130,7 @@ struct btlink {
 };
 
 static int g_connect_fail;
+static int g_disc_reason;     /* HCI reason of the last drop of OUR link */
 
 /* Last successful ACL handle (this process). Used to drop stale links. */
 static unsigned g_last_acl_handle;
@@ -1117,6 +1118,7 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
         }
         l->handle = le16(ev + 3) & 0x0FFF;
         l->connected = 1;
+        g_disc_reason = 0;
         l->t_conn = now_ms();
         g_last_acl_handle = l->handle;
         log_line("btlink: ACL up handle %#05x", l->handle);
@@ -1159,6 +1161,7 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
         }
         if (l->connected && dh == (l->handle & 0x0FFF)) {
             log_line("btlink: disconnected (reason %#04x)", ev[5]);
+            g_disc_reason = ev[5];
             l->connected = 0;
             if (g_last_acl_handle == dh) g_last_acl_handle = 0;
         }
@@ -1516,6 +1519,20 @@ int btlink_last_connect_fail(void)
     return g_connect_fail;
 }
 
+int btlink_last_disc_reason(void)
+{
+    return g_disc_reason;
+}
+
+/* Stop OUR page to this address. Does not disconnect any ACL, so a
+ * DualSense on another handle is left alone. */
+static void cancel_our_page(btlink *l)
+{
+    if (!l || !l->hci.ops) return;
+    fire_cmd(l->hci, 0x0408, l->addr, 6);
+    log_line("btlink: cancelled our page");
+}
+
 int btlink_connect(btlink *l, const unsigned char addr[6],
                    unsigned char psrm, unsigned clock_offset,
                    const unsigned char *link_key, unsigned char key_type,
@@ -1534,6 +1551,7 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
     l->need_drop = 0;
     l->cc_fail = 0;
     g_connect_fail = 0;
+    g_disc_reason = 0;
     l->drop_hint = 0;
     l->pending_disc = 0;
     l->pending_disc_done = 0;
@@ -1570,9 +1588,10 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         }
     }
     {
-        /* Explicit page timeout: 0x8000 slots = 20.48 s. */
-        unsigned char pt[2] = { 0x00, 0x80 }, o[16]; int ol = 0;
-        (void)hci_cmd_sync(l->hci, 0x0C18, pt, 2, o, &ol, (int)sizeof o);
+        /* Page timeout 0x8000 slots = 20.48 s. Fire and don't wait:
+         * a missing Command Complete used to stall Connect for seconds. */
+        unsigned char pt[2] = { 0x00, 0x80 };
+        (void)fire_cmd(l->hci, 0x0C18, pt, 2);
     }
     memcpy(p, addr, 6);
     put16(p + 6, 0xCC18);
@@ -1610,6 +1629,10 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
                     log_line("btlink: drop aborted — connect FAIL (stale ACL)");
                     return 0;
                 }
+                /* 0x0b with no handle of ours is a page we left running,
+                 * not some other device's ACL. Cancel that page only. */
+                if (!l->connected && !g_last_acl_handle)
+                    cancel_our_page(l);
             }
             if (l->purge_fail) {
                 log_line("btlink: purge_fail set — refusing CREATE retry");
@@ -1628,6 +1651,8 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         } else if (!l->connected && l->retry_create && l->create_retries >= 1) {
             log_line("btlink: 0x0b again after retry — FAIL (case-cycle buds?)");
             l->retry_create = 0;
+            cancel_our_page(l);
+            g_connect_fail = 0x0B;
             return 0;
         }
 
@@ -1651,6 +1676,7 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         if (!l->connected && l->cc_fail) {
             /* 0x04 page timeout etc.: no point waiting out the full timeout. */
             g_connect_fail = l->cc_fail;
+            cancel_our_page(l);
             log_line("btlink: connect failed (status %#04x%s)", l->cc_fail,
                      l->cc_fail == 0x04 ? ", page timeout" : "");
             return 0;
@@ -1663,6 +1689,7 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         }
         if (!l->connected && now_ms() - t0 > 20000) {
             g_connect_fail = 0x04;          /* no answer: same as a page timeout */
+            cancel_our_page(l);
             log_line("btlink: connection timeout");
             return 0;
         }
@@ -1672,6 +1699,10 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         }
     }
     log_line("btlink: overall timeout");
+    if (!l->connected) {
+        cancel_our_page(l);
+        g_connect_fail = 0x04;
+    }
     return 0;
 }
 
