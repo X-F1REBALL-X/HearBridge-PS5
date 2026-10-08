@@ -14,7 +14,7 @@ CFLAGS  := -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/bt -Isrc/a2dp
 # Symbols 1.0.2 did not import (sceAppInstUtilAppInstallTitleDir and friends,
 # opendir/readdir/closedir) are looked up at run time instead, so a firmware
 # without one of them still loads. scripts/check_imports.sh enforces this.
-LDLIBS  += -lSceSystemService -lSceAppInstUtil -lpthread
+LDLIBS  += -lSceSystemService -lpthread
 
 # 1.0.0: generic A2DP source — saved device or inquiry → SSP pair →
 # SDP A2DP Sink → AVDTP (SNK+SBC) → Avcap2 capture → SBC stream.

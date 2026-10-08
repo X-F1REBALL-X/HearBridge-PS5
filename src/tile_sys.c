@@ -28,10 +28,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-int sceAppInstUtilInitialize(void);
-int sceAppInstUtilTerminate(void);
-int sceAppInstUtilAppUnInstall(const char *title_id);
-
+/* libSceAppInstUtil is not a link-time dependency: the payload runtime
+ * binds every DT_NEEDED module before main() and dies silently when one
+ * cannot be loaded, so a missing or locked-down installer module would take
+ * the whole payload (notification, page, audio) with it. It is loaded here
+ * instead; without it there is just no tile. */
+#define NID_Initialize         "540lotO7oHE"  /* sceAppInstUtilInitialize */
+#define NID_Terminate          "kLLazhNh6d4"  /* sceAppInstUtilTerminate */
+#define NID_AppUnInstall       "Sx4TTyrQccE"  /* sceAppInstUtilAppUnInstall */
+#define NID_LoadStartModule    "wzvqT4UqKX8"  /* sceKernelLoadStartModule */
 #define NID_AppInstallTitleDir "Wudg3Xe3heE"  /* sceAppInstUtilAppInstallTitleDir */
 #define NID_AppInstallAll      "+scQA5stvjs"  /* sceAppInstUtilAppInstallAll */
 #define NID_AppExists          "kUT4RpxclMQ"  /* sceAppInstUtilAppExists */
@@ -42,12 +47,49 @@ static int is_dir(const char *p)
     return stat(p, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
+typedef int (*fn_load_start)(const char *, size_t, const void *, uint32_t, void *, int *);
+
+/* Handle of libSceAppInstUtil.sprx, loading it on first use. */
+static uint32_t appinst_handle(void)
+{
+    static const char *const kernels[] = { "libkernel_web.sprx", "libkernel.sprx", "libkernel_sys.sprx", NULL };
+    static const char *const paths[] = { "/system/common/lib/libSceAppInstUtil.sprx",
+                                         "libSceAppInstUtil.sprx", NULL };
+    static int tried;
+    uint32_t h = 0, kh = 0;
+    fn_load_start load = NULL;
+    int i, rv = 0, res = 0;
+
+    if (kernel_dynlib_handle(-1, "libSceAppInstUtil.sprx", &h) == 0 && h) return h;
+    if (tried) return 0;
+    tried = 1;
+    for (i = 0; kernels[i] && !load; i++)
+        if (kernel_dynlib_handle(-1, kernels[i], &kh) == 0 && kh)
+            load = (fn_load_start)kernel_dynlib_resolve(-1, kh, NID_LoadStartModule);
+    if (!load) {
+        log_line("tile: no sceKernelLoadStartModule, cannot load the installer module");
+        diag_set("libSceAppInstUtil.sprx", "FAILED: sceKernelLoadStartModule not resolved");
+        return 0;
+    }
+    for (i = 0; paths[i]; i++) {
+        res = 0;
+        rv = load(paths[i], 0, NULL, 0, NULL, &res);
+        if (kernel_dynlib_handle(-1, "libSceAppInstUtil.sprx", &h) == 0 && h) {
+            log_line("tile: loaded %s (rv %d, handle %#x)", paths[i], rv, h);
+            diag_set("libSceAppInstUtil.sprx", "loaded from %s", paths[i]);
+            return h;
+        }
+    }
+    log_line("tile: cannot load libSceAppInstUtil.sprx (rv %#x, res %#x) — no home screen icon",
+             (unsigned)rv, (unsigned)res);
+    diag_set("libSceAppInstUtil.sprx", "FAILED to load (rv %#x res %#x)", (unsigned)rv, (unsigned)res);
+    return 0;
+}
+
 static void *appinst_nid(const char *nid)
 {
-    uint32_t h = 0;
-    if (kernel_dynlib_handle(-1, "libSceAppInstUtil.sprx", &h) != 0 || !h)
-        return NULL;
-    return (void *)kernel_dynlib_resolve(-1, h, nid);
+    uint32_t h = appinst_handle();
+    return h ? (void *)kernel_dynlib_resolve(-1, h, nid) : NULL;
 }
 
 static int meta_exists(const char *title_id)
@@ -103,8 +145,15 @@ int tile_install(const char *url, tile_report *rep)
     }
 
     memset(&ops, 0, sizeof ops);
-    ops.init = sceAppInstUtilInitialize;
-    ops.term = sceAppInstUtilTerminate;
+    ops.init = (int (*)(void))appinst_nid(NID_Initialize);
+    ops.term = (int (*)(void))appinst_nid(NID_Terminate);
+    if (!ops.init || !ops.term) {
+        r->result = -1;
+        r->failed = "loading libSceAppInstUtil.sprx";
+        log_line("tile: installer module not available — skipping the icon, the page still works");
+        report(r);
+        return -1;
+    }
     ops.title_dir = (int (*)(const char *, const char *, void *))appinst_nid(NID_AppInstallTitleDir);
     ops.install_all = (int (*)(void *))appinst_nid(NID_AppInstallAll);
     ops.app_exists = (int (*)(const char *, int *))appinst_nid(NID_AppExists);
@@ -122,22 +171,27 @@ int tile_install(const char *url, tile_report *rep)
 int tile_uninstall(void)
 {
     hb_creds saved;
-    int rc;
+    int rc = -1;
+    int (*init)(void) = (int (*)(void))appinst_nid(NID_Initialize);
+    int (*term)(void) = (int (*)(void))appinst_nid(NID_Terminate);
+    int (*uninstall)(const char *) = (int (*)(const char *))appinst_nid(NID_AppUnInstall);
 
-    rc = sceAppInstUtilInitialize();
-    if (!rc) {
-        rc = sceAppInstUtilAppUnInstall(HB_TILE_ID);
-        sceAppInstUtilTerminate();
-    }
-    if (rc) {
-        /* Own rights refused (newer firmware): once more as ShellCore. */
-        creds_elevate(HB_AUTHID_SHELLCORE, &saved, "tile");
-        rc = sceAppInstUtilInitialize();
+    if (init && term && uninstall) {
+        rc = init();
         if (!rc) {
-            rc = sceAppInstUtilAppUnInstall(HB_TILE_ID);
-            sceAppInstUtilTerminate();
+            rc = uninstall(HB_TILE_ID);
+            term();
         }
-        creds_restore(&saved, "tile");
+        if (rc) {
+            /* Own rights refused (newer firmware): once more as ShellCore. */
+            creds_elevate(HB_AUTHID_SHELLCORE, &saved, "tile");
+            rc = init();
+            if (!rc) {
+                rc = uninstall(HB_TILE_ID);
+                term();
+            }
+            creds_restore(&saved, "tile");
+        }
     }
     log_line("tile: unregister %s -> %#x", HB_TILE_ID, (unsigned)rc);
     diag_set("tile", "removed on request (unregister %#x)", (unsigned)rc);
