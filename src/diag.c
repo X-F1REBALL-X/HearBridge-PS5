@@ -26,6 +26,13 @@ void diag_init(const char *path)
     pthread_mutex_unlock(&mu);
 }
 
+void diag_set_path(const char *path)
+{
+    pthread_mutex_lock(&mu);
+    snprintf(save_path, sizeof save_path, "%s", path ? path : "");
+    pthread_mutex_unlock(&mu);
+}
+
 void diag_set(const char *key, const char *fmt, ...)
 {
     char val[DIAG_VAL_MAX];

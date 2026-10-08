@@ -1467,6 +1467,35 @@ done:
     return rc;
 }
 
+/* Home-screen tile: rewritten and registered again on every run, so an
+ * icon deleted from the home screen comes back by running the ELF again.
+ * second = another instance is already running: only (re)register, never
+ * process remove_tile (the running instance did that). */
+static void home_tile(int second)
+{
+    if (!second && access(RM_TILE_PATH, F_OK) == 0) {
+        tile_uninstall();
+        (void)diag_save();
+        unlink(RM_TILE_PATH);
+        { FILE *f = fopen(NO_TILE_PATH, "w"); if (f) fclose(f); }
+    } else if (access(NO_TILE_PATH, F_OK) != 0 && access(RM_TILE_PATH, F_OK) != 0) {
+        char u[200] = "";
+        tile_report tr;
+        FILE *f = fopen(TILE_URL_PATH, "r");
+        if (f) {
+            if (!fgets(u, sizeof u, f)) u[0] = 0;
+            fclose(f);
+            u[strcspn(u, "\r\n ")] = 0;
+            if (!strcmp(u, "start")) snprintf(u, sizeof u, "%s", HB_TILE_START_URL);
+        }
+        if (tile_install(u, &tr) != 0)
+            notify("HearBridge: home-screen icon not added (%s, code %#x). Details: %s",
+                   tr.failed ? tr.failed : "?", (unsigned)tr.code, second ? LOG_PATH : DIAG_PATH);
+    } else {
+        diag_set("tile", "disabled (%s exists)", NO_TILE_PATH);
+    }
+}
+
 /* fw13.60 build: when Bluetooth cannot start, keep the web page (and
  * /api/diag) up until Stop is pressed or the stop file appears, instead of
  * exiting at once, so the report can be read from a phone or PC. */
@@ -1491,15 +1520,20 @@ int main(void)
     /* Log first so a lock problem is written down too (a second instance
      * only appends a few lines before it exits). */
     log_ok = log_open(LOG_PATH);
-    diag_init(DIAG_PATH);
+    diag_init(NULL);           /* file path set once we own the lock */
     diag_set("hearbridge", "%s (%s build, compiled %s)", HEARBRIDGE_VERSION,
              HEARBRIDGE_FLAVOR[0] ? HEARBRIDGE_FLAVOR : "default", __DATE__);
     lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
     if (lock_rc == LOCK_BUSY) {
+        /* Running the ELF again still brings back a deleted icon. */
+        log_line("HearBridge PS5 %s: another instance is running; refreshing the home-screen icon only",
+                 HEARBRIDGE_VERSION);
+        home_tile(1);
         notify("HearBridge: already running");
         log_close();
         return 1;
     }
+    diag_set_path(DIAG_PATH);
     if (lock_rc == LOCK_NO_WRITE) {
         /* Not "already running": the state folder is not writable. Carry on
          * so the page and /api/diag still work. */
@@ -1544,29 +1578,7 @@ int main(void)
     }
 
     /* Home-screen tile that opens the control page in the browser. */
-    if (access(RM_TILE_PATH, F_OK) == 0) {
-        tile_uninstall();
-        (void)diag_save();
-        unlink(RM_TILE_PATH);
-        { FILE *f = fopen(NO_TILE_PATH, "w"); if (f) fclose(f); }
-    } else if (access(NO_TILE_PATH, F_OK) != 0) {
-        char u[200] = "";
-        FILE *f = fopen(TILE_URL_PATH, "r");
-        if (f) {
-            if (!fgets(u, sizeof u, f)) u[0] = 0;
-            fclose(f);
-            u[strcspn(u, "\r\n ")] = 0;
-            if (!strcmp(u, "start")) snprintf(u, sizeof u, "%s", HB_TILE_START_URL);
-        }
-        {
-            tile_report tr;
-            if (tile_install(u, &tr) != 0)
-                notify("HearBridge: home-screen icon not added (%s, code %#x). Details: %s",
-                       tr.failed ? tr.failed : "?", (unsigned)tr.code, DIAG_PATH);
-        }
-    } else {
-        diag_set("tile", "disabled (%s exists)", NO_TILE_PATH);
-    }
+    home_tile(0);
 
     /* Diagnostics: audio libraries and every USB device (read-only). */
     (void)avcap2_probe();
