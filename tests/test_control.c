@@ -4,6 +4,7 @@
 #include "ctl.h"
 #include "gain.h"
 #include "http.h"
+#include "diag.h"
 #include "avrcp.h"
 #include "sdp_server.h"
 
@@ -76,6 +77,16 @@ int main(int argc, char **argv)
     CHECK(c.req_connect && !c.paused, "connect");
     get(&c, "/api/stop");
     CHECK(c.req_stop, "stop");
+    diag_init(NULL);
+    get(&c, "/api/diag");
+    CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/plain") &&
+          strstr(out, "no diagnostics collected yet"), "diag: placeholder before collection");
+    diag_set("model", "CFI-1016A");
+    diag_set("tile", "RESULT ok");
+    get(&c, "/api/diag");
+    CHECK(strstr(out, "\r\n\r\nmodel: CFI-1016A\ntile: RESULT ok\n") != NULL, "diag: serves the report");
+    get(&c, "/");
+    CHECK(strstr(out, "href=\"/api/diag\"") != NULL, "page links to /api/diag");
     strcpy(c.devices_path, "/nonexistent/devices.json");
     get(&c, "/api/devices");
     CHECK(strstr(out, "\"devices\":[]") != NULL, "devices: empty list when no scan yet");

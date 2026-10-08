@@ -28,6 +28,8 @@ background:var(--lime);transform:skewX(var(--sk));box-shadow:0 0 1.2rem rgba(200
 .meta{display:flex;align-items:center;margin-top:.2rem}
 .ver{color:var(--void);background:var(--ember);font-size:.72rem;font-weight:800;padding:0 .5em;margin-inline-end:.6em;letter-spacing:.06em;transform:skewX(var(--sk))}
 .by{color:var(--mute);font-size:.75rem;direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+.diag{color:var(--mute);font-size:.7rem;margin-inline-start:.8em;direction:ltr;unicode-bidi:isolate;white-space:nowrap;text-decoration:underline;opacity:.75}
+.diag:hover,.diag:focus{color:var(--ember);opacity:1}
 .live{display:flex;align-items:center;padding:.45rem 1.1rem;background:var(--deck);border:2px solid var(--edge);font-size:.9rem;font-weight:800;
 text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;transform:skewX(var(--sk))}
 .live i,.live span{transform:skewX(calc(var(--sk)*-1))}
@@ -218,7 +220,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 <body><div class="wrap">
 <header class="bar">
 <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span>
-<div><h1>Hear<b>Bridge</b> PS5</h1><div class="meta"><span class="ver" id="ver">-</span><span class="by">Developed by X-F1REBALL-X</span></div></div></div>
+<div><h1>Hear<b>Bridge</b> PS5</h1><div class="meta"><span class="ver" id="ver">-</span><span class="by">Developed by X-F1REBALL-X</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div></div></div>
 <div class="live" id="live"><i></i><span id="state">-</span></div>
 <div id="langbox"><button type="button" id="langbtn" aria-haspopup="true"><span data-i18n="language">Language</span></button><div id="langlist" role="menu"></div></div>
 </header>

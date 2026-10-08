@@ -3,7 +3,9 @@
 #include "log.h"
 
 #include <sys/types.h>
+#ifndef HB_LOCK_HOST_TEST
 #include <sys/sysctl.h>
+#endif
 #include <sys/time.h>
 
 #include <errno.h>
@@ -16,6 +18,9 @@ static char held_path[256];
 
 long lock_boot_time(void)
 {
+#ifdef HB_LOCK_HOST_TEST
+    return 0;          /* host test: no boot-time check */
+#else
     int mib[2] = { CTL_KERN, KERN_BOOTTIME };
     struct timeval bt;
     size_t sz = sizeof bt;
@@ -24,6 +29,7 @@ long lock_boot_time(void)
     if (sysctl(mib, 2, &bt, &sz, NULL, 0) != 0)
         return 0;
     return (long)bt.tv_sec;
+#endif
 }
 
 /* Is the instance described by the file still running? */
@@ -46,24 +52,38 @@ static int owner_alive(const char *path, long boot)
     return 0;
 }
 
-int lock_take(const char *path)
+int lock_take_ex(const char *path, int *err)
 {
     long boot = lock_boot_time();
     FILE *f;
 
+    if (err) *err = 0;
     if (owner_alive(path, boot)) {
         log_line("lock: %s belongs to a running instance", path);
-        return 0;
+        return LOCK_BUSY;
     }
     f = fopen(path, "w");
     if (!f) {
-        log_line("lock: cannot write %s (errno %d)", path, errno);
-        return 0;
+        int e = errno;
+        log_line("lock: cannot write %s (errno %d: %s)", path, e, strerror(e));
+        if (err) *err = e;
+        return LOCK_NO_WRITE;
     }
     fprintf(f, "%ld %ld\n", (long)getpid(), boot);
-    fclose(f);
+    if (fclose(f) != 0) {
+        int e = errno;
+        log_line("lock: cannot write %s (errno %d: %s)", path, e, strerror(e));
+        unlink(path);
+        if (err) *err = e;
+        return LOCK_NO_WRITE;
+    }
     snprintf(held_path, sizeof held_path, "%s", path);
-    return 1;
+    return LOCK_OK;
+}
+
+int lock_take(const char *path)
+{
+    return lock_take_ex(path, NULL) == LOCK_OK;
 }
 
 void lock_release(void)

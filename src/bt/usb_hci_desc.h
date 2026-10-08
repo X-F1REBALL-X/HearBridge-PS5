@@ -8,6 +8,7 @@
 #ifndef HEARBRIDGE_USB_HCI_DESC_H
 #define HEARBRIDGE_USB_HCI_DESC_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define USBHCI_MAX_IFACES 4
@@ -23,5 +24,11 @@ struct usbhci_iface {
  * interfaces are written to `found` in the order they appear. Returns the
  * number written. */
 int usbhci_scan(const uint8_t *d, int len, struct usbhci_iface *found);
+
+/* Human-readable summary of every interface and endpoint, for logs and the
+ * diagnostics report, e.g.
+ *   "if0.0 e0/01/01 (BT HCI) ep81 int/16 ep82 bulk/64 ep02 bulk/64; if1.0 ..."
+ * Returns the length written (out is always NUL-terminated if cap > 0). */
+int usbhci_describe(const uint8_t *d, int len, char *out, size_t cap);
 
 #endif
