@@ -42,7 +42,16 @@ typedef struct {
     int dump_left;
     int quick;              /* teardown: single short command try */
     int peer_opened;          /* signalling channel opened by the headset */
+    int unsupported_format;   /* the sink cannot take 48 kHz stereo SBC */
 } avdtp_session;
+
+/* Sampling frequency + channel mode octet (A2DP SBC IE octet 0) chosen
+ * from the sink's capability octet 0. Capture is 48 kHz stereo and there
+ * is no resampler or downmix, so only 48 kHz with a two-channel mode
+ * (joint stereo, stereo, dual channel, in that order) is accepted.
+ * Returns the octet (non-zero) and sets *joint; returns 0 and sets *why
+ * when the sink cannot take that. Pure (avdtp_media.c, host tested). */
+int avdtp_sbc_pick_mode(unsigned char caps0, int *joint, const char **why);
 
 /* Open signaling, Discover → GetAllCaps/GetCaps → SetConfiguration →
  * Open → media channel → Start. Returns 1 on success. */
