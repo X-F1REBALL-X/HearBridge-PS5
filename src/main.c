@@ -36,6 +36,7 @@
 #include "gain.h"
 #include "hsprefs.h"
 #include "eq.h"
+#include "cswitch.h"
 #include "http.h"
 
 #include <sys/stat.h>
@@ -359,6 +360,7 @@ typedef struct { int kind, index; unsigned char addr[6]; } hb_cmd;
 static headset_ini g_paired[PAIRED_MAX];
 static int g_npaired;
 static hb_cmd g_pending;              /* command that ended the last session */
+static hb_cswitch g_cs;               /* codec switch that needs a reconnect */
 
 static void publish_saved(const headset_ini *cur)
 {
@@ -1068,6 +1070,35 @@ static void persist_gain_if_dirty(void)
     }
 }
 
+/* Codec change on the open link: the hb_cswitch in-place steps (asked
+ * codec, then plain SBC). 1 = streaming again; 0 = the link is gone or the
+ * headset refused both, g_cs then holds the reconnect steps. */
+static int codec_switch_in_place(avdtp_session *av, btlink *link, int want, int no_xq)
+{
+    hb_cs_begin(&g_cs, want, no_xq);
+    while (g_cs.step == HB_CS_INPLACE || g_cs.step == HB_CS_INPLACE_SBC) {
+        int w = g_cs.step == HB_CS_INPLACE ? g_cs.want : HB_CODEC_SBC;
+        int ok = avdtp_switch_codec(av, w, g_cs.no_xq);
+        int up = btlink_is_up(link) && btlink_chan_is_open(link, av->sig_scid);
+        if (!ok) log_line("switch: in-place %s failed (link %s)", hb_codec_key(w), up ? "up" : "gone");
+        hb_cs_next(&g_cs, ok, up);
+    }
+    if (g_cs.step == HB_CS_DONE) {
+        log_line("switch: now %s, headset stayed connected", av->codec.name ? av->codec.name : "SBC");
+        g_cs.step = HB_CS_IDLE;
+        return 1;
+    }
+    return 0;
+}
+
+/* Pause before a reconnect attempt; a page command or Stop cuts it short. */
+static void cs_wait(hci_t hci)
+{
+    long end = now_ms() + g_cs.delay_ms;
+    while (now_ms() < end && !hb_stop_requested() && !cmd_waiting())
+        idle_pump(hci, 50);
+}
+
 /* Encode + send up to max_sbc frames from pcm[frames]. Returns packets sent. */
 /* Packs SBC frames into media packets of up to per_pkt frames. */
 typedef struct {
@@ -1238,12 +1269,13 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     double tone_phase = 0.0, sine_phase = 0.0;
     float peak_seen = 0.f;
     int tone = 0, tone_file = 0, gain_milli = 1000, out_peak = 0, gain_pct, muted;
-    int hs_vol = -1, avst = 0, want_codec = HB_CODEC_AUTO, xq_bad_s = 0;
+    int hs_vol = -1, avst = 0, want_codec = HB_CODEC_AUTO, xq_bad_s = 0, xq_low_s = 0;
     static hb_eq eq;
     unsigned eq_seq = 0;
     long xq_drops = 0;
     int lat_changed = 0;
     hb_latency lat;
+    int cs_want = -1, cs_no_xq = 0, switched = 0;
 
     memset(&av, 0, sizeof av);
     {
@@ -1256,9 +1288,23 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         if (pend.kind == CMD_ADDR || pend.kind == CMD_INDEX) {
             r = try_pick(asess, hci, &pend, NULL, NULL, 0, ini, &link, &av_psm);
         } else if (pend.kind == CMD_RECONNECT || (user && pend.kind == CMD_NONE)) {
+            int cs = pend.kind == CMD_RECONNECT && g_cs.step == HB_CS_RECONNECT;
             if (ini->ok) {
+                if (cs) cs_wait(hci);
                 hold_clear(ini->addr);
                 r = try_saved(hci, ini, &link, &av_psm, 30000);
+                /* After a codec change the link dropped: keep paging the
+                 * headset (growing pauses) instead of waiting for Connect. */
+                while (cs && r != 1 && !hb_stop_requested() && !cmd_waiting() &&
+                       hb_cs_next(&g_cs, 0, 0) == HB_CS_RECONNECT) {
+                    log_line("switch: reconnect attempt %d of %d in %ld ms", g_cs.attempt,
+                             HB_CS_TRIES, g_cs.delay_ms);
+                    write_status("connecting %s", ini->name[0] ? ini->name : "-");
+                    cs_wait(hci);
+                    hold_clear(ini->addr);
+                    r = try_saved(hci, ini, &link, &av_psm, 30000);
+                }
+                if (cs) log_line("switch: reconnect %s", r == 1 ? "worked" : "gave up — press Connect");
                 if (r != 1)
                     write_status("error %s %s", conn_fail_label(0), ini->name[0] ? ini->name : "-");
             } else if (g_npaired) {
@@ -1277,6 +1323,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             }
         }
         g_user_connect = 0;
+        g_cs.step = HB_CS_IDLE;
         if (hb_stop_requested()) { rc = RUN_STOP; goto done; }
         if (r != 1) {
             /* Not connected: keep the device list fresh (inquiry only, no
@@ -1332,6 +1379,18 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         }
     }
 
+stream_setup:
+    if (want_codec != HB_CODEC_AUTO && av.codec.codec != want_codec) {
+        /* The headset cannot take what was picked: plain SBC, and the page
+         * and this headset's settings say so. */
+        log_line("codec: %s does not fit this headset — using %s", hb_codec_key(want_codec),
+                 hb_codec_key(av.codec.codec));
+        want_codec = av.codec.codec;
+        CTL_LOCK(&g_ctl);
+        g_ctl.codec_pref = want_codec;
+        g_ctl.prefs_dirty = 1;
+        CTL_UNLOCK(&g_ctl);
+    }
     memset(&scfg, 0, sizeof scfg);
     scfg.sample_rate = av.sink.sample_rate ? av.sink.sample_rate : 48000;
     scfg.channels = av.sink.channels ? av.sink.channels : 2;
@@ -1355,7 +1414,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         goto done;
     }
 
-    cap = avcap2_session_open();
+    if (!cap) cap = avcap2_session_open();
     if (!cap) {
         log_line("stream: Avcap2 open failed");
         goto done;
@@ -1431,9 +1490,13 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
 
     write_status("connected %s", ini->name[0] ? ini->name : "-");
     ctl_set_state("streaming", ini->name);
-    notify("hearbridge: connected %s", ini->name[0] ? ini->name : "headphones");
+    if (!switched) notify("hearbridge: connected %s", ini->name[0] ? ini->name : "headphones");
+    else notify("HearBridge: now %s", av.codec.name ? av.codec.name : "SBC");
     log_line("stream: streaming until stop file or link drop");
 
+    samples = 0;
+    xq_bad_s = xq_low_s = 0;
+    xq_drops = btlink_tx_dropped(link);
     t_start = t_stat = now_ms();
     for (;;) {
         int nframes, req_vol = -1, req_disc = 0, changed = 0, req_codec = -1;
@@ -1509,9 +1572,26 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             }
         }
         if (req_codec >= 0) {
-            /* A new codec needs a new AVDTP configuration: reconnect. */
-            log_line("stream: codec %s picked on the page — reconnecting the headset", hb_codec_key(req_codec));
+            log_line("stream: codec %s picked on the page", hb_codec_key(req_codec));
+            cs_want = req_codec;
+            cs_no_xq = g_prefs.auto_no_xq;
+        }
+        if (cs_want >= 0) {
+            /* New codec = new AVDTP configuration. Done on the open link
+             * (no disconnect: some headsets, the Xbox one included, do not
+             * answer pages for minutes after we drop them). */
+            int ok;
             persist_gain_if_dirty();
+            ok = codec_switch_in_place(&av, link, cs_want, cs_no_xq);
+            want_codec = cs_want;
+            cs_want = -1;
+            if (ok) {
+                sbc_encoder_close(enc);
+                enc = NULL;
+                switched = 1;
+                goto stream_setup;
+            }
+            log_line("stream: codec switch lost the link — paging the headset again");
             memset(&g_pending, 0, sizeof g_pending);
             g_pending.kind = CMD_RECONNECT;
             rc = RUN_SWITCH;
@@ -1602,14 +1682,20 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
                 long d = btlink_tx_dropped(link);
                 xq_bad_s = (d > xq_drops && pk.rate.cur <= pk.rate.lo + 2) ? xq_bad_s + 1 : 0;
                 xq_drops = d;
+                /* Holding but far below its 38: dual channel at under 30 per
+                 * channel sounds worse than joint stereo SBC at 51-53. */
+                xq_low_s = pk.rate.cur < HB_XQ_LOW_BP ? xq_low_s + 1 : 0;
+                if (xq_low_s >= 30) {
+                    log_line("codec: SBC-XQ stays at bitpool %d (<%d) on this link", pk.rate.cur, HB_XQ_LOW_BP);
+                    xq_bad_s = 10;
+                }
                 if (xq_bad_s >= 10) {
                     log_line("codec: SBC-XQ does not hold on this link — auto uses SBC for this headset from now on");
                     g_prefs.auto_no_xq = 1;
                     prefs_save();
-                    memset(&g_pending, 0, sizeof g_pending);
-                    g_pending.kind = CMD_RECONNECT;
-                    rc = RUN_SWITCH;
-                    break;
+                    cs_want = HB_CODEC_AUTO;      /* switched in place on the next pass */
+                    cs_no_xq = 1;
+                    xq_bad_s = 0;
                 }
             }
             peak_seen = 0.f;

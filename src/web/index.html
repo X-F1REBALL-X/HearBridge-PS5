@@ -168,9 +168,10 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .presets button{min-height:2.2rem;padding:.1rem .8rem;font-size:.84rem;margin:var(--s1) 0}
 .presets button.act{color:var(--void)}.presets button.act:before{background:var(--b3);border-color:var(--b3)}
 /* codec picker: segmented row */
-.seg{display:grid;grid-template-columns:repeat(4,1fr);grid-gap:var(--s1);margin:0 0 var(--s2)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);grid-gap:var(--s1);margin:0 0 var(--s2)}
 .seg button{min-height:2.5rem;padding:.2rem .4rem;font-size:.88rem}
-.seg button[disabled]{opacity:.35;cursor:default}
+.seg button[disabled],.seg button.no{display:none}
+.cno{margin:0 0 var(--s2);color:var(--ink2)}.cno:empty{display:none}
 .seg button[disabled]:before{border-style:dashed}
 /* latency meter */
 .latm{margin:0 0 var(--s2);padding:var(--s2) var(--s3);background:var(--card);border:1px solid var(--edge)}
@@ -320,7 +321,8 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 <section class="panel conn"><p class="label" data-i18n="connection">Connection</p>
 <p class="sub" data-i18n="codec">Codec</p>
 <div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
-<p class="k note" id="codecnote" data-i18n="codecHint">Auto picks the best the headset takes: SBC-XQ, then SBC HQ, then SBC. Changing it reconnects the headset.</p>
+<p class="k note cno" id="codecno"></p>
+<p class="k note" id="codecnote" data-i18n="codecHint">Auto picks the best the headset takes: SBC-XQ, then SBC HQ, then SBC. Switching keeps the headset connected.</p>
 <p class="sub" data-i18n="latency">Latency</p>
 <div class="latm"><div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big" id="latv">-</span></div>
 <div class="lbar" id="lbar"><i id="lb0" style="background:var(--b0)"></i><i id="lb1" style="background:var(--b2)"></i><i id="lb2" style="background:var(--b3)"></i><i id="lb3" style="background:var(--b4)"></i></div>
@@ -428,8 +430,11 @@ $('hv').textContent=S.headset_volume<0?'-':pct(S.headset_volume*100/127);
 
 $('mute').className=S.muted?'ember':'';$('mute').textContent=t(S.muted?'unmute':'mute');
 $('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone');
-for(var ci=0;ci<4;ci++){var cb=$('cd'+ci);cb.className=(S.codec_pref|0)==ci?'act':'';
-cb.disabled=!!(ci&&S.codec_avail&&!(S.codec_avail&(1<<ci)));cb.title=cb.disabled?t('codecNo'):''}
+/* only what this headset's capabilities allow can be picked (the server refuses the rest too) */
+var CN=['','SBC','SBC HQ','SBC-XQ'],nos=[];
+for(var ci=0;ci<4;ci++){var cb=$('cd'+ci),ok=ci<2||!!(S.codec_avail&(1<<ci));cb.disabled=!ok;
+cb.className=!ok?'no':(S.codec_pref|0)==ci?'act':'';if(!ok)nos.push(CN[ci])}
+setHtml('codecno',!nos.length?'':S.codec_avail?esc(t('codecNo')+': '+nos.join(', ')):esc(t('codecWait')))
 drawEq();drawLat()}
 /* latency: estimate from the stream loop (see hb_latency_estimate) */
 var busyL=0,LATCOL=['var(--b0)','var(--b2)','var(--b3)','var(--b4)'];

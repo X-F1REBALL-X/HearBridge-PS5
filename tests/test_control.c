@@ -105,6 +105,19 @@ int main(int argc, char **argv)
     CHECK(strstr(out, "\"estimate_ms\":187") && strstr(out, "\"sink_ms\":130,\"sink_reported\":1"), "latency: estimate in status");
     post(&c, "/api/latency");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "latency without ms= -> 400");
+    c.codec_avail = (1 << 1);                 /* plain SBC sink */
+    c.codec_pref = 0;
+    post(&c, "/api/codec?mode=3");
+    CHECK(!strncmp(out, "HTTP/1.1 409", 12) && strstr(out, "not supported by this headset") && c.codec_pref == 0,
+          "codec: SBC-XQ on a plain SBC headset -> refused (409), setting unchanged");
+    post(&c, "/api/codec?mode=2");
+    CHECK(!strncmp(out, "HTTP/1.1 409", 12) && c.codec_pref == 0, "codec: SBC HQ on a plain SBC headset -> refused");
+    c.codec_avail = 0;                         /* nothing connected yet */
+    post(&c, "/api/codec?mode=3");
+    CHECK(!strncmp(out, "HTTP/1.1 409", 12), "codec: SBC-XQ refused while the headset's caps are unknown");
+    post(&c, "/api/codec?mode=1");
+    CHECK(c.codec_pref == 1, "codec: plain SBC always allowed");
+    c.codec_avail = (1 << 1) | (1 << 2) | (1 << 3);   /* Xbox headset: 3f ff, bitpool 2-60 */
     post(&c, "/api/codec?mode=3");
     CHECK(c.codec_pref == 3 && c.prefs_dirty && strstr(out, "\"codec_pref\":3"), "codec: SBC-XQ picked + saved per headset");
     post(&c, "/api/codec?mode=7");

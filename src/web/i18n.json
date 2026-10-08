@@ -120,8 +120,8 @@
    "volSoftware": "Software volume",
    "codec": "Codec",
    "codecAuto": "Auto",
-   "codecHint": "Auto picks the best the headset takes: SBC-XQ, then SBC HQ, then SBC. Changing it reconnects the headset.",
-   "codecNo": "This headset does not support it",
+   "codecHint": "Auto picks the best the headset takes: SBC-XQ, then SBC HQ, then SBC. Switching keeps the headset connected.",
+   "codecNo": "Not supported by this headset",
    "equalizer": "Equalizer",
    "eqHint": "Saved for this headset.",
    "eqOn": "On",
@@ -144,7 +144,8 @@
    "latQueue": "Queue",
    "latRadio": "Radio",
    "latSink": "Headset",
-   "latSinkTyp": "Headset (typical)"
+   "latSinkTyp": "Headset (typical)",
+   "codecWait": "SBC HQ and SBC-XQ show up once a headset that supports them is connected."
   },
   "ar": {
    "language": "اللغة",
@@ -209,8 +210,8 @@
    "volSoftware": "صوت برمجي",
    "codec": "الترميز",
    "codecAuto": "تلقائي",
-   "codecHint": "الوضع التلقائي يختار أفضل ما تدعمه السماعة: SBC-XQ ثم SBC HQ ثم SBC. التغيير يعيد توصيل السماعة.",
-   "codecNo": "هذه السماعة لا تدعمه",
+   "codecHint": "الوضع التلقائي يختار أفضل ما تدعمه السماعة: SBC-XQ ثم SBC HQ ثم SBC. التبديل يُبقي السماعة متصلة.",
+   "codecNo": "غير مدعوم في هذه السماعة",
    "equalizer": "المعادل الصوتي",
    "eqHint": "يُحفظ لهذه السماعة.",
    "eqOn": "تشغيل",
@@ -233,7 +234,8 @@
    "latQueue": "الطابور",
    "latRadio": "الراديو",
    "latSink": "السماعة",
-   "latSinkTyp": "السماعة (نموذجي)"
+   "latSinkTyp": "السماعة (نموذجي)",
+   "codecWait": "يظهر SBC HQ وSBC-XQ عند توصيل سماعة تدعمهما."
   },
   "es": {
    "language": "Idioma",
@@ -298,8 +300,8 @@
    "volSoftware": "Volumen por software",
    "codec": "Códec",
    "codecAuto": "Auto",
-   "codecHint": "Auto elige lo mejor que admiten los auriculares: SBC-XQ, luego SBC HQ, luego SBC. Al cambiarlo se reconectan.",
-   "codecNo": "Estos auriculares no lo admiten",
+   "codecHint": "Auto elige lo mejor que admiten los auriculares: SBC-XQ, luego SBC HQ, luego SBC. Al cambiar, siguen conectados.",
+   "codecNo": "No compatible con estos auriculares",
    "equalizer": "Ecualizador",
    "eqHint": "Se guarda para estos auriculares.",
    "eqOn": "Activado",
@@ -322,7 +324,8 @@
    "latQueue": "Cola",
    "latRadio": "Radio",
    "latSink": "Auriculares",
-   "latSinkTyp": "Auriculares (típico)"
+   "latSinkTyp": "Auriculares (típico)",
+   "codecWait": "SBC HQ y SBC-XQ aparecen al conectar unos auriculares que los admitan."
   },
   "fr": {
    "language": "Langue",
@@ -387,8 +390,8 @@
    "volSoftware": "Volume logiciel",
    "codec": "Codec",
    "codecAuto": "Auto",
-   "codecHint": "Auto choisit le meilleur que le casque accepte : SBC-XQ, puis SBC HQ, puis SBC. Changer reconnecte le casque.",
-   "codecNo": "Ce casque ne le prend pas en charge",
+   "codecHint": "Auto choisit le meilleur que le casque accepte : SBC-XQ, puis SBC HQ, puis SBC. Le changement garde le casque connecté.",
+   "codecNo": "Non pris en charge par ce casque",
    "equalizer": "Égaliseur",
    "eqHint": "Enregistré pour ce casque.",
    "eqOn": "Activé",
@@ -411,7 +414,8 @@
    "latQueue": "File",
    "latRadio": "Radio",
    "latSink": "Casque",
-   "latSinkTyp": "Casque (typique)"
+   "latSinkTyp": "Casque (typique)",
+   "codecWait": "SBC HQ et SBC-XQ apparaissent quand un casque qui les accepte est connecté."
   },
   "de": {
    "language": "Sprache",
@@ -476,8 +480,8 @@
    "volSoftware": "Software-Lautstärke",
    "codec": "Codec",
    "codecAuto": "Auto",
-   "codecHint": "Auto wählt das Beste, was das Headset kann: SBC-XQ, dann SBC HQ, dann SBC. Ein Wechsel verbindet das Headset neu.",
-   "codecNo": "Dieses Headset unterstützt das nicht",
+   "codecHint": "Auto wählt das Beste, was das Headset kann: SBC-XQ, dann SBC HQ, dann SBC. Beim Wechsel bleibt das Headset verbunden.",
+   "codecNo": "Von diesem Headset nicht unterstützt",
    "equalizer": "Equalizer",
    "eqHint": "Für dieses Headset gespeichert.",
    "eqOn": "An",
@@ -500,7 +504,8 @@
    "latQueue": "Warteschlange",
    "latRadio": "Funk",
    "latSink": "Headset",
-   "latSinkTyp": "Headset (typisch)"
+   "latSinkTyp": "Headset (typisch)",
+   "codecWait": "SBC HQ und SBC-XQ erscheinen, sobald ein Headset verbunden ist, das sie unterstützt."
   },
   "pt": {
    "language": "Idioma",
@@ -565,8 +570,8 @@
    "volSoftware": "Volume por software",
    "codec": "Codec",
    "codecAuto": "Auto",
-   "codecHint": "Auto escolhe o melhor que o headset aceita: SBC-XQ, depois SBC HQ, depois SBC. Mudar reconecta o headset.",
-   "codecNo": "Este headset não suporta",
+   "codecHint": "Auto escolhe o melhor que o headset aceita: SBC-XQ, depois SBC HQ, depois SBC. A troca mantém o headset conectado.",
+   "codecNo": "Não suportado por este headset",
    "equalizer": "Equalizador",
    "eqHint": "Salvo para este headset.",
    "eqOn": "Ligado",
@@ -589,7 +594,8 @@
    "latQueue": "Fila",
    "latRadio": "Rádio",
    "latSink": "Headset",
-   "latSinkTyp": "Headset (típico)"
+   "latSinkTyp": "Headset (típico)",
+   "codecWait": "SBC HQ e SBC-XQ aparecem quando um headset compatível estiver conectado."
   },
   "ru": {
    "language": "Язык",
@@ -654,8 +660,8 @@
    "volSoftware": "Программная громкость",
    "codec": "Кодек",
    "codecAuto": "Авто",
-   "codecHint": "«Авто» выбирает лучшее, что поддерживает гарнитура: SBC-XQ, затем SBC HQ, затем SBC. Смена переподключает гарнитуру.",
-   "codecNo": "Гарнитура это не поддерживает",
+   "codecHint": "Авто выбирает лучшее, что поддерживает гарнитура: SBC-XQ, затем SBC HQ, затем SBC. При смене гарнитура остаётся подключённой.",
+   "codecNo": "Эта гарнитура не поддерживает",
    "equalizer": "Эквалайзер",
    "eqHint": "Сохраняется для этой гарнитуры.",
    "eqOn": "Вкл",
@@ -678,7 +684,8 @@
    "latQueue": "Очередь",
    "latRadio": "Радио",
    "latSink": "Гарнитура",
-   "latSinkTyp": "Гарнитура (типично)"
+   "latSinkTyp": "Гарнитура (типично)",
+   "codecWait": "SBC HQ и SBC-XQ появятся, когда подключится гарнитура с их поддержкой."
   },
   "ja": {
    "language": "言語",
@@ -743,8 +750,8 @@
    "volSoftware": "ソフトウェア音量",
    "codec": "コーデック",
    "codecAuto": "自動",
-   "codecHint": "自動はヘッドセットが対応する最良のものを選びます：SBC-XQ、次に SBC HQ、次に SBC。変更するとヘッドセットを再接続します。",
-   "codecNo": "このヘッドセットは非対応です",
+   "codecHint": "自動はヘッドセットが対応する最良のものを選びます: SBC-XQ、次に SBC HQ、次に SBC。切り替えても接続は切れません。",
+   "codecNo": "このヘッドセットは非対応",
    "equalizer": "イコライザー",
    "eqHint": "このヘッドセット用に保存されます。",
    "eqOn": "オン",
@@ -767,7 +774,8 @@
    "latQueue": "キュー",
    "latRadio": "無線",
    "latSink": "ヘッドセット",
-   "latSinkTyp": "ヘッドセット (標準)"
+   "latSinkTyp": "ヘッドセット (標準)",
+   "codecWait": "SBC HQ と SBC-XQ は対応ヘッドセットの接続時に表示されます。"
   },
   "zh": {
    "language": "语言",
@@ -832,7 +840,7 @@
    "volSoftware": "软件音量",
    "codec": "编解码器",
    "codecAuto": "自动",
-   "codecHint": "自动选择耳机支持的最佳编码：SBC-XQ，其次 SBC HQ，再次 SBC。更改后会重新连接耳机。",
+   "codecHint": "自动会选择耳机支持的最佳方式：SBC-XQ，其次 SBC HQ，然后 SBC。切换时耳机保持连接。",
    "codecNo": "此耳机不支持",
    "equalizer": "均衡器",
    "eqHint": "为此耳机保存。",
@@ -856,7 +864,8 @@
    "latQueue": "队列",
    "latRadio": "无线",
    "latSink": "耳机",
-   "latSinkTyp": "耳机（典型）"
+   "latSinkTyp": "耳机（典型）",
+   "codecWait": "连接支持的耳机后才会显示 SBC HQ 和 SBC-XQ。"
   },
   "it": {
    "language": "Lingua",
@@ -921,8 +930,8 @@
    "volSoftware": "Volume software",
    "codec": "Codec",
    "codecAuto": "Auto",
-   "codecHint": "Auto sceglie il meglio supportato dalle cuffie: SBC-XQ, poi SBC HQ, poi SBC. Cambiarlo ricollega le cuffie.",
-   "codecNo": "Queste cuffie non lo supportano",
+   "codecHint": "Auto sceglie il meglio che le cuffie supportano: SBC-XQ, poi SBC HQ, poi SBC. Il cambio mantiene le cuffie collegate.",
+   "codecNo": "Non supportato da queste cuffie",
    "equalizer": "Equalizzatore",
    "eqHint": "Salvato per queste cuffie.",
    "eqOn": "Attivo",
@@ -945,7 +954,8 @@
    "latQueue": "Coda",
    "latRadio": "Radio",
    "latSink": "Cuffie",
-   "latSinkTyp": "Cuffie (tipico)"
+   "latSinkTyp": "Cuffie (tipico)",
+   "codecWait": "SBC HQ e SBC-XQ compaiono quando sono collegate cuffie che li supportano."
   },
   "he": {
    "language": "שפה",
@@ -1010,8 +1020,8 @@
    "volSoftware": "עוצמה בתוכנה",
    "codec": "קודק",
    "codecAuto": "אוטומטי",
-   "codecHint": "אוטומטי בוחר את הטוב ביותר שהאוזניות תומכות בו: SBC-XQ, אחר כך SBC HQ, אחר כך SBC. שינוי מחבר מחדש את האוזניות.",
-   "codecNo": "האוזניות האלה לא תומכות בזה",
+   "codecHint": "אוטומטי בוחר את הטוב ביותר שהאוזניות תומכות בו: SBC-XQ, אחר כך SBC HQ, אחר כך SBC. ההחלפה לא מנתקת את האוזניות.",
+   "codecNo": "לא נתמך באוזניות האלה",
    "equalizer": "אקולייזר",
    "eqHint": "נשמר עבור האוזניות האלה.",
    "eqOn": "פועל",
@@ -1034,7 +1044,8 @@
    "latQueue": "תור",
    "latRadio": "רדיו",
    "latSink": "אוזניות",
-   "latSinkTyp": "אוזניות (טיפוסי)"
+   "latSinkTyp": "אוזניות (טיפוסי)",
+   "codecWait": "SBC HQ ו-SBC-XQ יופיעו כשיחוברו אוזניות שתומכות בהם."
   }
  }
 }

@@ -51,9 +51,16 @@ int avdtp_sbc_pick(const uint8_t caps[4], int want, int no_xq, avdtp_codec_pick 
     out1 |= (c1 & 0x04) ? 0x04 : 0x08;
     out1 |= (c1 & 0x01) ? 0x01 : 0x02;
 
+    /* What the sink's advertised parameters really allow. HQ and XQ are
+     * defined for 16 blocks + 8 subbands (128 samples/frame):
+     *   SBC HQ: joint/stereo with a bitpool above 53 (to the sink max);
+     *   SBC-XQ: dual channel, bitpool 35..38 per channel.
+     * 48 kHz is already required above. */
     o->avail = 1 << HB_CODEC_SBC;
-    if (hi > 53 && (out0 & 0x03)) o->avail |= 1 << HB_CODEC_SBC_HQ;
-    if ((caps[0] & 0x04) && hi >= HB_XQ_MIN_BP) o->avail |= 1 << HB_CODEC_SBC_XQ;
+    if ((c1 & 0x10) && (c1 & 0x04)) {
+        if (hi > 53 && (out0 & 0x03)) o->avail |= 1 << HB_CODEC_SBC_HQ;
+        if ((caps[0] & 0x04) && hi >= HB_XQ_MIN_BP) o->avail |= 1 << HB_CODEC_SBC_XQ;
+    }
 
     if (want == HB_CODEC_AUTO)
         want = (o->avail & (1 << HB_CODEC_SBC_XQ)) && !no_xq ? HB_CODEC_SBC_XQ :

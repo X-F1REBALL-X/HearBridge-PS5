@@ -124,6 +124,7 @@ static int respond(char *out, int max, int code, const char *ctype,
 {
     const char *reason = code == 200 ? "OK" : code == 404 ? "Not Found" :
                          code == 405 ? "Method Not Allowed" : code == 403 ? "Forbidden" :
+                         code == 409 ? "Conflict" :
                          code == 500 ? "Internal Server Error" : "Bad Request";
     int n = snprintf(out, (size_t)max,
         "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
@@ -290,8 +291,14 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/codec")) {
         /* mode=0 auto, 1 SBC, 2 SBC HQ, 3 SBC-XQ (hsprefs.h); the stream
-         * loop reconnects the headset to apply it. */
+         * loop switches the headset to it. HQ / XQ only when the connected
+         * headset's capabilities allow them (codec_avail). */
         if (!query_int(q, "mode", &v) || v < 0 || v > 3) goto bad;
+        if (v >= 2 && !(c->codec_avail & (1 << v))) {
+            CTL_UNLOCK(c);
+            return respond(out, max, 409, "application/json",
+                           "{\"error\":\"not supported by this headset\"}", 41);
+        }
         c->codec_pref = v;
         c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/eq")) {

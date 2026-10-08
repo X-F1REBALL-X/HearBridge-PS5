@@ -49,7 +49,11 @@ check(el('latv').textContent === '≈ 187 ms' && el('latt').textContent === '200
 check(/Headset <em>130 ms/.test(el('lkeys').innerHTML) && /Queue <em>20 ms/.test(el('lkeys').innerHTML), 'page: latency breakdown, headset value from its report');
 calls.length = 0; el('lat').value = 120; el('lat').onchange.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=120' && calls[0].h['X-HB-Token'], 'page: latency slider -> POST with token');
-check(el('cd0').className === 'act' && el('cd2').disabled && !el('cd3').disabled, 'page: codec picker shows auto, greys out what the sink lacks');
+check(el('cd0').className === 'act' && el('cd2').disabled && el('cd2').className === 'no' && !el('cd3').disabled,
+  'page: codec picker shows auto, hides what the headset cannot take');
+check(/Not supported by this headset: SBC HQ/.test(el('codecno').innerHTML), 'page: says which codecs this headset does not support');
+calls.length = 0; el('cd2').onclick.call(el('cd2'));
+check(calls.length === 0, 'page: an unsupported codec cannot be picked');
 calls.length = 0; el('cd3').onclick.call(el('cd3'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/codec?mode=3' && calls[0].h['X-HB-Token'], 'page: codec -> POST with token');
 check(el('pr1').className === 'act' && el('eqv0').textContent === '+6 dB' && /^M0\.0 /.test(el('eqline').attrs.d || ''),
