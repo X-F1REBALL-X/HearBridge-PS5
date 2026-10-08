@@ -24,9 +24,9 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تلت
 
 ## التثبيت والتشغيل
 
-1. نزّل **HearBridge-PS5-1.0.1.elf** من [الإصدار](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
+1. نزّل **HearBridge-PS5-1.0.2.elf** من [الإصدار](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2).
 2. أرسله إلى محمّل الجهاز، مثلًا:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. افتح **http://&lt;console-ip&gt;:8090** (أو مربع **HearBridge** الذي يُضاف إلى الشاشة الرئيسية عند التشغيل الأول).
 
 ## الاستخدام
@@ -46,6 +46,36 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تلت
 - ترميز SBC فقط، وجهاز واحد في كل مرة، وبدون ميكروفون. يستمر التلفاز أيضًا في تشغيل الصوت.
 - تم الاختبار مع Sony WF-1000XM6 وOnePlus Buds Ace 2 وXbox Wireless Headset.
 - الإعدادات والأجهزة المحفوظة والسجل موجودة في ‎`/data/hearbridge/`‎ (يسجّل ‎`hearbridge.log`‎ كل خطوة).
+
+## حل المشكلات والإبلاغ عن مشكلة
+
+**تمت التجربة على:** طُوِّر HearBridge وجُرِّب على جهاز PS5 fat (الطراز الأصلي، CFI-10xx) بإصدار النظام 10.20. الطرازات الأخرى (Slim وPro وإصدارات fat اللاحقة) وإصدارات النظام الأخرى لم تُجرَّب، وقد تستخدم شريحة بلوتوث مختلفة، لذلك نرحّب بالتقارير منها.
+
+مشكلات شائعة:
+
+- **لا تظهر أيقونة HearBridge في الشاشة الرئيسية** بعد تشغيل ملف ELF.
+- **الصفحة لا تفتح** (‎http://&lt;console-ip&gt;:8090‎).
+- **لا يتم العثور على السماعات** عند الضغط على البحث عن أجهزة.
+- **لا يوجد صوت** مع أن السماعات متصلة.
+
+**إصدار النظام 13.60:** جرّب **HearBridge-PS5-1.0.2-fw13.60.elf** من [الإصدار v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). هذه نسخة تجريبية يُفترض أن تصلح غياب الأيقونة في الشاشة الرئيسية وتضيف معلومات تشخيص. لم تُجرَّب بعد على جهاز حقيقي.
+
+**الحصول على السجل:**
+
+1. أرسل حمولة خادم FTP (مثل [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)) عبر المحمّل نفسه الذي تستخدمه لـ HearBridge.
+2. اتصل باستخدام FileZilla بعنوان IP الخاص بالجهاز على المنفذ الذي يعرضه الخادم (يستخدم ftpsrv عادةً المنفذ **2121**).
+3. نزّل ‎`/data/hearbridge/hearbridge.log`‎، ومع نسخة fw13.60 نزّل أيضًا ‎`/data/hearbridge/diag.txt`‎.
+
+مع نسخة fw13.60 يمكنك أيضًا فتح ‎**http://&lt;console-ip&gt;:8090/api/diag**‎ ونسخ النص.
+
+**افتح [بلاغًا (issue) على GitHub](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose)** وأرفق:
+
+- طراز الجهاز (رقم CFI، مثل CFI-1016A)
+- إصدار النظام
+- المحمّل الذي استخدمته
+- هل ظهر الإشعار **"HearBridge 1.0.2: http://…"**
+- هل تفتح الصفحة
+- ملفات السجل (‎`hearbridge.log`‎ و‎`diag.txt`‎)
 
 </div>
 
