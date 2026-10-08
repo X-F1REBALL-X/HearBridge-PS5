@@ -28,6 +28,15 @@
 #define PDU_SET_ABSVOL 0x50
 #define EV_VOLUME      0x0D
 
+int avrcp_reported(const avrcp_state *a)
+{
+    if (!a) return 0;
+    /* notify_label stays set while the headset's VOLUME_CHANGED
+     * registration is outstanding; the other flags stick after it has
+     * shown absolute volume (SetAbsoluteVolume or our registration). */
+    return a->remote_abs || a->ct_registered || a->notify_label >= 0 || a->sink_renders;
+}
+
 void avrcp_init(avrcp_state *a, int volume)
 {
     memset(a, 0, sizeof *a);

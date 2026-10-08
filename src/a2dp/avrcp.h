@@ -22,6 +22,12 @@ typedef struct {
 
 void avrcp_init(avrcp_state *a, int volume);
 
+/* 1 once the headset has registered for volume or reported an absolute
+ * level. Independent of the L2CAP channel still being open this instant:
+ * the page's volume number comes from this. */
+int avrcp_reported(const avrcp_state *a);
+
+
 /* Handle one AVCTP packet from the headset. Writes a reply into out
  * (returns its length, 0 = none). */
 int avrcp_input(avrcp_state *a, const unsigned char *in, int len,

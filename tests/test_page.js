@@ -34,7 +34,7 @@ let fails = 0;
 const check = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 check(calls.length && calls[0].m === 'GET' && calls[0].p === '/api/status' && !calls[0].h['X-HB-Token'], 'page: status poll is a plain GET');
 const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], 
-  ['scan', '/api/scan'], ['stop', '/api/stop']];
+  ['scan', '/api/scan'], ['stop', '/api/stop'], ['clean', '/api/clean']];
 for (const [id, path] of actions) {
   calls.length = 0; el(id).onclick();
   const c = calls[0];
@@ -67,5 +67,17 @@ check(calls[0] && /^\/api\/eq\?on=0&/.test(calls[0].p), 'page: EQ toggle -> on=0
 XHR.prototype.send = function () { calls.push({}); this.status = 403; this.responseText = '{"error":"token"}'; this.onload(); };
 el('mute').onclick();
 check(el('msg').textContent.indexOf('Reload') >= 0, 'page: 403 shows the reload hint');
+XHR.prototype.send = function () { calls.push({ m: this.m, p: this.p, h: this.h }); this.status = 200;
+  this.responseText = JSON.stringify(STATUS); if (this.onload) this.onload(); };
+STATUS.avrcp = { connected: 0, absolute_volume: 1, notifications: 1, sink_volume: 1 };
+STATUS.headset_volume = 123;
+STATUS.xq_low = 1;
+STATUS.events = ['switch: now SBC', 'stream: link dropped'];
+global.hbTest.req('/api/status');
+check(/absolute volume/.test(el('av').innerHTML) && !/not connected/.test(el('av').innerHTML),
+  'page: AVRCP says connected when the headset is reporting volume');
+check(el('hv').textContent === '97%', 'page: headset volume 123/127 is 97%');
+check(/low bitpool/.test(el('xqnote').innerHTML), 'page: says plain SBC will sound better when XQ stays low');
+check(/link dropped/.test(el('evlog').innerHTML) && el('evbox').style.display === '', 'page: recent switches and disconnects');
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);

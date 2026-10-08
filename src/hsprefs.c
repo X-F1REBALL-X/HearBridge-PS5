@@ -25,6 +25,12 @@ void hb_prefs_default(hb_prefs *p)
     memset(p, 0, sizeof *p);
     p->codec = HB_CODEC_AUTO;
     p->latency_ms = HB_LAT_DEFAULT_MS;
+    p->gain_pct = -1;
+}
+
+void hb_prefs_new_headset(hb_prefs *p)
+{
+    if (p) p->latency_ms = HB_LAT_DEFAULT_MS;
 }
 
 static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -72,6 +78,10 @@ void hb_prefs_parse(hb_prefs *p, const char *t)
             if (end != v) p->latency_ms = clampi((int)ms, HB_LAT_MIN_MS, HB_LAT_MAX_MS);
         } else if (!strcmp(line, "eq")) {
             p->eq_on = !strcmp(v, "on");
+        } else if (!strcmp(line, "gain")) {
+            const char *end;
+            long g = parse_long(v, &end);
+            if (end != v) p->gain_pct = clampi((int)g, 0, 500);
         } else if (!strcmp(line, "eq_db")) {
             int i;
             const char *s = v, *end;
@@ -96,6 +106,8 @@ int hb_prefs_format(const hb_prefs *p, char *out, int max)
     for (i = 0; i < HB_EQ_BANDS && n > 0 && n < max; i++)
         n += snprintf(out + n, (size_t)(max - n), "%s%d", i ? "," : "", p->eq_db[i]);
     if (n > 0 && n < max) n += snprintf(out + n, (size_t)(max - n), "\n");
+    if (p->gain_pct >= 0 && n > 0 && n < max)
+        n += snprintf(out + n, (size_t)(max - n), "gain=%d\n", p->gain_pct);
     return n < max ? n : -1;
 }
 
