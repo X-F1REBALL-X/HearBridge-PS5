@@ -22,9 +22,9 @@ HearBridge PS5 é um payload (ELF) para um PS5 desbloqueado. Ele captura o áudi
 
 ## Instalação e execução
 
-1. Baixe **HearBridge-PS5-1.0.1.elf** na [versão](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
+1. Baixe **HearBridge-PS5-1.0.2.elf** na [versão](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2).
 2. Envie-o ao carregador do console, por exemplo:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. Abra **http://&lt;console-ip&gt;:8090** (ou o bloco **HearBridge** adicionado à tela inicial na primeira execução).
 
 ## Uso
@@ -56,7 +56,7 @@ Problemas comuns:
 - **Os fones não são encontrados** ao tocar em Procurar dispositivos.
 - **Não há som** mesmo com os fones conectados.
 
-**Firmware 13.60:** experimente **HearBridge-PS5-1.0.1-fw13.60.elf** da [versão v1.0.1](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1). É uma versão experimental feita para corrigir o ícone que falta na tela inicial e adiciona diagnósticos. Ela ainda não foi testada em um console real.
+**Firmware 13.60:** experimente **HearBridge-PS5-1.0.2-fw13.60.elf** da [versão v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). É uma versão experimental feita para corrigir o ícone que falta na tela inicial e adiciona diagnósticos. Ela ainda não foi testada em um console real.
 
 **Como obter o log:**
 
@@ -71,7 +71,7 @@ Com a versão fw13.60 você também pode abrir **http://&lt;console-ip&gt;:8090/
 - o modelo do console (número CFI, ex.: CFI-1016A)
 - a versão do firmware
 - o carregador que você usou
-- se a notificação **"HearBridge 1.0.1: http://…"** apareceu
+- se a notificação **"HearBridge 1.0.2: http://…"** apareceu
 - se a página abre
 - os arquivos de log (`hearbridge.log`, `diag.txt`)
 

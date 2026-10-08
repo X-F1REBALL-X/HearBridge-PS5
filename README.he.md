@@ -24,9 +24,9 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא לוכד את הש�
 
 ## התקנה והפעלה
 
-1. הורידו את **HearBridge-PS5-1.0.1.elf** מה[גרסה](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1).
+1. הורידו את **HearBridge-PS5-1.0.2.elf** מה[גרסה](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2).
 2. שלחו אותו לטוען של הקונסולה, למשל:
-   `socat -u FILE:HearBridge-PS5-1.0.1.elf TCP:<console-ip>:9021`
+   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
 3. פתחו **http://&lt;console-ip&gt;:8090** (או את האריח **HearBridge** שנוסף למסך הבית בהפעלה הראשונה).
 
 ## שימוש
@@ -58,7 +58,7 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא לוכד את הש�
 - **האוזניות לא נמצאות** כשלוחצים על חיפוש מכשירים.
 - **אין צליל** למרות שהאוזניות מחוברות.
 
-**קושחה 13.60:** נסו את **HearBridge-PS5-1.0.1-fw13.60.elf** מה[גרסה v1.0.1](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1). זו גרסה ניסיונית שאמורה לתקן את האייקון החסר במסך הבית ומוסיפה מידע לאבחון. היא עוד לא נבדקה על קונסולה אמיתית.
+**קושחה 13.60:** נסו את **HearBridge-PS5-1.0.2-fw13.60.elf** מה[גרסה v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). זו גרסה ניסיונית שאמורה לתקן את האייקון החסר במסך הבית ומוסיפה מידע לאבחון. היא עוד לא נבדקה על קונסולה אמיתית.
 
 **איך משיגים את היומן:**
 
@@ -73,7 +73,7 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא לוכד את הש�
 - דגם הקונסולה (מספר CFI, למשל CFI-1016A)
 - גרסת הקושחה
 - הטוען שבו השתמשתם
-- האם הופיעה ההודעה **"HearBridge 1.0.1: http://…"**
+- האם הופיעה ההודעה **"HearBridge 1.0.2: http://…"**
 - האם הדף נפתח
 - קובצי היומן (‏`hearbridge.log`,‏ `diag.txt`)
 
