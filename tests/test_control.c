@@ -4,6 +4,7 @@
 #include "ctl.h"
 #include "gain.h"
 #include "http.h"
+#include "diag.h"
 #include "avrcp.h"
 #include "sdp_server.h"
 
@@ -23,6 +24,15 @@ static int get(hb_ctl *c, const char *path)
 {
     char req[256];
     snprintf(req, sizeof req, "GET %s HTTP/1.1\r\nHost: ps5\r\n\r\n", path);
+    return http_handle(c, req, (int)strlen(req), out, (int)sizeof out);
+}
+
+/* State-changing request as the page sends it: POST + X-HB-Token. */
+static int post(hb_ctl *c, const char *path)
+{
+    char req[320];
+    snprintf(req, sizeof req, "POST %s HTTP/1.1\r\nHost: ps5\r\nContent-Length: 0\r\n"
+             "x-hb-token: %s\r\n\r\n", path, c->token);
     return http_handle(c, req, (int)strlen(req), out, (int)sizeof out);
 }
 
@@ -54,28 +64,47 @@ int main(int argc, char **argv)
         const char *b = strstr(out, "\r\n\r\n");
         if (f && b) { fwrite(b + 4, 1, (size_t)(out + n - (b + 4)), f); fclose(f); }
     }
-    get(&c, "/api/volume?pct=250");
+    post(&c, "/api/volume?pct=250");
     CHECK(c.gain_pct == 250 && c.gain_dirty, "volume 250% set + marked for saving");
-    get(&c, "/api/volume?pct=999");
+    post(&c, "/api/volume?pct=999");
     CHECK(c.gain_pct == 500, "volume clamped to 500%");
-    n = get(&c, "/api/volume");
+    n = post(&c, "/api/volume");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "volume without pct -> 400");
-    get(&c, "/api/headset?vol=100");
+    post(&c, "/api/headset?vol=100");
     CHECK(c.req_hs_volume == 100 && c.hs_volume == 100, "headset volume request");
-    get(&c, "/api/headset?pct=50");
+    post(&c, "/api/headset?pct=50");
     CHECK(c.req_hs_volume == 64, "headset volume by percent");
-    get(&c, "/api/mute?on=1");
+    post(&c, "/api/mute?on=1");
     CHECK(c.muted == 1, "mute on");
-    get(&c, "/api/mute");
+    post(&c, "/api/mute");
     CHECK(c.muted == 0, "mute toggle");
-    get(&c, "/api/tone?on=1");
+    post(&c, "/api/tone?on=1");
     CHECK(c.tone == 1, "tone on");
-    get(&c, "/api/disconnect");
+    post(&c, "/api/disconnect");
     CHECK(c.req_disconnect && c.paused, "disconnect");
-    get(&c, "/api/connect");
+    post(&c, "/api/connect");
     CHECK(c.req_connect && !c.paused, "connect");
-    get(&c, "/api/stop");
+    post(&c, "/api/stop");
     CHECK(c.req_stop, "stop");
+    n = get(&c, "/api/status");
+    CHECK(strstr(out, "\"stable\":0") && strstr(out, "\"queue_ms\":200"), "latency: low latency by default (200 ms)");
+    post(&c, "/api/latency?stable=1");
+    CHECK(c.stable == 1 && c.stable_dirty && strstr(out, "\"queue_ms\":1000"), "latency: stable mode set + saved");
+    c.stable_dirty = 0;
+    post(&c, "/api/latency?stable=0");
+    CHECK(c.stable == 0 && c.stable_dirty, "latency: back to low latency");
+    post(&c, "/api/latency");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "latency without stable= -> 400");
+    diag_init(NULL);
+    get(&c, "/api/diag");
+    CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/plain") &&
+          strstr(out, "no diagnostics collected yet"), "diag: placeholder before collection");
+    diag_set("model", "CFI-1016A");
+    diag_set("tile", "RESULT ok");
+    get(&c, "/api/diag");
+    CHECK(strstr(out, "\r\n\r\nmodel: CFI-1016A\ntile: RESULT ok\n") != NULL, "diag: serves the report");
+    get(&c, "/");
+    CHECK(strstr(out, "href=\"/api/diag\"") != NULL, "page links to /api/diag");
     strcpy(c.devices_path, "/nonexistent/devices.json");
     get(&c, "/api/devices");
     CHECK(strstr(out, "\"devices\":[]") != NULL, "devices: empty list when no scan yet");
@@ -88,7 +117,7 @@ int main(int argc, char **argv)
     }
     get(&c, "/api/devices");
     CHECK(strstr(out, "AA:BB:CC:DD:EE:FF") != NULL, "devices: serves devices.json");
-    get(&c, "/api/select?addr=AA:BB:CC:DD:EE:FF");
+    post(&c, "/api/select?addr=AA:BB:CC:DD:EE:FF");
     {
         char line[64] = "";
         FILE *f = fopen("build/host/select.txt", "r");
@@ -96,9 +125,9 @@ int main(int argc, char **argv)
         CHECK(!strncmp(out, "HTTP/1.1 200", 12) && !strcmp(line, "AA:BB:CC:DD:EE:FF\n"),
               "select by address writes select.txt");
     }
-    get(&c, "/api/select?addr=AA:BB:CC:DD:EE:F;rm");
+    post(&c, "/api/select?addr=AA:BB:CC:DD:EE:F;rm");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "select rejects a malformed address");
-    get(&c, "/api/select?index=2");
+    post(&c, "/api/select?index=2");
     CHECK(!strncmp(out, "HTTP/1.1 200", 12), "select by index");
     {
         static const struct { const char *path, *line; } cmds[] = {
@@ -111,7 +140,7 @@ int main(int argc, char **argv)
             char line[64] = "", what[96];
             FILE *f;
             c.paused = 1;
-            get(&c, cmds[i].path);
+            post(&c, cmds[i].path);
             f = fopen("build/host/select.txt", "r");
             if (f) { if (!fgets(line, sizeof line, f)) line[0] = 0; fclose(f); }
             snprintf(what, sizeof what, "%s writes \"%.*s\"", cmds[i].path,
@@ -119,12 +148,12 @@ int main(int argc, char **argv)
             CHECK(!strncmp(out, "HTTP/1.1 200", 12) && !strcmp(line, cmds[i].line), what);
         }
         CHECK(c.paused == 1, "forget does not resume a paused session");
-        get(&c, "/api/scan");
+        post(&c, "/api/scan");
         CHECK(c.paused == 0, "scan resumes from paused");
     }
-    get(&c, "/api/forget?index=1");
+    post(&c, "/api/forget?index=1");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "forget needs an address");
-    get(&c, "/api/forget?addr=58:18:62:63:3B:7C%0Ascan");
+    post(&c, "/api/forget?addr=58:18:62:63:3B:7C%0Ascan");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "forget rejects trailing junk");
     {
         FILE *f = fopen("build/host/saved.json", "w");
@@ -134,6 +163,42 @@ int main(int argc, char **argv)
     }
     get(&c, "/api/saved");
     CHECK(strstr(out, "\"current\":1") && strstr(out, "application/json"), "saved: serves saved.json");
+    /* POST + token for everything that changes state. */
+    {
+        hb_ctl d;
+        char rq[320];
+        int i, hex = 1;
+        ctl_init(&d, "1.0.9");
+        for (i = 0; i < HB_TOKEN_LEN; i++)
+            if (!((c.token[i] >= '0' && c.token[i] <= '9') || (c.token[i] >= 'a' && c.token[i] <= 'f'))) hex = 0;
+        CHECK(strlen(c.token) == HB_TOKEN_LEN && hex, "token: 32 hex digits");
+        CHECK(strcmp(c.token, d.token) != 0, "token: a new one per start");
+        get(&c, "/");
+        CHECK(strstr(out, c.token) && !strstr(out, HB_TOKEN_SLOT), "page carries this run's token");
+        c.muted = 0;
+        get(&c, "/api/mute?on=1");
+        CHECK(!strncmp(out, "HTTP/1.1 405", 12) && c.muted == 0, "GET on a state-changing endpoint -> 405, nothing changed");
+        c.req_stop = 0;
+        get(&c, "/api/stop");
+        CHECK(!strncmp(out, "HTTP/1.1 405", 12) && !c.req_stop, "GET /api/stop -> 405");
+        snprintf(rq, sizeof rq, "POST /api/mute?on=1 HTTP/1.1\r\nHost: ps5\r\n\r\n");
+        http_handle(&c, rq, (int)strlen(rq), out, (int)sizeof out);
+        CHECK(!strncmp(out, "HTTP/1.1 403", 12) && c.muted == 0, "POST without token -> 403");
+        snprintf(rq, sizeof rq, "POST /api/stop HTTP/1.1\r\nX-HB-Token: %s\r\n\r\n", d.token);
+        http_handle(&c, rq, (int)strlen(rq), out, (int)sizeof out);
+        CHECK(!strncmp(out, "HTTP/1.1 403", 12) && !c.req_stop, "POST with another run's token -> 403");
+        snprintf(rq, sizeof rq, "POST /api/stop HTTP/1.1\r\nX-HB-Token: %.31s\r\n\r\n", c.token);
+        http_handle(&c, rq, (int)strlen(rq), out, (int)sizeof out);
+        CHECK(!strncmp(out, "HTTP/1.1 403", 12) && !c.req_stop, "POST with a truncated token -> 403");
+        snprintf(rq, sizeof rq, "POST /api/mute?on=1 HTTP/1.1\r\nX-Other: 1\r\nX-HB-TOKEN:   %s\r\n\r\n", c.token);
+        http_handle(&c, rq, (int)strlen(rq), out, (int)sizeof out);
+        CHECK(!strncmp(out, "HTTP/1.1 200", 12) && c.muted == 1, "POST with the token (any header case) -> 200");
+        snprintf(rq, sizeof rq, "POST /api/mute?on=0&X-HB-Token=%s HTTP/1.1\r\n\r\n", c.token);
+        http_handle(&c, rq, (int)strlen(rq), out, (int)sizeof out);
+        CHECK(!strncmp(out, "HTTP/1.1 403", 12) && c.muted == 1, "token in the query string is not accepted");
+        get(&c, "/api/status");
+        CHECK(!strncmp(out, "HTTP/1.1 200", 12), "reads stay GET");
+    }
     n = get(&c, "/nope");
     CHECK(!strncmp(out, "HTTP/1.1 404", 12), "404");
     n = http_handle(&c, "DELETE / HTTP/1.1\r\n\r\n", 21, out, sizeof out);

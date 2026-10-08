@@ -67,6 +67,9 @@ typedef struct {
     int all_found, all_called, all_rc, all_errno;
     int exists_found, exists_rc, exists;   /* exists: 1 yes, 0 no, -1 unknown */
     int already;            /* install returned an error but the title is installed */
+    int plain_failed;       /* the attempt with the payload's own rights failed ... */
+    int plain_code;         /* ... with this code ... */
+    const char *plain_at;   /* ... at this step; then retried with raised rights */
     int result;             /* 0 = icon registered */
     int code;               /* failing return code for the toast */
     const char *failed;     /* failing step for the toast, or NULL */
@@ -79,6 +82,16 @@ typedef struct {
  * unavailable, when /user/appmeta/<id> exists), so re-registering an
  * installed title never reports a failure. Fills *r; returns r->result. */
 int tile_register(const tile_ops *ops, tile_report *r);
+
+/* Runtime fallback instead of a per-firmware build: tile_register() with
+ * the payload's own rights first (the path tested on fw 10.20); only when
+ * that fails, raise() (e.g. switch to ShellCore, needed on newer firmware
+ * such as 13.60), register once more and lower() again. raise returns the
+ * authid now in effect (stored in r->authid_used). raise/lower may be NULL
+ * (no retry). Returns r->result. */
+int tile_register_fallback(const tile_ops *ops, tile_report *r,
+                           unsigned long long (*raise)(void *ctx),
+                           void (*lower)(void *ctx), void *ctx);
 
 /* One-line summary of the steps ("init 0; TitleDir 0 ..."). */
 int tile_report_line(const tile_report *r, char *out, size_t cap);

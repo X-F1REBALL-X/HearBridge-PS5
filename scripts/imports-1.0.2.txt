@@ -1,0 +1,89 @@
+# Dynamic imports of the released HearBridge-PS5 1.0.2 ELF, known to load on
+# fw 10.20. The payload runtime binds every import before main(); one that
+# does not bind ends the payload silently. Anything else must be looked up
+# at run time (kernel_dynlib_dlsym / kernel_dynlib_resolve).
+#
+# NEEDED, in load order:
+needed libSceSystemService.sprx
+needed libSceAppInstUtil.sprx
+needed libkernel_web.sprx
+needed libSceLibcInternal.sprx
+needed libSceNet.sprx
+#
+# Imported symbols:
+__error
+__inet_ntop
+__stderrp
+accept
+access
+atexit
+atoi
+bind
+calloc
+clock_gettime
+close
+fclose
+fflush
+fgets
+flock
+fopen
+fprintf
+fputc
+fputs
+fread
+free
+freeifaddrs
+ftruncate
+fwrite
+getifaddrs
+getpid
+ioctl
+kill
+listen
+lseek
+malloc
+memcmp
+memcpy
+memmove
+memset
+mkdir
+open
+poll
+pthread_create
+pthread_join
+pthread_mutex_init
+pthread_mutex_lock
+pthread_mutex_unlock
+read
+recv
+remove
+rename
+rmdir
+sceAppInstUtilAppInstallTitleDir
+sceAppInstUtilAppUnInstall
+sceAppInstUtilInitialize
+sceAppInstUtilTerminate
+sceKernelSendNotificationRequest
+select
+send
+setsockopt
+signal
+snprintf
+socket
+sscanf
+stat
+strchr
+strcmp
+strcpy
+strcspn
+strerror
+strlen
+strncmp
+strncpy
+strstr
+sysctl
+unlink
+usleep
+vfprintf
+vsnprintf
+write

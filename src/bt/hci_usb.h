@@ -14,4 +14,10 @@
  * Returns 1 on success, 0 on failure (out is left zeroed). */
 int hci_usb_open(hci_t *out);
 
+/* Diagnostics: open every /dev/ugen* node read-only, log and report (diag.h)
+ * its VID:PID, names, interfaces (class/subclass/protocol) and endpoints,
+ * then close it again. Nothing is sent to any device. Call before
+ * hci_usb_open(). Returns the number of nodes listed. */
+int hci_usb_survey(void);
+
 #endif

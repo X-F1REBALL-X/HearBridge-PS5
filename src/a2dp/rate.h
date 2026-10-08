@@ -6,7 +6,11 @@
 #define HB_RATE_H
 
 #define HB_RATE_FLOOR 22   /* lowest bitpool we step down to (if the range allows) */
-#define HB_RATE_CEIL  45   /* highest bitpool we step up to (if the range allows) */
+/* Highest bitpool we step up to: the A2DP high-quality value for 48 kHz
+ * joint stereo (~345 kbit/s). The sink's own advertised maximum (and the
+ * range accepted in SET_CONFIGURATION) is the real limit; the controller
+ * only climbs while the link returns credits with headroom. */
+#define HB_RATE_CEIL  53
 
 typedef struct {
     int lo, hi;            /* allowed range (configured range ∩ floor/ceiling) */
@@ -29,5 +33,16 @@ int hb_rate_update(hb_rate *r, long now_ms, int queue, int qmax, long drops);
  * (4-bit count), at least 1. Recompute whenever the bitpool changes. */
 #define HB_MEDIA_HDR 13
 int hb_frames_per_packet(int mtu, int frame_len);
+
+/* Media queue depth (packets waiting for the radio) = worst-case added
+ * latency before the oldest packet is dropped. Low latency (default):
+ * ~200 ms, for games. Stable: ~1 s (the 1.0.x behaviour), rides out
+ * longer radio stalls without dropouts. */
+#define HB_QUEUE_LOW_MS     200
+#define HB_QUEUE_STABLE_MS 1000
+#define HB_QUEUE_MIN_PKTS     4
+/* Packets that hold about target_ms of audio at pkt_ms per packet
+ * (rounded to nearest), at least HB_QUEUE_MIN_PKTS. */
+int hb_media_queue_cap(int pkt_ms, int target_ms);
 
 #endif

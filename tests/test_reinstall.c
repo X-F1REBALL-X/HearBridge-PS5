@@ -25,6 +25,8 @@ static struct {
     int all_rc;
     int exists_rc;
     int n_init, n_term, n_titledir, n_all, n_exists;
+    int need_raise;         /* installer refuses unless rights are raised */
+    int raised, n_raise, n_lower;
 } F;
 
 static int f_init(void) { F.n_init++; return 0; }
@@ -34,6 +36,7 @@ static int f_titledir(const char *id, const char *dir, void *opt)
 {
     (void)opt;
     F.n_titledir++;
+    if (F.need_raise && !F.raised) return (int)0x80990030u;
     if (strcmp(id, HB_TILE_ID) || strcmp(dir, HB_TILE_ROOT "/")) return -1;
     if (F.installed) return F.titledir_rc_dup;
     if (F.titledir_rc_new) return F.titledir_rc_new;
@@ -44,6 +47,7 @@ static int f_all(void *opt)
 {
     (void)opt;
     F.n_all++;
+    if (F.need_raise && !F.raised) return (int)0x80990031u;
     if (F.all_rc) return F.all_rc;
     F.installed = F.meta = 1;
     return 0;
@@ -56,6 +60,8 @@ static int f_exists(const char *id, int *e)
     return 0;
 }
 static int f_meta(const char *id) { return !strcmp(id, HB_TILE_ID) && F.meta; }
+static unsigned long long f_raise(void *ctx) { (void)ctx; F.raised = 1; F.n_raise++; return 0x4801000000000013ULL; }
+static void f_lower(void *ctx) { (void)ctx; F.raised = 0; F.n_lower++; }
 
 static tile_ops fake_ops(void)
 {
@@ -169,6 +175,47 @@ static void test_tile_register(void)
     CHECK(strstr(line, "files ERROR (errno 13)") && !strstr(line, "init"), "write error: report line");
 }
 
+/* One build for all firmwares: own rights first, raised rights only when
+ * the installer refuses (newer firmware). */
+static void test_tile_fallback(void)
+{
+    tile_ops o = fake_ops();
+    tile_report r;
+    char line[600];
+
+    memset(&F, 0, sizeof F);
+    memset(&r, 0, sizeof r);
+    CHECK(tile_register_fallback(&o, &r, f_raise, f_lower, NULL) == 0 && F.n_raise == 0 &&
+          !r.plain_failed && !r.authid_used, "fallback: own rights work -> no raise (fw 10.20 path)");
+
+    memset(&F, 0, sizeof F);
+    memset(&r, 0, sizeof r);
+    F.need_raise = 1;
+    r.authid_before = 0x4800000000000010ULL;
+    r.legacy_marker = 1;
+    CHECK(tile_register_fallback(&o, &r, f_raise, f_lower, NULL) == 0 && F.n_raise == 1 &&
+          F.n_lower == 1 && !F.raised && F.installed && r.plain_failed && r.legacy_marker &&
+          r.authid_before == 0x4800000000000010ULL && r.authid_used == 0x4801000000000013ULL,
+          "fallback: refused -> raised retry registers, rights lowered again");
+    CHECK(r.plain_at && !strcmp(r.plain_at, "InstallAll") && r.plain_code == (int)0x80990031u,
+          "fallback: first failure kept for the report");
+    tile_report_line(&r, line, sizeof line);
+    CHECK(strstr(line, "own rights failed at InstallAll (0x80990031)") && strstr(line, "RESULT ok"),
+          "fallback: report line");
+
+    memset(&F, 0, sizeof F);
+    memset(&r, 0, sizeof r);
+    F.need_raise = 1;
+    CHECK(tile_register_fallback(&o, &r, NULL, NULL, NULL) == -1 && F.n_raise == 0,
+          "fallback: no raise function -> plain failure");
+
+    memset(&F, 0, sizeof F);
+    memset(&r, 0, sizeof r);
+    F.need_raise = 1; F.all_rc = 7; F.titledir_rc_new = 8;
+    CHECK(tile_register_fallback(&o, &r, f_raise, f_lower, NULL) == -1 && F.n_raise == 1 &&
+          F.n_lower == 1 && r.failed && r.code == 7, "fallback: both attempts fail -> failure, rights lowered");
+}
+
 static void test_lock(void)
 {
     char dir[] = "/tmp/hb_lock_XXXXXX", path[300];
@@ -249,6 +296,7 @@ static void test_lock(void)
 int main(void)
 {
     test_tile_register();
+    test_tile_fallback();
     test_lock();
     if (fails) printf("%d test(s) FAILED\n", fails);
     else printf("ALL OK (0 failures)\n");

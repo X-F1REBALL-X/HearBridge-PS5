@@ -20,6 +20,8 @@
 #include "a2dp/sbc.h"
 #include "a2dp/sdp_a2dp.h"
 #include "avcap2.h"
+#include "diag.h"
+#include "sysinfo.h"
 #include "hci_cmd.h"
 #include "hci_usb.h"
 #include "acl_track.h"
@@ -49,10 +51,13 @@
 #define LOCK_PATH STATE_DIR "/hearbridge.lock"
 #define TONE_PATH STATE_DIR "/tone"          /* exists → 1 kHz test tone */
 #define GAIN_PATH STATE_DIR "/gain"          /* text: linear gain, e.g. 5 */
+#define LATENCY_PATH STATE_DIR "/latency"    /* text: "low" (default) or "stable" */
 #define DUMP_PATH STATE_DIR "/media_dump.bin"
+#define DUMP_FLAG_PATH STATE_DIR "/media_dump"   /* exists → dump the first media packets (debug) */
 #define NO_TILE_PATH STATE_DIR "/no_tile"      /* exists → never add the home tile */
 #define RM_TILE_PATH STATE_DIR "/remove_tile"  /* exists → remove the tile once */
 #define TILE_URL_PATH STATE_DIR "/tile_url"    /* optional: deep link for the tile ("start" = fallback page) */
+#define DIAG_PATH STATE_DIR "/diag.txt"        /* diagnostics report, also at /api/diag */
 #define DUMP_PKTS 200
 
 #define PCM_CAP_FRAMES  1024  /* matches Avcap2 READ_BYTES / (2*sizeof float) */
@@ -208,7 +213,6 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 #define STATUS_TXT    STATE_DIR "/status.txt"
 #define PAIRED_INI    STATE_DIR "/paired.ini"
 #define SAVED_JSON    STATE_DIR "/saved.json"
-#define RETRY_SAVED_S 10    /* (unused: no background paging) */
 #define SELECT_WAIT_S 86400 /* manual mode: wait for a choice indefinitely */
 /* Scans run only when the user presses Scan: inquiries back to back for
  * SCAN_WINDOW_S, then the list stays until the next press. */
@@ -973,15 +977,43 @@ static void write_gain_pct(int pct)
     rename(GAIN_PATH ".tmp", GAIN_PATH);
 }
 
+/* Latency mode from LATENCY_PATH: 1 = stable, 0 = low latency (default). */
+static int read_stable(void)
+{
+    char buf[16] = "";
+    FILE *f = fopen(LATENCY_PATH, "r");
+    if (f) {
+        if (!fgets(buf, sizeof buf, f)) buf[0] = 0;
+        fclose(f);
+    }
+    return !strncmp(buf, "stable", 6);
+}
+
+static void write_stable(int stable)
+{
+    FILE *f = fopen(LATENCY_PATH ".tmp", "w");
+    if (!f) return;
+    fputs(stable ? "stable\n" : "low\n", f);
+    fclose(f);
+    rename(LATENCY_PATH ".tmp", LATENCY_PATH);
+}
+
+/* Gain and latency mode changed from the page: write them down. */
 static void persist_gain_if_dirty(void)
 {
-    int pct = -1;
+    int pct = -1, stable = -1;
     CTL_LOCK(&g_ctl);
     if (g_ctl.gain_dirty) { pct = g_ctl.gain_pct; g_ctl.gain_dirty = 0; }
+    if (g_ctl.stable_dirty) { stable = g_ctl.stable; g_ctl.stable_dirty = 0; }
     CTL_UNLOCK(&g_ctl);
     if (pct >= 0) {
         write_gain_pct(pct);
         log_line("volume: base gain %d%% saved", pct);
+    }
+    if (stable >= 0) {
+        write_stable(stable);
+        log_line("latency: %s mode saved (media queue ~%d ms)", stable ? "stable" : "low-latency",
+                 stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS);
     }
 }
 
@@ -994,6 +1026,7 @@ typedef struct {
     hb_rate rate;
     int fsz, samples_per, per_pkt, mtu;
     int max_pp;          /* tuned frames/packet ceiling (0 = MTU fit) */
+    int queue_ms;        /* media queue target: HB_QUEUE_LOW_MS or HB_QUEUE_STABLE_MS */
     int rate_hz;
     unsigned char buf[HCI_PKT_MAX];
     int nbytes, nframes;
@@ -1045,16 +1078,16 @@ static void packer_flush(packer *p)
 static void tune_link(packer *p, long now)
 {
     static unsigned long l_sent, l_cred;
-    static long l_drop, l_t, t_jit_ok;
+    static long l_drop, l_t;
     static int jitter_s;
     unsigned long sent = 0, cred = 0;
     long drops = btlink_tx_dropped(p->link), dt;
-    int limit = 0, pkt_ms, cap, fit;
+    int limit = 0, pkt_ms, cap;
     double need_pps, cred_pps;
 
     btlink_tx_counters(p->link, &sent, &cred, &limit);
     if (!l_t || sent < l_sent) {                  /* new link */
-        l_sent = sent; l_cred = cred; l_drop = drops; l_t = now; t_jit_ok = now;
+        l_sent = sent; l_cred = cred; l_drop = drops; l_t = now;
         jitter_s = 0;
         return;
     }
@@ -1065,12 +1098,13 @@ static void tune_link(packer *p, long now)
     need_pps = 1000.0 / pkt_ms;
     cred_pps = (double)(cred - l_cred) * 1000.0 / (double)dt;
 
-    /* Queue: about one second of audio, whatever the packet size. */
-    cap = (1000 + pkt_ms - 1) / pkt_ms;
-    if (cap < 16) cap = 16;
+    /* Queue: about queue_ms of audio (low latency ~200 ms, stable ~1 s),
+     * whatever the packet size. */
+    cap = hb_media_queue_cap(pkt_ms, p->queue_ms);
     if (cap != btlink_media_cap(p->link)) {
         btlink_set_media_cap(p->link, cap);
-        log_line("tune: media queue %d packets (~1 s at %d ms/packet)", btlink_media_cap(p->link), pkt_ms);
+        log_line("tune: media queue %d packets (~%d ms at %d ms/packet)", btlink_media_cap(p->link),
+                 btlink_media_cap(p->link) * pkt_ms, pkt_ms);
     }
 
     if (drops > l_drop && (cred_pps >= need_pps * 1.05 ||
@@ -1085,10 +1119,8 @@ static void tune_link(packer *p, long now)
                      cred_pps, need_pps, p->per_pkt);
             jitter_s = 0;
         }
-        t_jit_ok = now;
     } else if (drops == l_drop) {
         jitter_s = 0;
-        (void)fit; (void)t_jit_ok;
     }
     /* Bitpool: only step up while the link returns credits with headroom. */
     if (cred_pps < need_pps * 1.15 && btlink_tx_backlog(p->link) > 1)
@@ -1196,6 +1228,16 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
 
     {
         int av_ok = avdtp_setup(&av, link, av_psm);
+        if (!av_ok && av.unsupported_format) {
+            /* Retrying cannot help: the sink cannot take 48 kHz stereo. */
+            g_kept_link = 0;
+            log_line("stream: %s takes no 48 kHz stereo SBC; HearBridge has no resampler or "
+                     "downmix, so it does not stream to it", ini->name[0] ? ini->name : "the headset");
+            write_status("error unsupported-format %s", ini->name[0] ? ini->name : "-");
+            notify("HearBridge: %s is not supported (needs 48 kHz stereo)",
+                   ini->name[0] ? ini->name : "this device");
+            goto done;
+        }
         if (!av_ok && g_kept_link && !hb_stop_requested()) {
             /* Kept pairing link: AVDTP failed there — close, page, retry once. */
             log_line("stream: AVDTP on the pairing link failed — closing it and paging");
@@ -1225,6 +1267,13 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     memset(&scfg, 0, sizeof scfg);
     scfg.sample_rate = av.sink.sample_rate ? av.sink.sample_rate : 48000;
     scfg.channels = av.sink.channels ? av.sink.channels : 2;
+    if (scfg.sample_rate != 48000 || scfg.channels != 2) {
+        /* avdtp only configures 48 kHz stereo; never stream anything else. */
+        log_line("stream: sink format %d Hz / %d ch is not 48 kHz stereo — not streaming",
+                 scfg.sample_rate, scfg.channels);
+        write_status("error unsupported-format %s", ini->name[0] ? ini->name : "-");
+        goto done;
+    }
     scfg.bitpool = av.bitpool;
     scfg.blocks = 16;
     scfg.subbands = 8;
@@ -1237,9 +1286,6 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         log_line("stream: SBC encoder open failed");
         goto done;
     }
-    if (scfg.sample_rate != 48000)
-        log_line("stream: WARN sink %d Hz, capture is 48 kHz (no resample yet)",
-                 scfg.sample_rate);
 
     cap = avcap2_session_open();
     if (!cap) {
@@ -1257,17 +1303,32 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     if (!mtu) mtu = 672;
     pk.mtu = (int)mtu;
     pk.rate_hz = scfg.sample_rate;
+    CTL_LOCK(&g_ctl);
+    pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+    CTL_UNLOCK(&g_ctl);
     packer_size(&pk);
+    {
+        /* Media queue from the first packet (tune_link() keeps it in step). */
+        int pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
+        btlink_set_media_cap(link, hb_media_queue_cap(pkt_ms, pk.queue_ms));
+        log_line("stream: %s mode, media queue %d packets (~%d ms)",
+                 pk.queue_ms == HB_QUEUE_STABLE_MS ? "stable" : "low-latency",
+                 btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
+    }
     hb_rate_init(&pk.rate, av.bitpool_lo ? av.bitpool_lo : av.bitpool,
                  av.bitpool_hi ? av.bitpool_hi : av.bitpool, sbc_encoder_bitpool(enc), now_ms());
     log_line("stream: media MTU %u, SBC frame %d bytes, %d frames/packet, bitpool %d "
              "(adapts %d-%d)", mtu, pk.fsz, pk.per_pkt, sbc_encoder_bitpool(enc),
              pk.rate.lo, pk.rate.hi);
 
-    if (avdtp_dump_open(&av, DUMP_PATH, DUMP_PKTS))
-        log_line("stream: dumping first %d media payloads to %s", DUMP_PKTS, DUMP_PATH);
-    else
-        log_line("stream: media dump %s not writable", DUMP_PATH);
+    /* Debug only: create /data/hearbridge/media_dump to write the first
+     * media payloads to media_dump.bin (checked with tests/decode_dump). */
+    if (file_exists(DUMP_FLAG_PATH)) {
+        if (avdtp_dump_open(&av, DUMP_PATH, DUMP_PKTS))
+            log_line("stream: dumping first %d media payloads to %s", DUMP_PKTS, DUMP_PATH);
+        else
+            log_line("stream: media dump %s not writable", DUMP_PATH);
+    }
     tone_file = file_exists(TONE_PATH);
 
     /* AVRCP: most headsets open the control channel themselves right after
@@ -1341,6 +1402,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             gain_pct = g_ctl.gain_pct;
             muted = g_ctl.muted;
             tone = g_ctl.tone || tone_file;
+            pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
             g_ctl.avrcp = avst;
             CTL_UNLOCK(&g_ctl);
             if (changed) log_line("stream: headset volume %d/127 -> gain", v);
@@ -1472,6 +1534,7 @@ static void home_tile(int second)
 {
     if (!second && access(RM_TILE_PATH, F_OK) == 0) {
         tile_uninstall();
+        (void)diag_save();
         unlink(RM_TILE_PATH);
         { FILE *f = fopen(NO_TILE_PATH, "w"); if (f) fclose(f); }
     } else if (access(NO_TILE_PATH, F_OK) != 0 && access(RM_TILE_PATH, F_OK) != 0) {
@@ -1486,8 +1549,20 @@ static void home_tile(int second)
         }
         if (tile_install(u, &tr) != 0)
             notify("HearBridge: home-screen icon not added (%s, code %#x). Details: %s",
-                   tr.failed ? tr.failed : "?", (unsigned)tr.code, LOG_PATH);
+                   tr.failed ? tr.failed : "?", (unsigned)tr.code, second ? LOG_PATH : DIAG_PATH);
+    } else {
+        diag_set("tile", "disabled (%s exists)", NO_TILE_PATH);
     }
+}
+
+/* When Bluetooth cannot start, keep the web page (and
+ * /api/diag) up until Stop is pressed or the stop file appears, instead of
+ * exiting at once, so the report can be read from a phone or PC. */
+static void bt_failed_wait(const char *status)
+{
+    write_status("%s", status);
+    log_line("hearbridge: %s - page and /api/diag stay up until Stop", status);
+    while (!hb_stop_requested()) usleep(500 * 1000);
 }
 
 int main(void)
@@ -1496,13 +1571,23 @@ int main(void)
     a2dp_session *asess = NULL;
     a2dp_open_opts opts;
     headset_ini ini;
-    int rc = 2, lock_rc, lock_errno = 0;
+    int rc = 2, mk_errno = 0, lock_rc, lock_errno = 0, log_ok;
 
-    mkdir(STATE_DIR, 0755);
+    /* First sign of life, before any file, lock or library work: if this
+     * toast shows but nothing else happens, the payload did start and the
+     * log/diag.txt say where it stopped; if it does not show, the loader
+     * never ran it. */
+    notify("HearBridge %s: starting", HEARBRIDGE_VERSION);
+
+    if (mkdir(STATE_DIR, 0755) != 0 && errno != EEXIST) mk_errno = errno;
     unlink(DEVICES_JSON);      /* a list from an older run or build is stale */
 
-    /* Log first so a lock problem is written down too. */
-    log_open(LOG_PATH);
+    /* Log first so a lock problem is written down too (a second instance
+     * only appends a few lines before it exits). */
+    log_ok = log_open(LOG_PATH);
+    diag_init(NULL);           /* file path set once we own the lock */
+    diag_set("hearbridge", "%s (one build for all firmwares, compiled %s)", HEARBRIDGE_VERSION,
+             __DATE__);
     lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
     if (lock_rc == LOCK_BUSY) {
         /* Running the ELF again still brings back a deleted icon. */
@@ -1513,12 +1598,19 @@ int main(void)
         log_close();
         return 1;
     }
-    if (lock_rc == LOCK_NO_WRITE)      /* not "already running": /data not writable */
+    diag_set_path(DIAG_PATH);
+    if (lock_rc == LOCK_NO_WRITE) {
+        /* Not "already running": the state folder is not writable. Carry on
+         * so the page and /api/diag still work. */
         notify("HearBridge: cannot write %s (errno %d). Continuing; settings and logs may not be saved.",
                STATE_DIR, lock_errno);
+    }
 
     hb_stop_init();
     log_line("HearBridge PS5 %s", HEARBRIDGE_VERSION);
+    diag_set("state dir", "%s: mkdir errno %d; lock %s (errno %d); log %s", STATE_DIR, mk_errno,
+             lock_rc == LOCK_OK ? "ok" : "NOT WRITABLE", lock_errno, log_ok ? "ok" : "NOT WRITABLE");
+    (void)diag_save();
     log_line("attach to running controller (no reset); stop file %s", HB_STOP_PATH);
     ctl_init(&g_ctl, HEARBRIDGE_VERSION);
     snprintf(g_ctl.devices_path, sizeof g_ctl.devices_path, "%s", DEVICES_JSON);
@@ -1526,6 +1618,8 @@ int main(void)
     snprintf(g_ctl.saved_path, sizeof g_ctl.saved_path, "%s", SAVED_JSON);
     g_ctl.gain_pct = read_gain_pct();
     log_line("volume: base gain %d%% (%s)", g_ctl.gain_pct, GAIN_PATH);
+    g_ctl.stable = read_stable();
+    log_line("latency: %s mode (%s)", g_ctl.stable ? "stable" : "low-latency", LATENCY_PATH);
     {
         char url[64];
         int port;
@@ -1539,15 +1633,25 @@ int main(void)
             snprintf(g_ctl.url, sizeof g_ctl.url, "%s", url);
             CTL_UNLOCK(&g_ctl);
             log_line("http: control page at %s", url);
+            diag_set("web page", "%s (diagnostics at %s/api/diag)", url, url);
             notify("HearBridge %s: %s", HEARBRIDGE_VERSION, url);
         } else {
             log_line("http: control page could not start");
+            diag_set("web page", "FAILED to start (ports %d-%d)", HB_HTTP_PORT, HB_HTTP_PORT + 5);
             notify("hearbridge: started\n%s", HEARBRIDGE_VERSION);
         }
     }
 
     /* Home-screen tile that opens the control page in the browser. */
     home_tile(0);
+
+    /* Diagnostics: firmware, audio libraries and every USB device
+     * (read-only). They run only after the page and the icon are up, so
+     * everything before this point is the 1.0.2 startup path. */
+    sysinfo_collect();
+    (void)avcap2_probe();
+    (void)hci_usb_survey();
+    (void)diag_save();
 
     if (!headset_ini_load(&ini) && !ini.have_addr)
         log_line("select: no headset.ini — will discover a new device");
@@ -1563,7 +1667,9 @@ int main(void)
     memset(&hci, 0, sizeof hci);
     if (!hci_usb_open(&hci)) {
         log_line("hearbridge: HCI open failed");
+        (void)diag_save();
         notify("HearBridge: HCI open failed");
+        bt_failed_wait("error hci-open-failed");
         goto out;
     }
 
@@ -1573,7 +1679,10 @@ int main(void)
     asess = a2dp_open(hci, &opts);
     if (!asess) {
         log_line("hearbridge: controller setup failed");
+        diag_set("bt setup", "FAILED (a2dp_open)");
+        (void)diag_save();
         notify("HearBridge: controller setup failed");
+        bt_failed_wait("error controller-setup-failed");
         goto close_hci;
     }
 

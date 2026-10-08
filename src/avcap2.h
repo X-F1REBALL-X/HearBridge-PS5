@@ -8,15 +8,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Capture roughly CAPTURE_SECONDS of audio into out_path (raw float32 LE stereo).
- * Logs rate/frames/amplitude stats. Returns 0 on success, non-zero on failure. */
-int avcap2_capture_to_file(const char *out_path, int capture_seconds);
-
 /* Streaming session for A2DP encode path (48 kHz stereo). */
 typedef struct avcap2_session avcap2_session;
 
 avcap2_session *avcap2_session_open(void);
 void            avcap2_session_close(avcap2_session *s);
+
+/* Diagnostics only: load libSceIpmi/libSceAvcap2 and check that the Avcap2
+ * functions resolve (no capture is started). Results go to diag.h.
+ * 0 = everything present. */
+int avcap2_probe(void);
 
 /* Read up to max_frames stereo frames into interleaved s16le.
  * Returns frames read (>0), 0 if empty/transient, -1 on hard error.
