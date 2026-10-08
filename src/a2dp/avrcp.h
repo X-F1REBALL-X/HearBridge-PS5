@@ -15,6 +15,8 @@ typedef struct {
     int remote_abs;        /* headset showed absolute volume support */
     int changed;           /* volume changed by the headset (consumer clears) */
     int need_register;     /* re-register for VOLUME_CHANGED after a CHANGED */
+    int sink_renders;      /* the headset applies the volume itself (it took our
+                              SetAbsoluteVolume or answered our registration) */
     unsigned long rx_cmds, rx_rsps;
 } avrcp_state;
 

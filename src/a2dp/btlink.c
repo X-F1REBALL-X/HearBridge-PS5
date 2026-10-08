@@ -2065,6 +2065,7 @@ int btlink_avrcp_state(const btlink *l)
     if (avrcp_open(l)) st |= 1;
     if (l->avrcp.remote_abs) st |= 2;
     if (l->avrcp.ct_registered || l->avrcp.notify_label >= 0) st |= 4;
+    if (l->avrcp.sink_renders) st |= 8;
     return st;
 }
 
