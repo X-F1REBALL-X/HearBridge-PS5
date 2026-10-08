@@ -8,11 +8,13 @@ BUILD ?= build/ps5
 
 CFLAGS  := -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/bt -Isrc/a2dp
 
-# One build for every firmware. libSceSystemService was linked but never
-# used (dropped). libSceAppInstUtil stays linked so the module is loaded;
-# sceAppInstUtilAppInstallTitleDir/AppInstallAll/AppExists are looked up at
-# run time (tile_sys.c), so a firmware without one of them still loads.
-LDLIBS  += -lSceAppInstUtil -lpthread
+# One build for every firmware. Keep the DT_NEEDED list and its order the
+# same as 1.0.2 (SystemService first): the payload runtime loads these
+# modules before main(), and a load failure kills the payload silently.
+# Symbols 1.0.2 did not import (sceAppInstUtilAppInstallTitleDir and friends,
+# opendir/readdir/closedir) are looked up at run time instead, so a firmware
+# without one of them still loads. scripts/check_imports.sh enforces this.
+LDLIBS  += -lSceSystemService -lSceAppInstUtil -lpthread
 
 # 1.0.0: generic A2DP source — saved device or inquiry → SSP pair →
 # SDP A2DP Sink → AVDTP (SNK+SBC) → Avcap2 capture → SBC stream.
@@ -30,6 +32,7 @@ OBJS := $(patsubst src/%.c,$(BUILD)/%.o,$(SRCS))
 $(ELF): $(OBJS)
 	@mkdir -p dist
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	sh scripts/check_imports.sh $@ scripts/imports-1.0.2.txt || { rm -f $@; exit 1; }
 
 $(BUILD)/%.o: src/%.c
 	@mkdir -p $(dir $@)
