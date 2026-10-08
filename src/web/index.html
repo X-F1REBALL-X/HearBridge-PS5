@@ -142,6 +142,11 @@ input[type=range]::-moz-range-track{height:1.6rem;background:var(--void)}
 input[type=range]::-moz-range-progress{height:1.6rem;background:var(--lime)}
 input[type=range]::-moz-range-thumb{width:.6rem;height:1.6rem;border:0;border-radius:0;background:#fff}
 .vol .btns{margin-top:var(--s1)}
+/* codec picker: segmented row */
+.seg{display:grid;grid-template-columns:repeat(4,1fr);grid-gap:var(--s1);margin:0 0 var(--s2)}
+.seg button{min-height:2.5rem;padding:.2rem .4rem;font-size:.88rem}
+.seg button[disabled]{opacity:.35;cursor:default}
+.seg button[disabled]:before{border-style:dashed}
 /* connection */
 .conn .cbox{display:grid;grid-template-columns:auto minmax(0,1fr);grid-gap:var(--s4);align-items:center}
 .conn .note{margin:0;font-size:.8rem;line-height:1.3}
@@ -255,6 +260,9 @@ html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 <div class="btns"><button id="mute" data-i18n="mute">Mute</button><button id="tone" data-i18n="tone">Test tone</button></div>
 </section>
 <section class="panel conn"><p class="label" data-i18n="connection">Connection</p>
+<p class="sub" data-i18n="codec">Codec</p>
+<div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
+<p class="k note" id="codecnote" data-i18n="codecHint">Auto picks the best the headset takes: SBC-XQ, then SBC HQ, then SBC. Changing it reconnects the headset.</p>
 <div class="btns"><button id="lat" data-i18n="lowLatency">Low latency</button></div>
 <p class="k note" id="latnote" data-i18n="latHint">Low latency: about 0.2 s of buffering. Stable: about 1 s, fewer dropouts on a busy radio.</p>
 <div class="cbox"><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
@@ -358,6 +366,8 @@ $('hv').textContent=S.headset_volume<0?'-':pct(S.headset_volume*100/127);
 
 $('mute').className=S.muted?'ember':'';$('mute').textContent=t(S.muted?'unmute':'mute');
 $('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone');
+for(var ci=0;ci<4;ci++){var cb=$('cd'+ci);cb.className=(S.codec_pref|0)==ci?'act':'';
+cb.disabled=!!(ci&&S.codec_avail&&!(S.codec_avail&(1<<ci)));cb.title=cb.disabled?t('codecNo'):''}
 $('lat').className=S.stable?'':'act';$('lat').textContent=t(S.stable?'stableMode':'lowLatency')}
 $('gain').oninput=function(){busyG=1;$('gv').textContent=pct(this.value)};
 $('gain').onchange=function(){act('/api/volume?pct='+this.value,function(){busyG=0})};
@@ -366,6 +376,7 @@ $('hs').onchange=function(){act('/api/headset?vol='+this.value,function(){busyH=
 $('mute').onclick=function(){act('/api/mute?on='+(S&&S.muted?0:1))};
 $('tone').onclick=function(){act('/api/tone?on='+(S&&S.tone?0:1))};
 $('lat').onclick=function(){act('/api/latency?stable='+(S&&S.stable?0:1))};
+for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!this.disabled)act('/api/codec?mode='+m)}})(cj);
 $('scan').onclick=function(){act('/api/scan');$('scanning').style.display=''};
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();

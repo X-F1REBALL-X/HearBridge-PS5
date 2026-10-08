@@ -95,6 +95,11 @@ int main(int argc, char **argv)
     CHECK(c.stable == 0 && c.stable_dirty, "latency: back to low latency");
     post(&c, "/api/latency");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "latency without stable= -> 400");
+    post(&c, "/api/codec?mode=3");
+    CHECK(c.codec_pref == 3 && c.prefs_dirty && strstr(out, "\"codec_pref\":3"), "codec: SBC-XQ picked + saved per headset");
+    post(&c, "/api/codec?mode=7");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12) && c.codec_pref == 3, "codec: unknown mode -> 400");
+    c.prefs_dirty = 0;
     diag_init(NULL);
     get(&c, "/api/diag");
     CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/plain") &&

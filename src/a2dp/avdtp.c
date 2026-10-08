@@ -1,4 +1,5 @@
 #include "avdtp.h"
+#include "hsprefs.h"
 #include "log.h"
 #include "util.h"
 
@@ -320,66 +321,30 @@ static int get_caps_for_seid(avdtp_session *s, int seid,
     return msg;
 }
 
-static int pick_sbc_config(avdtp_sink_info *sink, uint8_t cfg[4], int *bitpool)
+static int pick_sbc_config(avdtp_session *s, int want)
 {
-    unsigned char c0 = sink->sbc_caps[0];
-    unsigned char c1 = sink->sbc_caps[1];
-    int rate = 48000, ch = 2, joint = 0;
-    unsigned char out0, out1 = 0;
     const char *why = NULL;
-    int bp;
-
-    /* 48 kHz, two channels (joint > stereo > dual): what the capture
-     * delivers. Anything else is refused instead of streamed wrong. */
-    out0 = (unsigned char)avdtp_sbc_pick_mode(c0, &joint, &why);
-    if (!out0) {
-        log_line("sbc: NOT SUPPORTED: %s (capabilities %02x)", why ? why : "?", c0);
+    uint8_t caps[4];
+    memcpy(caps, s->sink.sbc_caps, 4);
+    caps[2] = (uint8_t)s->sink.bitpool_min;
+    caps[3] = (uint8_t)s->sink.bitpool_max;
+    if (!avdtp_sbc_pick(caps, want, s->no_xq, &s->codec, &why)) {
+        log_line("sbc: NOT SUPPORTED: %s (capabilities %02x)", why ? why : "?", caps[0]);
         return 0;
     }
-
-    /* A2DP 4.3.2: block length bit7=4 bit6=8 bit5=12 bit4=16; subbands
-     * bit3=4 bit2=8; allocation bit1=SNR bit0=Loudness. Prefer 16 blocks,
-     * 8 subbands, Loudness: 16*8 = 128 samples/frame, 375 frames/s at
-     * 48 kHz. (Earlier builds took bit7 as 16 and so asked for 4 blocks:
-     * 1500 tiny frames/s, ~4x the packet rate and no audio.) */
-    if (c1 & 0x10) out1 |= 0x10;
-    else if (c1 & 0x20) out1 |= 0x20;
-    else if (c1 & 0x40) out1 |= 0x40;
-    else out1 |= 0x80;
-
-    if (c1 & 0x04) out1 |= 0x04;      /* 8 subbands */
-    else out1 |= 0x08;                /* 4 subbands */
-
-    if (c1 & 0x01) out1 |= 0x01;      /* Loudness */
-    else out1 |= 0x02;                /* SNR */
-
-    /* Start at bitpool 35 (~250 kbit/s at 48 kHz joint stereo). The
-     * configuration carries a bitpool RANGE (A2DP 4.3.2.6: octets 2-3 are
-     * min / max) so the stream can step the bitpool down when the radio
-     * cannot keep up, and back up later; every SBC frame header carries the
-     * bitpool in use. */
-    {
-        int lo = sink->bitpool_min, hi = sink->bitpool_max;
-        if (lo < 2) lo = 2;
-        if (hi > 53 || hi < lo) hi = hi < lo ? lo : 53;
-        bp = 35;
-        if (bp > hi) bp = hi;
-        if (bp < lo) bp = lo;
-        cfg[2] = (unsigned char)lo;
-        cfg[3] = (unsigned char)hi;
-    }
-
-    cfg[0] = out0;
-    cfg[1] = out1;
-
-    sink->sample_rate = rate;
-    sink->channels = ch;
-    sink->joint_stereo = joint;
-    *bitpool = bp;
+    memcpy(s->sbc_cfg, s->codec.cfg, 4);
+    s->bitpool = s->codec.start_bp;
+    s->sink.sample_rate = 48000;
+    s->sink.channels = 2;
+    s->sink.joint_stereo = (s->sbc_cfg[0] & 0x01) != 0;
+    log_line("codec: sink takes %s%s%s; asked %s -> %s (bitpool up to %d)",
+             "SBC", (s->codec.avail & (1 << HB_CODEC_SBC_HQ)) ? ", SBC HQ" : "",
+             (s->codec.avail & (1 << HB_CODEC_SBC_XQ)) ? ", SBC-XQ" : "",
+             hb_codec_key(want), s->codec.name, s->codec.ceil);
     return 1;
 }
 
-int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
+int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm, int want_codec, int no_xq)
 {
     unsigned char body[64], rsp[256];
     int rsp_len = 0;
@@ -387,6 +352,8 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
     int msg;
 
     memset(s, 0, sizeof *s);
+    s->want_codec = want_codec;
+    s->no_xq = no_xq;
     s->link = link;
     s->psm = avdtp_psm ? avdtp_psm : AVDTP_PSM;
     s->int_seid = 1; /* our Source SEID */
@@ -535,11 +502,10 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
              s->sink.seid, s->sink.sbc_caps[0], s->sink.sbc_caps[1],
              (unsigned)s->sink.bitpool_min, (unsigned)s->sink.bitpool_max);
 
-    if (!pick_sbc_config(&s->sink, s->sbc_cfg, &s->bitpool)) {
+    if (!pick_sbc_config(s, s->want_codec)) {
         s->unsupported_format = 1;
         return 0;
     }
-    memcpy(s->sink.sbc_caps, s->sbc_cfg, 4); /* store chosen */
 
     /* SetConfiguration: ACP SEID, INT SEID, Media Transport + Media Codec */
     {
@@ -564,6 +530,12 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
                  (s->sbc_cfg[1] & 0x04) ? "8" : "4",
                  (s->sbc_cfg[1] & 0x01) ? "loudness" : "snr");
         msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
+        if (msg != AV_MSG_ACCEPT && s->codec.codec != HB_CODEC_SBC && pick_sbc_config(s, HB_CODEC_SBC)) {
+            /* The sink refused the high-quality flavour: plain SBC. */
+            log_line("avdtp: %s refused — falling back to SBC", s->want_codec == HB_CODEC_AUTO ? "auto pick" : "requested codec");
+            memcpy(body + n - 4, s->sbc_cfg, 4);
+            msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
+        }
         if (msg != AV_MSG_ACCEPT && s->sbc_cfg[2] != s->sbc_cfg[3]) {
             /* Some sinks only take a single bitpool: retry fixed (no adaptation). */
             log_line("avdtp: bitpool range %u-%u refused — retrying with fixed bitpool %d",

@@ -2,6 +2,7 @@
  * media packets with the console's builder, and write media_dump.bin in the
  * console format for tests/decode_dump.py. */
 #include "avdtp.h"
+#include "hsprefs.h"
 #include "sbc.h"
 
 #include <math.h>
@@ -14,13 +15,17 @@ void log_line(const char *fmt, ...) { (void)fmt; }
 int main(int argc, char **argv)
 {
     /* What pick_sbc_config() selects for caps 3f ff, bitpool 2-53. */
-    static const uint8_t ie[4] = { 0x11, 0x15, 35, 35 };
+    static const uint8_t ie_sbc[4] = { 0x11, 0x15, 35, 35 };
+    /* SBC-XQ: 48 kHz dual channel, bitpool 38 per channel. */
+    static const uint8_t ie_xq[4] = { 0x14, 0x15, 38, 38 };
+    int xq = argc > 3 && !strcmp(argv[3], "xq");
+    const uint8_t *ie = xq ? ie_xq : ie_sbc;
     avdtp_session s;
     sbc_config cfg;
     sbc_encoder *e;
     int16_t pcm[128 * 2];
     unsigned char frames[15 * 128], pkt[2048];
-    int per_pkt = 10, fsz, i, t = 0, npk = argc > 2 ? atoi(argv[2]) : 200;
+    int per_pkt = 4, fsz, i, t = 0, npk = argc > 2 ? atoi(argv[2]) : 200;
 
     if (argc < 2) return 2;
     {
@@ -37,11 +42,36 @@ int main(int argc, char **argv)
                bad ? "FAIL" : "ok", bad ? " (see bits)" : "");
         if (bad) { printf("FAIL bits %#x\n", bad); return 1; }
     }
+    {
+        /* Codec pick. The Xbox headset reports 3f ff, bitpool 2-60. */
+        static const uint8_t xbox[4] = { 0x3f, 0xff, 2, 60 };
+        static const uint8_t nodual[4] = { 0x33, 0xff, 2, 53 };   /* 48/44.1k, stereo+joint */
+        static const uint8_t lowbp[4] = { 0x3f, 0xff, 2, 32 };
+        avdtp_codec_pick c;
+        const char *why;
+        int bad = 0;
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 0, &c, &why) || c.codec != HB_CODEC_SBC_XQ ||
+            c.cfg[0] != 0x14 || c.ceil != HB_XQ_CEIL || c.cfg[3] != HB_XQ_CEIL || c.start_bp != 35 ||
+            c.avail != 0x0E) bad |= 1;                    /* auto -> XQ, all three available */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_AUTO, 1, &c, &why) || c.codec != HB_CODEC_SBC_HQ || c.ceil != 60 ||
+            c.cfg[0] != 0x11) bad |= 2;                   /* XQ failed before -> HQ */
+        if (!avdtp_sbc_pick(xbox, HB_CODEC_SBC, 0, &c, &why) || c.codec != HB_CODEC_SBC || c.ceil != 53 ||
+            c.cfg[3] != 53 || c.cfg[2] != 2 || c.cfg[1] != 0x15) bad |= 4;   /* plain SBC: 53 */
+        if (!avdtp_sbc_pick(nodual, HB_CODEC_AUTO, 0, &c, &why) || c.codec != HB_CODEC_SBC || c.avail != 0x02)
+            bad |= 8;                                     /* no dual, max 53 -> SBC */
+        if (!avdtp_sbc_pick(nodual, HB_CODEC_SBC_XQ, 0, &c, &why) || c.codec != HB_CODEC_SBC) bad |= 16;
+        if (!avdtp_sbc_pick(lowbp, HB_CODEC_AUTO, 0, &c, &why) || c.codec != HB_CODEC_SBC || c.ceil != 32 ||
+            c.start_bp != 32) bad |= 32;                  /* bitpool max 32: too low for XQ */
+        if (avdtp_sbc_pick((const uint8_t[4]){ 0x18, 0xff, 2, 53 }, HB_CODEC_AUTO, 0, &c, &why)) bad |= 64;
+        printf("%s   codec pick: auto -> SBC-XQ on the Xbox caps, HQ/SBC fallbacks, refuse mono%s\n",
+               bad ? "FAIL" : "ok", bad ? " (see bits)" : "");
+        if (bad) { printf("FAIL bits %#x\n", bad); return 1; }
+    }
     memset(&s, 0, sizeof s);
     memcpy(s.sbc_cfg, ie, 4);
     s.rtp_ssrc = 0x48524247; s.rtp_seq = 1;
     memset(&cfg, 0, sizeof cfg);
-    cfg.sample_rate = 48000; cfg.channels = 2; cfg.bitpool = 35;
+    cfg.sample_rate = 48000; cfg.channels = 2; cfg.bitpool = ie[2];
     memcpy(cfg.a2dp_ie, ie, 4); cfg.have_a2dp_ie = 1;
     e = sbc_encoder_open(&cfg);
     if (!e) return 1;
@@ -63,6 +93,6 @@ int main(int argc, char **argv)
     }
     avdtp_dump_close(&s);
     sbc_encoder_close(e);
-    printf("wrote %d packets, %d-byte frames\n", npk, fsz);
+    printf("wrote %d packets, %d-byte frames (%s)\n", npk, fsz, xq ? "SBC-XQ dual channel" : "SBC joint stereo");
     return 0;
 }

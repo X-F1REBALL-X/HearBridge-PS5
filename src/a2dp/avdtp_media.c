@@ -1,6 +1,7 @@
 /* A2DP media packet builder + debug dump. No link dependency, so the host
  * tests build the exact bytes the console sends. Developed by X-F1REBALL-X. */
 #include "avdtp.h"
+#include "hsprefs.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -26,6 +27,60 @@ int avdtp_sbc_pick_mode(unsigned char caps0, int *joint, const char **why)
         return 0;
     }
     return out;
+}
+
+int avdtp_sbc_pick(const uint8_t caps[4], int want, int no_xq, avdtp_codec_pick *o,
+                   const char **why)
+{
+    int joint = 0, lo = caps[2], hi = caps[3];
+    unsigned char c1 = caps[1], out0, out1 = 0;
+
+    memset(o, 0, sizeof *o);
+    out0 = (unsigned char)avdtp_sbc_pick_mode(caps[0], &joint, why);
+    if (!out0) return 0;
+    if (lo < 2) lo = 2;
+    if (hi < lo) hi = lo;
+
+    /* A2DP 4.3.2: block length bit7=4 bit6=8 bit5=12 bit4=16; subbands
+     * bit3=4 bit2=8; allocation bit1=SNR bit0=Loudness. Prefer 16 blocks,
+     * 8 subbands, Loudness: 128 samples/frame, 375 frames/s at 48 kHz. */
+    if (c1 & 0x10) out1 |= 0x10;
+    else if (c1 & 0x20) out1 |= 0x20;
+    else if (c1 & 0x40) out1 |= 0x40;
+    else out1 |= 0x80;
+    out1 |= (c1 & 0x04) ? 0x04 : 0x08;
+    out1 |= (c1 & 0x01) ? 0x01 : 0x02;
+
+    o->avail = 1 << HB_CODEC_SBC;
+    if (hi > 53 && (out0 & 0x03)) o->avail |= 1 << HB_CODEC_SBC_HQ;
+    if ((caps[0] & 0x04) && hi >= HB_XQ_MIN_BP) o->avail |= 1 << HB_CODEC_SBC_XQ;
+
+    if (want == HB_CODEC_AUTO)
+        want = (o->avail & (1 << HB_CODEC_SBC_XQ)) && !no_xq ? HB_CODEC_SBC_XQ :
+               (o->avail & (1 << HB_CODEC_SBC_HQ)) ? HB_CODEC_SBC_HQ : HB_CODEC_SBC;
+    if (want < HB_CODEC_SBC || want >= HB_CODEC_N || !(o->avail & (1 << want))) want = HB_CODEC_SBC;
+
+    o->codec = want;
+    o->cfg[1] = out1;
+    o->cfg[2] = (unsigned char)lo;
+    if (want == HB_CODEC_SBC_XQ) {
+        o->cfg[0] = 0x10 | 0x04;                  /* 48 kHz, dual channel */
+        o->ceil = hi < HB_XQ_CEIL ? hi : HB_XQ_CEIL;
+        o->name = "SBC-XQ";
+    } else if (want == HB_CODEC_SBC_HQ) {
+        o->cfg[0] = out0;
+        o->ceil = hi < HB_HQ_MAX_BP ? hi : HB_HQ_MAX_BP;
+        o->name = "SBC HQ";
+    } else {
+        o->cfg[0] = out0;
+        o->ceil = hi < 53 ? hi : 53;
+        o->name = "SBC";
+    }
+    if (o->ceil < lo) o->ceil = lo;
+    o->cfg[3] = (unsigned char)o->ceil;
+    o->start_bp = 35 < o->ceil ? 35 : o->ceil;
+    if (o->start_bp < lo) o->start_bp = lo;
+    return 1;
 }
 
 int avdtp_build_media(avdtp_session *s, const unsigned char *sbc_frames, int len,

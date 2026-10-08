@@ -119,7 +119,11 @@
    "reload": "HearBridge was restarted. Reload this page.",
    "unsupportedFmt": "device needs 48 kHz stereo, not supported",
    "volOnHeadset": "Volume on headset",
-   "volSoftware": "Software volume"
+   "volSoftware": "Software volume",
+   "codec": "Codec",
+   "codecAuto": "Auto",
+   "codecHint": "Auto picks the best the headset takes: SBC-XQ, then SBC HQ, then SBC. Changing it reconnects the headset.",
+   "codecNo": "This headset does not support it"
   },
   "ar": {
    "language": "اللغة",
@@ -183,7 +187,11 @@
    "reload": "تمت إعادة تشغيل HearBridge. أعد تحميل هذه الصفحة.",
    "unsupportedFmt": "الجهاز لا يدعم 48 كيلوهرتز ستيريو، غير مدعوم",
    "volOnHeadset": "الصوت من السماعة",
-   "volSoftware": "صوت برمجي"
+   "volSoftware": "صوت برمجي",
+   "codec": "الترميز",
+   "codecAuto": "تلقائي",
+   "codecHint": "الوضع التلقائي يختار أفضل ما تدعمه السماعة: SBC-XQ ثم SBC HQ ثم SBC. التغيير يعيد توصيل السماعة.",
+   "codecNo": "هذه السماعة لا تدعمه"
   },
   "es": {
    "language": "Idioma",
@@ -247,7 +255,11 @@
    "reload": "HearBridge se ha reiniciado. Recarga esta página.",
    "unsupportedFmt": "el dispositivo no admite 48 kHz estéreo, no compatible",
    "volOnHeadset": "Volumen en los auriculares",
-   "volSoftware": "Volumen por software"
+   "volSoftware": "Volumen por software",
+   "codec": "Códec",
+   "codecAuto": "Auto",
+   "codecHint": "Auto elige lo mejor que admiten los auriculares: SBC-XQ, luego SBC HQ, luego SBC. Al cambiarlo se reconectan.",
+   "codecNo": "Estos auriculares no lo admiten"
   },
   "fr": {
    "language": "Langue",
@@ -311,7 +323,11 @@
    "reload": "HearBridge a redémarré. Rechargez cette page.",
    "unsupportedFmt": "l'appareil n'accepte pas le 48 kHz stéréo, non pris en charge",
    "volOnHeadset": "Volume sur le casque",
-   "volSoftware": "Volume logiciel"
+   "volSoftware": "Volume logiciel",
+   "codec": "Codec",
+   "codecAuto": "Auto",
+   "codecHint": "Auto choisit le meilleur que le casque accepte : SBC-XQ, puis SBC HQ, puis SBC. Changer reconnecte le casque.",
+   "codecNo": "Ce casque ne le prend pas en charge"
   },
   "de": {
    "language": "Sprache",
@@ -375,7 +391,11 @@
    "reload": "HearBridge wurde neu gestartet. Seite neu laden.",
    "unsupportedFmt": "Gerät unterstützt kein 48 kHz Stereo, nicht unterstützt",
    "volOnHeadset": "Lautstärke am Headset",
-   "volSoftware": "Software-Lautstärke"
+   "volSoftware": "Software-Lautstärke",
+   "codec": "Codec",
+   "codecAuto": "Auto",
+   "codecHint": "Auto wählt das Beste, was das Headset kann: SBC-XQ, dann SBC HQ, dann SBC. Ein Wechsel verbindet das Headset neu.",
+   "codecNo": "Dieses Headset unterstützt das nicht"
   },
   "pt": {
    "language": "Idioma",
@@ -439,7 +459,11 @@
    "reload": "O HearBridge foi reiniciado. Recarregue esta página.",
    "unsupportedFmt": "o dispositivo não aceita 48 kHz estéreo, não suportado",
    "volOnHeadset": "Volume no headset",
-   "volSoftware": "Volume por software"
+   "volSoftware": "Volume por software",
+   "codec": "Codec",
+   "codecAuto": "Auto",
+   "codecHint": "Auto escolhe o melhor que o headset aceita: SBC-XQ, depois SBC HQ, depois SBC. Mudar reconecta o headset.",
+   "codecNo": "Este headset não suporta"
   },
   "ru": {
    "language": "Язык",
@@ -503,7 +527,11 @@
    "reload": "HearBridge перезапущен. Перезагрузите эту страницу.",
    "unsupportedFmt": "устройство не поддерживает 48 кГц стерео",
    "volOnHeadset": "Громкость на гарнитуре",
-   "volSoftware": "Программная громкость"
+   "volSoftware": "Программная громкость",
+   "codec": "Кодек",
+   "codecAuto": "Авто",
+   "codecHint": "«Авто» выбирает лучшее, что поддерживает гарнитура: SBC-XQ, затем SBC HQ, затем SBC. Смена переподключает гарнитуру.",
+   "codecNo": "Гарнитура это не поддерживает"
   },
   "ja": {
    "language": "言語",
@@ -567,7 +595,11 @@
    "reload": "HearBridge が再起動されました。このページを再読み込みしてください。",
    "unsupportedFmt": "48 kHz ステレオ非対応のデバイスです",
    "volOnHeadset": "音量はヘッドセット側",
-   "volSoftware": "ソフトウェア音量"
+   "volSoftware": "ソフトウェア音量",
+   "codec": "コーデック",
+   "codecAuto": "自動",
+   "codecHint": "自動はヘッドセットが対応する最良のものを選びます：SBC-XQ、次に SBC HQ、次に SBC。変更するとヘッドセットを再接続します。",
+   "codecNo": "このヘッドセットは非対応です"
   },
   "zh": {
    "language": "语言",
@@ -631,7 +663,11 @@
    "reload": "HearBridge 已重新启动。请重新加载此页面。",
    "unsupportedFmt": "设备不支持 48 kHz 立体声",
    "volOnHeadset": "音量由耳机控制",
-   "volSoftware": "软件音量"
+   "volSoftware": "软件音量",
+   "codec": "编解码器",
+   "codecAuto": "自动",
+   "codecHint": "自动选择耳机支持的最佳编码：SBC-XQ，其次 SBC HQ，再次 SBC。更改后会重新连接耳机。",
+   "codecNo": "此耳机不支持"
   },
   "it": {
    "language": "Lingua",
@@ -695,7 +731,11 @@
    "reload": "HearBridge è stato riavviato. Ricarica questa pagina.",
    "unsupportedFmt": "il dispositivo non accetta 48 kHz stereo, non supportato",
    "volOnHeadset": "Volume sulle cuffie",
-   "volSoftware": "Volume software"
+   "volSoftware": "Volume software",
+   "codec": "Codec",
+   "codecAuto": "Auto",
+   "codecHint": "Auto sceglie il meglio supportato dalle cuffie: SBC-XQ, poi SBC HQ, poi SBC. Cambiarlo ricollega le cuffie.",
+   "codecNo": "Queste cuffie non lo supportano"
   },
   "he": {
    "language": "שפה",
@@ -759,7 +799,11 @@
    "reload": "HearBridge הופעל מחדש. טענו מחדש את הדף.",
    "unsupportedFmt": "המכשיר לא תומך ב-48 kHz סטריאו, לא נתמך",
    "volOnHeadset": "עוצמה באוזניות",
-   "volSoftware": "עוצמה בתוכנה"
+   "volSoftware": "עוצמה בתוכנה",
+   "codec": "קודק",
+   "codecAuto": "אוטומטי",
+   "codecHint": "אוטומטי בוחר את הטוב ביותר שהאוזניות תומכות בו: SBC-XQ, אחר כך SBC HQ, אחר כך SBC. שינוי מחבר מחדש את האוזניות.",
+   "codecNo": "האוזניות האלה לא תומכות בזה"
   }
  }
 }

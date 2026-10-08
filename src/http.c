@@ -83,7 +83,7 @@ static int is_write_path(const char *path)
     static const char *const w[] = {
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
-        "/api/stop", "/api/latency",
+        "/api/stop", "/api/latency", "/api/codec",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -105,13 +105,14 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"notifications\":%d,\"sink_volume\":%d},\"pkts\":%ld,\"frames\":%ld,\"empty_reads\":%ld,"
         "\"peak\":%.3f,\"out_peak\":%.3f,\"sample_rate\":%d,\"bitpool\":%d,"
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
-        "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"codec\":\"%s\"}",
+        "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d}",
         c->version, !strcmp(c->state, "streaming"), det, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
         c->out_peak_milli / 1000.0, c->sample_rate, c->bitpool, c->backlog,
         c->bitpool_lo, c->bitpool_hi, c->per_packet, c->dropped, ctl_uptime_s(c), c->uptime_s,
-        c->stable, c->stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS, c->codec);
+        c->stable, c->stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS, c->codec,
+        c->codec_pref, c->codec_avail);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,
@@ -280,6 +281,12 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         if (!query_int(q, "stable", &v)) goto bad;
         c->stable = v != 0;
         c->stable_dirty = 1;
+    } else if (!strcmp(path, "/api/codec")) {
+        /* mode=0 auto, 1 SBC, 2 SBC HQ, 3 SBC-XQ (hsprefs.h); the stream
+         * loop reconnects the headset to apply it. */
+        if (!query_int(q, "mode", &v) || v < 0 || v > 3) goto bad;
+        c->codec_pref = v;
+        c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/mute")) {
         c->muted = query_int(q, "on", &v) ? (v != 0) : !c->muted;
     } else if (!strcmp(path, "/api/tone")) {
