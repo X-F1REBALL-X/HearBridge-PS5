@@ -112,6 +112,14 @@ int hb_rate_update(hb_rate *r, long now, int queue, int qmax, long drops)
     return r->cur;
 }
 
+int hb_rate_settled(const hb_rate *r, long now)
+{
+    if (!r || r->t_late >= 0) return 0;
+    if (now - r->t_calm < UP_CALM_MS) return 0;
+    if (now - r->t_down < UP_CALM_MS) return 0;
+    return 1;
+}
+
 int hb_latency_clamp(int ms)
 {
     return ms < HB_LAT_MIN_MS ? HB_LAT_MIN_MS : ms > HB_LAT_MAX_MS ? HB_LAT_MAX_MS : ms;

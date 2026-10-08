@@ -148,7 +148,14 @@
    "latSink": "Headset",
    "latSinkTyp": "Headset (typical)",
    "codecWait": "SBC HQ and SBC-XQ show up once a headset that supports them is connected.",
-   "xqLow": "SBC-XQ is staying at a low bitpool on this link. Plain SBC will sound better."
+   "xqLow": "SBC-XQ is staying at a low bitpool on this link. Plain SBC will sound better.",
+   "why_timeout": "timed out",
+   "why_dropped": "headset dropped the link",
+   "why_closed": "headset closed the audio",
+   "why_quiet": "no audio coming back",
+   "why_held": "link is in use elsewhere",
+   "why_failed": "could not connect",
+   "why_off": "disconnected on this page"
   },
   "ar": {
    "language": "اللغة",
@@ -241,7 +248,14 @@
    "latSink": "السماعة",
    "latSinkTyp": "السماعة (نموذجي)",
    "codecWait": "يظهر SBC HQ وSBC-XQ عند توصيل سماعة تدعمهما.",
-   "xqLow": "SBC-XQ عالق عند معدل بت منخفض على هذا الرابط. صوت SBC العادي سيكون أفضل."
+   "xqLow": "SBC-XQ عالق عند معدل بت منخفض على هذا الرابط. صوت SBC العادي سيكون أفضل.",
+   "why_timeout": "انتهت المهلة",
+   "why_dropped": "السماعة قطعت الاتصال",
+   "why_closed": "السماعة أغلقت الصوت",
+   "why_quiet": "لا يرجع صوت",
+   "why_held": "الرابط مستخدم في مكان آخر",
+   "why_failed": "تعذر الاتصال",
+   "why_off": "قُطع من هذه الصفحة"
   },
   "es": {
    "language": "Idioma",
@@ -334,7 +348,14 @@
    "latSink": "Auriculares",
    "latSinkTyp": "Auriculares (típico)",
    "codecWait": "SBC HQ y SBC-XQ aparecen al conectar unos auriculares que los admitan.",
-   "xqLow": "SBC-XQ se queda en un bitpool bajo en este enlace. El SBC normal sonará mejor."
+   "xqLow": "SBC-XQ se queda en un bitpool bajo en este enlace. El SBC normal sonará mejor.",
+   "why_timeout": "tiempo agotado",
+   "why_dropped": "los auriculares cortaron el enlace",
+   "why_closed": "los auriculares cerraron el audio",
+   "why_quiet": "no vuelve el audio",
+   "why_held": "el enlace está en uso en otro sitio",
+   "why_failed": "no se pudo conectar",
+   "why_off": "desconectado desde esta página"
   },
   "fr": {
    "language": "Langue",
@@ -427,7 +448,14 @@
    "latSink": "Casque",
    "latSinkTyp": "Casque (typique)",
    "codecWait": "SBC HQ et SBC-XQ apparaissent quand un casque qui les accepte est connecté.",
-   "xqLow": "SBC-XQ reste sur un bitpool bas sur cette liaison. Le SBC simple sonnera mieux."
+   "xqLow": "SBC-XQ reste sur un bitpool bas sur cette liaison. Le SBC simple sonnera mieux.",
+   "why_timeout": "délai dépassé",
+   "why_dropped": "le casque a coupé le lien",
+   "why_closed": "le casque a fermé l'audio",
+   "why_quiet": "plus d'audio en retour",
+   "why_held": "lien utilisé ailleurs",
+   "why_failed": "connexion impossible",
+   "why_off": "déconnecté depuis cette page"
   },
   "de": {
    "language": "Sprache",
@@ -520,7 +548,14 @@
    "latSink": "Headset",
    "latSinkTyp": "Headset (typisch)",
    "codecWait": "SBC HQ und SBC-XQ erscheinen, sobald ein Headset verbunden ist, das sie unterstützt.",
-   "xqLow": "SBC-XQ bleibt auf diesem Link bei einem niedrigen Bitpool. Normales SBC klingt besser."
+   "xqLow": "SBC-XQ bleibt auf diesem Link bei einem niedrigen Bitpool. Normales SBC klingt besser.",
+   "why_timeout": "Zeit abgelaufen",
+   "why_dropped": "Headset hat die Verbindung getrennt",
+   "why_closed": "Headset hat den Ton geschlossen",
+   "why_quiet": "kein Ton kommt zurück",
+   "why_held": "Verbindung wird woanders benutzt",
+   "why_failed": "Verbindung fehlgeschlagen",
+   "why_off": "hier auf der Seite getrennt"
   },
   "pt": {
    "language": "Idioma",
@@ -613,7 +648,14 @@
    "latSink": "Headset",
    "latSinkTyp": "Headset (típico)",
    "codecWait": "SBC HQ e SBC-XQ aparecem quando um headset compatível estiver conectado.",
-   "xqLow": "O SBC-XQ fica num bitpool baixo nesta ligação. O SBC normal vai soar melhor."
+   "xqLow": "O SBC-XQ fica num bitpool baixo nesta ligação. O SBC normal vai soar melhor.",
+   "why_timeout": "tempo esgotado",
+   "why_dropped": "o fone largou a ligação",
+   "why_closed": "o fone fechou o áudio",
+   "why_quiet": "o áudio não volta",
+   "why_held": "ligação em uso noutro sítio",
+   "why_failed": "não foi possível ligar",
+   "why_off": "desligado nesta página"
   },
   "ru": {
    "language": "Язык",
@@ -706,7 +748,14 @@
    "latSink": "Гарнитура",
    "latSinkTyp": "Гарнитура (типично)",
    "codecWait": "SBC HQ и SBC-XQ появятся, когда подключится гарнитура с их поддержкой.",
-   "xqLow": "SBC-XQ держится на низком битпуле на этом канале. Обычный SBC будет звучать лучше."
+   "xqLow": "SBC-XQ держится на низком битпуле на этом канале. Обычный SBC будет звучать лучше.",
+   "why_timeout": "время вышло",
+   "why_dropped": "гарнитура сбросила связь",
+   "why_closed": "гарнитура закрыла звук",
+   "why_quiet": "звук не возвращается",
+   "why_held": "канал занят в другом месте",
+   "why_failed": "не удалось подключиться",
+   "why_off": "отключено на этой странице"
   },
   "ja": {
    "language": "言語",
@@ -799,7 +848,14 @@
    "latSink": "ヘッドセット",
    "latSinkTyp": "ヘッドセット (標準)",
    "codecWait": "SBC HQ と SBC-XQ は対応ヘッドセットの接続時に表示されます。",
-   "xqLow": "この接続では SBC-XQ のビットプールが低いままです。通常の SBC の方がきれいに聞こえます。"
+   "xqLow": "この接続では SBC-XQ のビットプールが低いままです。通常の SBC の方がきれいに聞こえます。",
+   "why_timeout": "時間切れ",
+   "why_dropped": "ヘッドセットが切断しました",
+   "why_closed": "ヘッドセットが音声を閉じました",
+   "why_quiet": "音声が戻ってきません",
+   "why_held": "リンクは別のところで使用中",
+   "why_failed": "接続できませんでした",
+   "why_off": "このページで切断しました"
   },
   "zh": {
    "language": "语言",
@@ -892,7 +948,14 @@
    "latSink": "耳机",
    "latSinkTyp": "耳机（典型）",
    "codecWait": "连接支持的耳机后才会显示 SBC HQ 和 SBC-XQ。",
-   "xqLow": "这条链路上 SBC-XQ 的比特池一直很低。普通 SBC 会更好听。"
+   "xqLow": "这条链路上 SBC-XQ 的比特池一直很低。普通 SBC 会更好听。",
+   "why_timeout": "超时",
+   "why_dropped": "耳机断开了连接",
+   "why_closed": "耳机关掉了音频",
+   "why_quiet": "没有音频回来",
+   "why_held": "链路在别处使用",
+   "why_failed": "连接失败",
+   "why_off": "在此页面断开"
   },
   "it": {
    "language": "Lingua",
@@ -985,7 +1048,14 @@
    "latSink": "Cuffie",
    "latSinkTyp": "Cuffie (tipico)",
    "codecWait": "SBC HQ e SBC-XQ compaiono quando sono collegate cuffie che li supportano.",
-   "xqLow": "SBC-XQ resta su un bitpool basso su questo collegamento. L'SBC normale suonerà meglio."
+   "xqLow": "SBC-XQ resta su un bitpool basso su questo collegamento. L'SBC normale suonerà meglio.",
+   "why_timeout": "tempo scaduto",
+   "why_dropped": "le cuffie hanno chiuso il collegamento",
+   "why_closed": "le cuffie hanno chiuso l'audio",
+   "why_quiet": "l'audio non torna",
+   "why_held": "collegamento in uso altrove",
+   "why_failed": "connessione non riuscita",
+   "why_off": "disconnesso da questa pagina"
   },
   "he": {
    "language": "שפה",
@@ -1078,7 +1148,14 @@
    "latSink": "אוזניות",
    "latSinkTyp": "אוזניות (טיפוסי)",
    "codecWait": "SBC HQ ו-SBC-XQ יופיעו כשיחוברו אוזניות שתומכות בהם.",
-   "xqLow": "SBC-XQ נשאר על ביטפול נמוך בקישור הזה. SBC רגיל יישמע טוב יותר."
+   "xqLow": "SBC-XQ נשאר על ביטפול נמוך בקישור הזה. SBC רגיל יישמע טוב יותר.",
+   "why_timeout": "הזמן נגמר",
+   "why_dropped": "האוזניות ניתקו את הקישור",
+   "why_closed": "האוזניות סגרו את השמע",
+   "why_quiet": "אין שמע בחזרה",
+   "why_held": "הקישור בשימוש במקום אחר",
+   "why_failed": "לא ניתן להתחבר",
+   "why_off": "נותק מהעמוד הזה"
   }
  }
 }

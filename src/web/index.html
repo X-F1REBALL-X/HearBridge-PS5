@@ -414,6 +414,8 @@ $('msg').textContent='';
 $('ver').textContent=S.version;
 var st=S.paused?'paused':S.state;
 var det=st=='error'&&S.detail?S.detail.replace(/^error\s*/,''):'';if(/^unsupported-format/.test(det))det=t('unsupportedFmt');
+var whyTxt=S.why&&t('why_'+S.why)!=='why_'+S.why?t('why_'+S.why):'';
+if(whyTxt)det=whyTxt;
 $('state').textContent={reconnecting:1,disconnected:1,paused:1,error:1,idle:1,'waiting-selection':1}[st]?t('notConnected')+(det?' ('+det+')':''):(t(st)==st?st:t(st));
 $('live').className='live '+(st=='streaming'||st=='connected'?'ok':(st=='paused'||st=='disconnected'||st=='error'?'bad':'wait'));
 var on=!!S.connected,link=on||((st=='connecting'||st=='pairing')&&S.device);

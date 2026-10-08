@@ -22,6 +22,8 @@ typedef struct {
     int eq_on;
     int eq_db[HB_EQ_BANDS];  /* -12..+12 dB per band */
     int gain_pct;            /* software gain, -1 = not in the file yet */
+    int held_codec;          /* codec that actually held last time, 0 = none */
+    int held_bp;             /* bitpool that held with it, 0 = none */
 } hb_prefs;
 
 void hb_prefs_default(hb_prefs *p);

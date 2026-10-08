@@ -62,6 +62,7 @@ typedef struct {
     int peer_opened;          /* signalling channel opened by the headset */
     int unsupported_format;   /* the sink cannot take 48 kHz stereo SBC */
     int want_codec, no_xq;    /* request (HB_CODEC_*), see avdtp_sbc_pick() */
+    int held_codec, held_bp;  /* last codec/bitpool that held (0 = none) */
     avdtp_codec_pick codec;   /* what was configured */
     int delay_on;             /* Delay Reporting was configured */
     int sink_delay_x10;       /* last DELAY_REPORT from the sink, 1/10 ms (0 = none yet) */
@@ -80,8 +81,10 @@ int avdtp_sbc_pick_mode(unsigned char caps0, int *joint, const char **why);
  * codec id (falls back to SBC when the sink cannot take it). caps = the
  * sink's SBC capability IE (bitpool min/max in octets 2-3). Returns 0 (and
  * *why) when the sink takes no 48 kHz two-channel SBC. Pure. */
+/* held_codec/held_bp: what actually held last time (0 = none). Auto starts
+ * there instead of always trying SBC-XQ at bitpool 35. */
 int avdtp_sbc_pick(const uint8_t caps[4], int want, int no_xq, avdtp_codec_pick *out,
-                   const char **why);
+                   const char **why, int held_codec, int held_bp);
 
 /* Open signaling, Discover → GetAllCaps/GetCaps → SetConfiguration →
  * Open → media channel → Start. Returns 1 on success. */
