@@ -45,6 +45,36 @@ HearBridge PS5 是用于破解 PS5 的载荷（ELF）。它采集主机的声音
 - 已在 Sony WF-1000XM6、OnePlus Buds Ace 2 和 Xbox Wireless Headset 上测试。
 - 设置、已保存的设备和日志位于 `/data/hearbridge/`（`hearbridge.log` 记录每一步）。
 
+## 故障排除 / 报告问题
+
+**测试环境**：HearBridge 是在 PS5 初代机型（原始型号，CFI-10xx）、固件 10.20 上开发和测试的。其他机型（Slim、Pro、后期初代机型版本）和其他固件未经测试，可能使用不同的蓝牙芯片，欢迎反馈这些机型上的情况。
+
+常见问题：
+
+- 运行 ELF 后 **主屏幕上没有 HearBridge 图标**。
+- **网页打不开**（http://&lt;console-ip&gt;:8090）。
+- 按下 **搜索设备** 后 **找不到耳机**。
+- 耳机已连接但 **没有声音**。
+
+**固件 13.60**：请尝试 [v1.0.1 发布页](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1)中的 **HearBridge-PS5-1.0.1-fw13.60.elf**。这是一个实验性版本，旨在修复主屏幕图标缺失的问题，并增加了诊断信息。它尚未在真机上测试。
+
+**获取日志：**
+
+1. 用运行 HearBridge 的同一个加载器发送 FTP 服务器载荷（例如 [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)）。
+2. 用 FileZilla 连接主机的 IP，端口使用服务器显示的端口（ftpsrv 通常为 **2121**）。
+3. 下载 `/data/hearbridge/hearbridge.log`，如使用 fw13.60 版本，还要下载 `/data/hearbridge/diag.txt`。
+
+使用 fw13.60 版本时，也可以打开 **http://&lt;console-ip&gt;:8090/api/diag** 并复制其中的文字。
+
+**[在 GitHub 上提交 issue](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose)**，并附上：
+
+- 主机型号（CFI 编号，例如 CFI-1016A）
+- 固件版本
+- 使用的加载器
+- 是否出现了 **"HearBridge 1.0.1: http://…"** 通知
+- 网页能否打开
+- 日志文件（`hearbridge.log`、`diag.txt`）
+
 ## 编译
 
 ```sh

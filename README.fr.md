@@ -45,6 +45,36 @@ La page est disponible en 11 langues, dont l'hébreu et l'arabe (de droite à ga
 - Testé avec Sony WF-1000XM6, OnePlus Buds Ace 2 et Xbox Wireless Headset.
 - Les réglages, les appareils enregistrés et le journal se trouvent dans `/data/hearbridge/` (`hearbridge.log` enregistre chaque étape).
 
+## Dépannage / signaler un problème
+
+**Testé sur :** HearBridge a été développé et testé sur une PS5 fat (modèle d'origine, CFI-10xx) avec le firmware 10.20. Les autres modèles (Slim, Pro, révisions fat plus récentes) et les autres firmwares ne sont pas testés et peuvent utiliser une autre puce Bluetooth : les retours depuis ces consoles sont les bienvenus.
+
+Problèmes fréquents :
+
+- **Pas d'icône HearBridge sur l'écran d'accueil** après avoir lancé l'ELF.
+- **La page ne s'ouvre pas** (http://&lt;console-ip&gt;:8090).
+- **Le casque n'est pas trouvé** quand vous appuyez sur Rechercher des appareils.
+- **Pas de son** alors que le casque est connecté.
+
+**Firmware 13.60 :** essayez **HearBridge-PS5-1.0.1-fw13.60.elf** depuis la [version v1.0.1](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.1). C'est une version expérimentale destinée à corriger l'icône absente de l'écran d'accueil et ajoute des diagnostics. Elle n'a pas encore été testée sur une vraie console.
+
+**Récupérer le journal :**
+
+1. Envoyez un payload de serveur FTP (par exemple [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)) avec le même chargeur que pour HearBridge.
+2. Connectez-vous avec FileZilla à l'IP de la console, sur le port affiché par le serveur (ftpsrv utilise généralement **2121**).
+3. Téléchargez `/data/hearbridge/hearbridge.log` et, avec la version fw13.60, `/data/hearbridge/diag.txt`.
+
+Avec la version fw13.60, vous pouvez aussi ouvrir **http://&lt;console-ip&gt;:8090/api/diag** et copier le texte.
+
+**Ouvrez un [ticket GitHub](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose)** en indiquant :
+
+- le modèle de la console (numéro CFI, par ex. CFI-1016A)
+- la version du firmware
+- le chargeur utilisé
+- si la notification **« HearBridge 1.0.1: http://… »** est apparue
+- si la page s'ouvre
+- les fichiers journaux (`hearbridge.log`, `diag.txt`)
+
 ## Compilation
 
 ```sh
