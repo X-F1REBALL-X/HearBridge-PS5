@@ -41,7 +41,7 @@ Cerca il tuo modello nella tabella. Le fat e le Slim montano uno di due chip Blu
 
 \* da forum di riparazione, non confermato da Sony
 
-**Come controllare:** avvia HearBridge e guarda **Chip** in fondo a **Status** nella pagina. Oppure apri `/data/hearbridge/hearbridge.log` e cerca la riga `usb: /dev/ugen0.2 is XXXX:YYYY` (il numero ugen può cambiare). `1286` = Marvell/NXP, usa **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, usa **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**Come controllare:** avvia HearBridge una volta, apri `/data/hearbridge/hearbridge.log` e cerca la riga `usb: /dev/ugen0.2 is XXXX:YYYY` (il numero ugen può cambiare). `1286` = Marvell/NXP, usa **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, usa **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
 
 Fonti: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

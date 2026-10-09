@@ -41,7 +41,7 @@ HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带�
 
 \* 来自维修论坛的报告，未经 Sony 确认
 
-**如何检查：** 运行 HearBridge，查看页面上 **Status** 底部的 **Chip**。或者打开 `/data/hearbridge/hearbridge.log`，找到 `usb: /dev/ugen0.2 is XXXX:YYYY` 这一行（ugen 编号可能不同）。`1286` = Marvell/NXP，用 **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**。`0e8d` = MediaTek，用 **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**。
+**如何检查：** 运行一次 HearBridge，打开 `/data/hearbridge/hearbridge.log`，找到 `usb: /dev/ugen0.2 is XXXX:YYYY` 这一行（ugen 编号可能不同）。`1286` = Marvell/NXP，用 **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**。`0e8d` = MediaTek，用 **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**。
 
 来源: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

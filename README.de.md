@@ -41,7 +41,7 @@ Such dein Modell in der Tabelle. Fat- und Slim-Konsolen haben einen von zwei Blu
 
 \* laut Berichten aus Reparaturforen, nicht von Sony bestätigt
 
-**So prüfst du es:** HearBridge starten und auf der Seite unten in **Status** bei **Chip** schauen. Oder `/data/hearbridge/hearbridge.log` öffnen und die Zeile `usb: /dev/ugen0.2 is XXXX:YYYY` suchen (die ugen-Nummer kann abweichen). `1286` = Marvell/NXP, nimm **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, nimm **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**So prüfst du es:** HearBridge einmal starten, `/data/hearbridge/hearbridge.log` öffnen und die Zeile `usb: /dev/ugen0.2 is XXXX:YYYY` suchen (die ugen-Nummer kann abweichen). `1286` = Marvell/NXP, nimm **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, nimm **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
 
 Quellen: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

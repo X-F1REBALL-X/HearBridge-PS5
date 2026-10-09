@@ -41,7 +41,7 @@ ELF をもう一度送ると、動作中のものと入れ替わります。ペ�
 
 \* 修理フォーラムの報告より。Sony の確認なし
 
-**確認方法:** HearBridge を起動し、ページの **Status** 下部にある **Chip** を見ます。または `/data/hearbridge/hearbridge.log` を開いて `usb: /dev/ugen0.2 is XXXX:YYYY` の行を探します (ugen の番号は違うことがあります)。`1286` = Marvell/NXP → **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**。`0e8d` = MediaTek → **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**。
+**確認方法:** HearBridge を一度起動し、`/data/hearbridge/hearbridge.log` を開いて `usb: /dev/ugen0.2 is XXXX:YYYY` の行を探します (ugen の番号は違うことがあります)。`1286` = Marvell/NXP → **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**。`0e8d` = MediaTek → **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**。
 
 出典: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
