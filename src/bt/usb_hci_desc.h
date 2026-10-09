@@ -25,7 +25,7 @@ struct usbhci_iface {
  * number written. */
 int usbhci_scan(const uint8_t *d, int len, struct usbhci_iface *found);
 
-/* MediaTek only (hci_usb calls it for vendor 0x0e8d): with two bulk OUT
+/* MediaTek profile only (hci_usb, see btchip.h): with two bulk OUT
  * pipes, put ACL on the one numbered like the bulk IN. */
 void usbhci_pair_out_with_in(struct usbhci_iface *f);
 

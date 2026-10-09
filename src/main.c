@@ -25,6 +25,7 @@
 #include "hci_cmd.h"
 #include "hci_usb.h"
 #include "hcidbg.h"
+#include "btchip.h"
 #include "acl_track.h"
 #include "lock.h"
 #include "log.h"
@@ -65,6 +66,7 @@
 #define TILE_URL_PATH STATE_DIR "/tile_url"    /* optional: deep link for the tile ("start" = fallback page) */
 #define DIAG_PATH STATE_DIR "/diag.txt"        /* diagnostics report, also at /api/diag */
 #define HCI_DEBUG_PATH STATE_DIR "/hci_debug"  /* exists → /api/hcilog trace + /api/hci raw commands */
+#define CHIP_PATH STATE_DIR "/chip"            /* optional: "mediatek" or "marvell" forces the chip profile */
 #define DUMP_PKTS 200
 
 #define PCM_CAP_FRAMES  1024  /* matches Avcap2 READ_BYTES / (2*sizeof float) */
@@ -2525,6 +2527,17 @@ int main(void)
     if (file_exists(HCI_DEBUG_PATH)) {
         hcidbg_enable();
         log_line("debug: %s present: HCI trace at /api/hcilog, raw commands at /api/hci", HCI_DEBUG_PATH);
+    }
+    {
+        char ct[32] = "";
+        FILE *cf = fopen(CHIP_PATH, "r");
+        if (cf) {
+            if (!fgets(ct, (int)sizeof ct, cf)) ct[0] = 0;
+            fclose(cf);
+            btchip_set_override(btchip_parse_override(ct));
+            log_line("chip: %s says \"%.20s\" -> %s", CHIP_PATH, ct,
+                     btchip_get_override() >= 0 ? btchip_profile_name(btchip_get_override()) : "ignored (use mediatek or marvell)");
+        }
     }
     ctl_init(&g_ctl, HEARBRIDGE_VERSION);
     snprintf(g_ctl.devices_path, sizeof g_ctl.devices_path, "%s", DEVICES_JSON);

@@ -131,7 +131,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,"
-        "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"mtk_build\":%d},\"events\":%s}",
+        "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},\"events\":%s}",
         c->version, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
@@ -143,7 +143,8 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->codec_pref, c->codec_avail,
         c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4],
         c->xq_low, cid[0], cid[1], chip_ok && cven ? cven : "",
-        chip_ok && btchip_is_mediatek(c->chip_vid), HB_MTK_BUILD, ev);
+        chip_ok && btchip_is_mediatek(c->chip_vid),
+        chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "", ev);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,

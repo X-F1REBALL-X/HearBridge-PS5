@@ -46,10 +46,10 @@ int hci_cmd_status(hci_t hci, unsigned op, const void *params, int plen);
  * resume() puts the system's value back when the outermost pause ends. */
 void hci_scan_pause(hci_t hci, const char *why);
 /* Off by default: pause/resume do nothing unless the controller is a
- * MediaTek (hci_usb turns it on for USB vendor 0x0e8d). */
+ * MediaTek (hci_usb turns it on for the mediatek chip profile). */
 void hci_scan_pause_enable(int on);
 void hci_scan_resume(hci_t hci);
-/* MediaTek controller (hci_usb sets it for USB vendor 0x0e8d). Its L2CAP
+/* MediaTek controller (hci_usb sets it for the mediatek chip profile). Its L2CAP
  * replies take 0.4-2 s and some are read by the system stack, so btlink
  * paces and repeats its config requests differently. 0 elsewhere. */
 void hci_set_mediatek(int on);
