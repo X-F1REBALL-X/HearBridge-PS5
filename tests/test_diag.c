@@ -84,6 +84,19 @@ static void test_usb_describe(void)
         usbhci_describe(bad, (int)sizeof bad, out, sizeof out);
         CHECK(!strcmp(out, "if0.0 e0/01/01 (BT HCI)"), "malformed tail ignored");
     }
+    {
+        /* MediaTek 0e8d:3603 (CFI-12xx): ep81 int, ep01 bulk OUT, ep82 bulk
+         * IN, ep02 bulk OUT. ACL must go on 0x02, 0x01 is the spare. */
+        static const unsigned char mtk[] = {
+            9, 4, 0, 0, 4, 0xe0, 0x01, 0x01, 0,
+            7, 5, 0x81, 3, 0x10, 0, 1,
+            7, 5, 0x01, 2, 0x00, 2, 0,
+            7, 5, 0x82, 2, 0x00, 2, 0,
+            7, 5, 0x02, 2, 0x00, 2, 0,
+        };
+        CHECK(usbhci_scan(mtk, (int)sizeof mtk, f) == 1 && f[0].in_ep == 0x82 &&
+              f[0].out_ep == 0x02 && f[0].spare_out_ep == 0x01, "bulk OUT paired with bulk IN");
+    }
 }
 
 int main(void)
