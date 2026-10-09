@@ -14,6 +14,7 @@ typedef struct {
     int is_target;        /* the device we are connecting / pairing right now */
     int streaming_other;  /* we stream to another headset */
     int busy_other;       /* connecting / pairing another device */
+    int bg_page;          /* ...but only a background page nobody pressed for */
 } hb_cr_in;
 
 enum {
