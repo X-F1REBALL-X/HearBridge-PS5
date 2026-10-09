@@ -6,6 +6,9 @@
 #include "diag.h"
 #include "rate.h"
 #include "btchip.h"
+#include "backup.h"
+#include "avrcp.h"
+#include "version.h"
 #ifndef HB_HTTP_HOST_TEST
 #include "hcidbg.h"
 #endif
@@ -13,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* ---- request handling (pure) ----------------------------------------- */
 
@@ -87,8 +91,8 @@ static int is_write_path(const char *path)
     static const char *const w[] = {
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
-        "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean",
-        "/api/hci",
+        "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean", "/api/night",
+        "/api/hci", "/api/game", "/api/backup", "/api/restore",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -98,7 +102,7 @@ static int is_write_path(const char *path)
 
 static int status_json(hb_ctl *c, char *o, int max)
 {
-    char dev[140], st[70], url[140], det[200], why[40], ev[2400], cid[2][8];
+    char dev[140], st[70], url[140], det[200], why[40], ev[2400], cid[2][8], gname[100];
     const char *cven = btchip_vendor(c->chip_vid);
     int ei, en, chip_ok = c->chip_vid >= 0 && c->chip_vid <= 0xffff &&
                           c->chip_pid >= 0 && c->chip_pid <= 0xffff;
@@ -107,6 +111,7 @@ static int status_json(hb_ctl *c, char *o, int max)
     json_esc(url, sizeof url, c->url);
     json_esc(det, sizeof det, c->detail);
     json_esc(why, sizeof why, c->why);
+    json_esc(gname, sizeof gname, c->game_name);
     ev[0] = '[';
     en = 1;
     for (ei = 0; ei < c->event_n && ei < HB_EVENT_N; ei++) {
@@ -131,7 +136,12 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,"
-        "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},\"events\":%s}",
+        "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},"
+        "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d},"
+        "\"battery\":{\"status\":\"%s\",\"level\":%d},\"hs_moves\":%d,"
+        "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
+        "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,"
+        "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d},\"events\":%s}",
         c->version, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
@@ -144,7 +154,12 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4],
         c->xq_low, cid[0], cid[1], chip_ok && cven ? cven : "",
         chip_ok && btchip_is_mediatek(c->chip_vid),
-        chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "", ev);
+        chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "",
+        c->lat_backoff_ms, c->lat_normal_ms,
+        avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->hs_moves,
+        c->link_score, c->link_rssi == 127 ? 0 : c->link_rssi, c->link_lq, c->drops_min,
+        c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch,
+        c->game_avail, c->game_id, gname, c->game_profile, c->game_active, ev);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,
@@ -161,6 +176,133 @@ static int respond(char *out, int max, int code, const char *ctype,
     if (n < 0 || n + blen > max) return 0;
     memcpy(out + n, body, (size_t)blen);
     return n + blen;
+}
+
+static long wall_s(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (long)ts.tv_sec;
+}
+
+/* Value of a short word parameter (letters, digits, - _ .) into v. */
+static int query_word(const char *q, const char *key, char *v, int vmax)
+{
+    size_t kl = strlen(key);
+    while (q && *q) {
+        if (!strncmp(q, key, kl) && q[kl] == '=') {
+            const char *p = q + kl + 1;
+            int n = 0;
+            while (*p && *p != '&' && n < vmax - 1) {
+                char ch = *p++;
+                if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') ||
+                      ch == '-' || ch == '_' || ch == '.')) return 0;
+                v[n++] = ch;
+            }
+            v[n] = 0;
+            return n > 0;
+        }
+        q = strchr(q, '&');
+        if (q) q++;
+    }
+    return 0;
+}
+
+/* Backup folder for where=usb|internal; 0 (and "no USB") if none. */
+static int backup_dir(hb_ctl *c, const char *where, char *dir, int max)
+{
+    char mnt[32];
+    CTL_LOCK(c);
+    snprintf(mnt, sizeof mnt, "%s", c->mnt_root);
+    CTL_UNLOCK(c);
+    if (!strcmp(where, "internal")) {
+        if (!strcmp(mnt, "/mnt")) snprintf(dir, (size_t)max, "%s", HB_BACKUP_INTERNAL);
+        else snprintf(dir, (size_t)max, "%s/internal-backup", mnt);   /* tests */
+        return 1;
+    }
+    if (!strcmp(where, "usb")) return hb_backup_find_usb(mnt, dir, max);
+    return 0;
+}
+
+/*  GET  /api/backups?where=usb|internal          list (newest first)
+ *  POST /api/backup?where=usb|internal|download  save (download: JSON back)
+ *  POST /api/restore?where=usb|internal&name=..  or where=upload + JSON body */
+static int backup_api(hb_ctl *c, const char *path, const char *q, const char *req, int reqlen,
+                      char *out, int max)
+{
+    static char big[HB_BACKUP_MAX + 512];
+    char where[16], dir[160], sd[64], name[48];
+    int n;
+    if (!query_word(q, "where", where, sizeof where))
+        return respond(out, max, 400, "application/json", "{\"error\":\"bad parameter\"}", 25);
+    CTL_LOCK(c);
+    snprintf(sd, sizeof sd, "%s", c->state_dir);
+    CTL_UNLOCK(c);
+    if (!strcmp(path, "/api/backup") && !strcmp(where, "download")) {
+        n = hb_backup_make(sd, HEARBRIDGE_VERSION, wall_s(), big, (int)sizeof big);
+        if (n <= 0) return respond(out, max, 500, "application/json", "{\"error\":\"read\"}", 16);
+        CTL_LOCK(c);
+        ctl_event_locked(c, "Backup downloaded");
+        CTL_UNLOCK(c);
+        return respond(out, max, 200, "application/json", big, n);
+    }
+    if (!strcmp(path, "/api/restore") && !strcmp(where, "upload")) {
+        const char *body = NULL;
+        int i, bl;
+        for (i = 0; i + 3 < reqlen; i++)
+            if (req[i] == '\r' && req[i + 1] == '\n' && req[i + 2] == '\r' && req[i + 3] == '\n') {
+                body = req + i + 4;
+                break;
+            }
+        bl = body ? reqlen - (int)(body - req) : 0;
+        if (bl <= 0 || bl > HB_BACKUP_MAX)
+            return respond(out, max, 400, "application/json", "{\"error\":\"no file\"}", 19);
+        memcpy(big, body, (size_t)bl);
+        big[bl] = 0;
+        n = hb_backup_restore_text(sd, big);
+        dir[0] = 0;
+    } else {
+        if (!backup_dir(c, where, dir, sizeof dir)) {
+            int l = snprintf(big, sizeof big, "{\"where\":\"%s\",\"avail\":0,\"files\":[]}", where);
+            return respond(out, max, !strcmp(path, "/api/backups") ? 200 : 409, "application/json", big, l);
+        }
+        if (!strcmp(path, "/api/backups")) {
+            char names[HB_BACKUP_KEEP][HB_BACKUP_NAME];
+            int k, l, cnt = hb_backup_list(dir, names, HB_BACKUP_KEEP);
+            l = snprintf(big, sizeof big, "{\"where\":\"%s\",\"avail\":1,\"dir\":\"%s\",\"files\":[", where, dir);
+            for (k = 0; k < cnt && l > 0 && l < (int)sizeof big - 120; k++) {
+                char when[24];
+                hb_backup_when(names[k], when, sizeof when);
+                l += snprintf(big + l, sizeof big - (size_t)l, "%s{\"name\":\"%s\",\"when\":\"%s\"}",
+                              k ? "," : "", names[k], when);
+            }
+            l += snprintf(big + l, sizeof big - (size_t)l, "]}");
+            return respond(out, max, 200, "application/json", big, l);
+        }
+        if (!strcmp(path, "/api/backup")) {
+            int l;
+            if (!hb_backup_save(sd, dir, HEARBRIDGE_VERSION, wall_s(), name, sizeof name))
+                return respond(out, max, 500, "application/json", "{\"error\":\"write\"}", 17);
+            CTL_LOCK(c);
+            ctl_event_locked(c, !strcmp(where, "usb") ? "Backup saved to USB" : "Backup saved on the console");
+            CTL_UNLOCK(c);
+            l = snprintf(big, sizeof big, "{\"ok\":1,\"name\":\"%s\",\"dir\":\"%s\"}", name, dir);
+            return respond(out, max, 200, "application/json", big, l);
+        }
+        if (!query_word(q, "name", name, sizeof name) || !hb_backup_name_ok(name))
+            return respond(out, max, 400, "application/json", "{\"error\":\"bad parameter\"}", 25);
+        n = hb_backup_restore(sd, dir, name);
+    }
+    if (n <= 0)
+        return respond(out, max, 400, "application/json", "{\"error\":\"not a HearBridge backup\"}", 35);
+    CTL_LOCK(c);
+    c->req_reload = 1;
+    ctl_event_locked(c, "Settings restored");
+    CTL_UNLOCK(c);
+    {
+        int l = snprintf(big, sizeof big, "{\"ok\":1,\"files\":%d}", n);
+        return respond(out, max, 200, "application/json", big, l);
+    }
 }
 
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
@@ -316,10 +458,10 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         {
             char evl[64];
             if (!strcmp(line, "scan")) snprintf(evl, sizeof evl, "Scan started");
-            else if (!strcmp(line, "reconnect")) snprintf(evl, sizeof evl, "Reconnect pressed");
-            else if (forget) snprintf(evl, sizeof evl, "Forget pressed (%s)", line + 7);
-            else if (strchr(line, ':')) snprintf(evl, sizeof evl, "Connect pressed (%s)", line);
-            else snprintf(evl, sizeof evl, "Connect pressed");
+            else if (!strcmp(line, "reconnect")) snprintf(evl, sizeof evl, "Reconnecting");
+            else if (forget) snprintf(evl, sizeof evl, "Forgetting a headset");
+            else if (strchr(line, ':')) snprintf(evl, sizeof evl, "Connecting");
+            else snprintf(evl, sizeof evl, "Connecting");
             CTL_LOCK(c);
             c->cmd_seq++;                  /* the stream loop sees a new command */
             ctl_event_locked(c, evl);
@@ -332,6 +474,9 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         }
         return respond(out, max, 200, "application/json", "{\"ok\":1}", 8);
     }
+
+    if (!strcmp(path, "/api/backups") || !strcmp(path, "/api/backup") || !strcmp(path, "/api/restore"))
+        return backup_api(c, path, q, req, reqlen, out, max);
 
     CTL_LOCK(c);
     if (!strcmp(path, "/api/status")) {
@@ -351,7 +496,7 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->req_hs_volume = v;
         c->hs_volume = v;
     } else if (!strcmp(path, "/api/latency")) {
-        /* ms=60..200: media queue target, saved per headset.
+        /* ms=40..200: media queue target, saved per headset.
          * stable=0|1 (older pages): both land on 200 ms now. */
         if (query_int(q, "ms", &v)) { }
         else if (query_int(q, "stable", &v)) v = v ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
@@ -370,11 +515,17 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         }
         c->codec_pref = v;
         c->prefs_dirty = 1;
+    } else if (!strcmp(path, "/api/night")) {
+        /* on=0|1: night mode compressor, saved per headset. */
+        if (!query_int(q, "on", &v)) goto bad;
+        c->night = v != 0;
+        c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/clean")) {
         /* EQ off and flat, software gain back to the default, buffer 200 ms.
          * Saved for this headset (prefs) and the gain file. */
         int k;
         c->eq_on = 0;
+        c->night = 0;
         for (k = 0; k < 5; k++) c->eq_db[k] = 0;
         c->eq_seq++;
         c->gain_pct = HB_GAIN_DEFAULT_PCT;
@@ -394,16 +545,23 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         if (!any) goto bad;
         c->eq_seq++;
         c->prefs_dirty = 1;
+    } else if (!strcmp(path, "/api/game")) {
+        /* do=1 save the live EQ / boost / headset volume for the running
+         * game, do=2 forget its profile. The stream loop does it. */
+        if (!query_int(q, "do", &v) || v < 1 || v > 2 || !c->game_id[0]) goto bad;
+        c->req_game = v;
+        if (v == 1) { c->game_profile = 1; c->game_active = 1; }
+        else { c->game_profile = 0; c->game_active = 0; }
     } else if (!strcmp(path, "/api/mute")) {
         c->muted = query_int(q, "on", &v) ? (v != 0) : !c->muted;
     } else if (!strcmp(path, "/api/tone")) {
         c->tone = query_int(q, "on", &v) ? (v != 0) : !c->tone;
     } else if (!strcmp(path, "/api/connect")) {
-        ctl_event_locked(c, "Connect pressed");
+        ctl_event_locked(c, "Connecting");
         c->req_connect = 1;
         c->paused = 0;
     } else if (!strcmp(path, "/api/disconnect")) {
-        ctl_event_locked(c, "Disconnect pressed");
+        ctl_event_locked(c, "Disconnecting");
         c->req_disconnect = 1;
         c->paused = 1;
     } else if (!strcmp(path, "/api/stop")) {
@@ -462,8 +620,8 @@ static void console_ip(char *ip, size_t n)
 
 static void serve_one(int fd)
 {
-    static char req[4096], out[196608];   /* the page (~75 KB with all languages) */
-    int got = 0, n;
+    static char req[HB_BACKUP_MAX + 4096], out[196608];   /* the page (~75 KB with all languages) */
+    int got = 0, n, need = -1;
     struct timeval tv = { 2, 0 };
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
@@ -472,7 +630,18 @@ static void serve_one(int fd)
         if (n <= 0) break;
         got += n;
         req[got] = 0;
-        if (strstr(req, "\r\n\r\n")) break;     /* headers done; no body used */
+        if (need < 0) {
+            char *hend = strstr(req, "\r\n\r\n");
+            if (hend) {
+                /* headers done; only an uploaded backup carries a body */
+                char cl[16];
+                int len = 0, k;
+                if (header_value(req, got, "Content-Length", cl, sizeof cl))
+                    for (k = 0; cl[k] >= '0' && cl[k] <= '9' && len < 1000000; k++) len = len * 10 + (cl[k] - '0');
+                need = (int)(hend - req) + 4 + (len > HB_BACKUP_MAX ? 0 : len);
+            }
+        }
+        if (need >= 0 && got >= need) break;
     }
     if (got <= 0) return;
     n = http_handle(g_c, req, got, out, (int)sizeof out);

@@ -107,6 +107,13 @@ void btlink_avrcp_set_volume(btlink *l, int vol);
 int  btlink_avrcp_volume(btlink *l, int *changed);
 int  btlink_avrcp_state(const btlink *l);
 int  btlink_avrcp_connect(btlink *l);
+/* Headset battery as AVRCP status 0..4 (avrcp.h AVRCP_BATT_*), -1 unknown. */
+int  btlink_avrcp_battery(const btlink *l);
+/* Bumped each time the headset itself changed the volume (its buttons/app). */
+int  btlink_avrcp_headset_moves(const btlink *l);
+/* Last HCI Read RSSI (signed, 127 unknown) and Read Link Quality (0..255,
+ * -1 unknown) for this link; polled about once a second while it is up. */
+void btlink_link_quality(const btlink *l, int *rssi, int *lq);
 
 void btlink_set_rx(btlink *l, unsigned scid, btlink_rx_fn fn, void *ud);
 /* Config-stuck limit for non-media channels (0 = default 8 s). */

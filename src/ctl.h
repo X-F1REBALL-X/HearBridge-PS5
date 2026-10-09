@@ -29,6 +29,11 @@ typedef struct {
     int eq_on;             /* equalizer (per headset) */
     int eq_db[5];          /* -12..12 dB: 80 Hz shelf, 250, 1k, 3.5k, 10 kHz shelf */
     unsigned eq_seq;       /* bumped on every change (stream loop re-designs) */
+    int night;             /* night mode compressor (per headset) */
+    int night_db10;        /* its gain right now, tenths of a dB (status) */
+    int batt_alert;        /* last low battery heads-up: 20 / 10, 0 none */
+    unsigned batt_alert_seq; /* bumped with each one (the page toasts once) */
+    int rest_watch;        /* 1 = rest mode requests can be seen */
     /* status (stream loop → web) */
     char token[HB_TOKEN_LEN + 1];  /* hex, set once by ctl_init() */
     char version[16];
@@ -59,6 +64,25 @@ typedef struct {
     char events[HB_EVENT_N][HB_EVENT_LEN]; /* last codec switches / disconnects */
     int event_n;
     unsigned cmd_seq;      /* bumped by the web thread for each select.txt command */
+    /* headset extras (stream loop -> web) */
+    int battery;           /* AVRCP battery status 0..4, -1 unknown */
+    int hs_moves;          /* volume changes made on the headset itself */
+    int link_rssi, link_lq; /* HCI Read RSSI (127 unknown) / Link Quality (-1 unknown) */
+    int link_score;        /* 0..100, -1 unknown (linkq.h) */
+    int drops_min;         /* media packets dropped per minute (smoothed) */
+    /* running game + its profile */
+    int game_avail;        /* game detection works on this firmware */
+    char game_id[16];      /* "" no game */
+    char game_name[48];
+    int game_profile;      /* a profile is saved for game_id */
+    int game_active;       /* that profile is applied now */
+    int req_game;          /* page: 1 save for this game, 2 forget it */
+    int lat_backoff_ms;    /* low buffer target stepped back this much (drops) */
+    int lat_normal_ms;     /* last delay estimate at the default 200 ms target, 0 none */
+    /* backup / restore */
+    int req_reload;        /* restore wrote new settings: reload them */
+    char state_dir[64];    /* /data/hearbridge (tests point it elsewhere) */
+    char mnt_root[32];     /* /mnt (USB drives at <mnt_root>/usbN) */
     long t0_s;             /* monotonic seconds at ctl_init (uptime base) */
 } hb_ctl;
 

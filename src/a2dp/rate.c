@@ -145,3 +145,43 @@ void hb_latency_estimate(hb_latency *o, int pkt_ms, int queue_x10, int radio_gap
     o->sink_ms = sink_x10 > 0 ? (sink_x10 + 5) / 10 : HB_SINK_TYPICAL_MS;
     o->total_ms = o->capture_ms + o->packet_ms + o->queue_ms + o->radio_ms + o->sink_ms;
 }
+
+void hb_lat_backoff_init(hb_lat_backoff *b)
+{
+    b->extra_ms = b->bad_s = b->good_s = 0;
+}
+
+int hb_lat_effective(const hb_lat_backoff *b, int target)
+{
+    int t = hb_latency_clamp(target), e;
+    if (t >= HB_QUEUE_LOW_MS) return t;
+    e = t + b->extra_ms;
+    return e > HB_QUEUE_LOW_MS ? HB_QUEUE_LOW_MS : e;
+}
+
+int hb_lat_backoff_tick(hb_lat_backoff *b, int target, int dpm)
+{
+    int t = hb_latency_clamp(target);
+    if (t >= HB_QUEUE_LOW_MS) {               /* default buffer: nothing to step back */
+        hb_lat_backoff_init(b);
+        return t;
+    }
+    if (dpm >= HB_LAT_BAD_DPM) {
+        b->good_s = 0;
+        if (++b->bad_s >= HB_LAT_BAD_S && t + b->extra_ms < HB_QUEUE_LOW_MS) {
+            b->extra_ms += HB_LAT_STEP_MS;
+            b->bad_s = 0;
+        }
+    } else if (dpm == 0) {
+        b->bad_s = 0;
+        if (++b->good_s >= HB_LAT_GOOD_S && b->extra_ms > 0) {
+            b->extra_ms -= HB_LAT_STEP_MS;
+            if (b->extra_ms < 0) b->extra_ms = 0;
+            b->good_s = 0;
+        }
+    } else {
+        b->bad_s = 0;
+    }
+    if (t + b->extra_ms > HB_QUEUE_LOW_MS) b->extra_ms = HB_QUEUE_LOW_MS - t;
+    return hb_lat_effective(b, t);
+}

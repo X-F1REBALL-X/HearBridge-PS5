@@ -11,7 +11,7 @@ enum { HB_CODEC_AUTO = 0, HB_CODEC_SBC = 1, HB_CODEC_SBC_HQ = 2, HB_CODEC_SBC_XQ
 #define HB_EQ_BANDS   5
 #define HB_EQ_MAX_DB 12
 
-#define HB_LAT_MIN_MS      60
+#define HB_LAT_MIN_MS      40
 #define HB_LAT_MAX_MS     200
 #define HB_LAT_DEFAULT_MS 200
 
@@ -26,6 +26,7 @@ typedef struct {
     int hs_vol;              /* headset volume 0..127 the user set, -1 none */
     int held_codec;          /* codec that actually held last time, 0 = none */
     int held_bp;             /* bitpool that held with it, 0 = none */
+    int night;               /* night mode (dynamic range compression) */
 } hb_prefs;
 
 /* Start values for a headset the user has not set: software gain in the
