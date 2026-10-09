@@ -2,7 +2,7 @@
 
 # HearBridge PS5
 
-**Auriculares Bluetooth para una PS5 con jailbreak: audio de juegos y del sistema, sin adaptador.**
+**Auriculares Bluetooth para una PS5 con jailbreak: audio de juegos y del sistema, sin dongle.**
 
 Desarrollado por **X-F1REBALL-X**
 
@@ -10,77 +10,66 @@ Desarrollado por **X-F1REBALL-X**
 
 </div>
 
-HearBridge PS5 es un payload (ELF) para una PS5 con jailbreak. Captura el audio de la consola y lo transmite por la propia radio Bluetooth de la consola a auriculares o altavoces Bluetooth normales (A2DP, SBC). Se controla desde una página web que sirve la consola. No modifica los juegos, el firmware ni el jailbreak.
+HearBridge PS5 es un payload (ELF) para una PS5 con jailbreak. Transmite el audio de la consola por el Bluetooth de la propia PS5 a auriculares o altavoces Bluetooth normales (A2DP). Se controla desde una página web que sirve la consola. No toca los juegos, el firmware ni el jailbreak.
 
 <p align="center"><img src="docs/img/ui-en.png" alt="Página web de HearBridge PS5" width="520"></p>
 
 ## Requisitos
 
-- Una PS5 con jailbreak y un cargador de ELF escuchando en el puerto **9021** (elfldr).
-- Auriculares o un altavoz Bluetooth con **A2DP** (SBC).
-- El navegador de la PS5, un móvil o un PC en la misma red.
+- Una PS5 con jailbreak y un cargador ELF en el puerto **9021** (elfldr). Probado en una PS5 fat (CFI-10xx) con firmware **10.20**.
+- Auriculares o altavoz Bluetooth con A2DP (SBC, 48 kHz estéreo).
+- Un navegador en la misma red (PS5, móvil o PC).
 
-## Instalación y ejecución
+## Instalar y ejecutar
 
-1. Descarga **HearBridge-PS5-1.0.2.elf** desde la [versión](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2).
-2. Envíalo al cargador de la consola, por ejemplo:
-   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
-3. Abre **http://&lt;console-ip&gt;:8090** (o el icono **HearBridge** que se añade a la pantalla de inicio la primera vez).
+1. Descarga **HearBridge-PS5-1.1.0.elf** de la [última versión](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+2. Envíalo al cargador: `socat -u FILE:HearBridge-PS5-1.1.0.elf TCP:<console-ip>:9021`
+3. Abre **http://&lt;console-ip&gt;:8090**, o el icono **HearBridge** de la pantalla de inicio.
 
-## Uso
+Enviar el ELF otra vez reemplaza la copia en ejecución. **Stop HearBridge** en la página lo detiene.
 
-- **Emparejar:** pon los auriculares en modo de emparejamiento, pulsa **Buscar dispositivos** (unos 20 s) y luego **Conectar** junto a ellos. Se guardan y empieza el audio.
-- **Conectar:** los dispositivos guardados solo se conectan cuando pulsas **Conectar** en su fila. Nada se conecta en segundo plano.
-- **Desconectar:** corta la conexión; el dispositivo sigue guardado. Si los auriculares vuelven a su estuche o salen de alcance, la página muestra **No conectado** hasta que pulses Conectar de nuevo.
-- **Olvidar:** elimina el dispositivo y su clave de emparejamiento.
-- **Volumen:** el control de refuerzo (ganancia por software, hasta 500 %) y el volumen de los auriculares (volumen absoluto AVRCP, también sigue sus propios botones). **Silenciar** y **Tono de prueba** ayudan a comprobar.
-- **Detener HearBridge** termina el payload limpiamente. Úsalo antes de volver a cargar el ELF.
+## Funciones
 
-La página está disponible en 11 idiomas, incluidos hebreo y árabe (de derecha a izquierda).
+- **Emparejar:** pon los auriculares en modo emparejamiento, pulsa **Scan for devices** (20 s) y luego **Connect**.
+- **Conexión automática:** los auriculares guardados se conectan solos al encenderlos o sacarlos del estuche. Sacar otro par guardado cambia a ese. Tras un **Disconnect** manual esperan a **Connect**.
+- **Disconnect / Forget:** Disconnect corta la conexión y los deja guardados. Forget los desconecta y los borra.
+- **Volumen:** boost (ganancia por software hasta 500 %, empieza en 250 %) y volumen del auricular (AVRCP, empieza en 50 %). Se guardan por auricular cuando los cambias. **Mute** y **Test tone** para pruebas.
+- **Ecualizador:** 5 bandas (±12 dB) con presets, guardado por auricular, con limitador para que el boost no sature.
+- **Latencia:** objetivo de búfer de 60 a 200 ms (por defecto 200 ms) y una estimación en vivo del retardo.
+- **Clean sound:** apaga el ecualizador, vuelve el boost a 250 % y el búfer a 200 ms.
+- **Registro** en la página con cada paso. La página está en 11 idiomas.
 
-## Notas
+## Códecs
 
-- Usa el Bluetooth integrado de la PS5; el DualSense sigue funcionando. Ejecuta solo un payload que use Bluetooth a la vez.
-- Solo códec SBC, un dispositivo a la vez, sin micrófono. El televisor también sigue sonando.
-- Probado con Sony WF-1000XM6, OnePlus Buds Ace 2 y Xbox Wireless Headset.
-- Los ajustes, los dispositivos guardados y el registro están en `/data/hearbridge/` (`hearbridge.log` registra cada paso).
+- **Auto:** SBC normal, funciona con todo.
+- **SBC HQ** y **SBC-XQ:** se eligen a mano, solo si los auriculares los admiten. Los no admitidos aparecen en gris.
+
+AAC, aptX y LDAC no son compatibles.
+
+## Límites conocidos
+
+- Un auricular a la vez, sin micrófono. La TV también sigue sonando.
+- Los auriculares deben aceptar SBC a 48 kHz estéreo.
+- Ejecuta solo un payload de Bluetooth a la vez. El DualSense sigue funcionando.
+- Solo probado en fw 10.20 (PS5 fat). Otros modelos y firmwares no están probados; se informó que la PS5 Pro y algunas configuraciones 13.x no arrancan ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)).
+- Auriculares probados: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Solución de problemas / informar de un problema
 
-**Probado en:** HearBridge se desarrolló y probó en una PS5 fat (modelo original, CFI-10xx) con firmware 10.20. Otros modelos (Slim, Pro, revisiones fat posteriores) y otros firmwares no están probados y pueden usar otro chip Bluetooth, así que los informes desde ellos son bienvenidos.
+Al ejecutar el payload debería aparecer la notificación **"HearBridge &lt;version&gt;: starting"**. Si no aparece, el cargador no lo ejecutó.
 
-Problemas habituales:
+Los ajustes, los auriculares guardados y el registro están en `/data/hearbridge/`. Para informar de un problema:
 
-- **No aparece el icono de HearBridge en la pantalla de inicio** después de ejecutar el ELF.
-- **La página no se abre** (http://&lt;console-ip&gt;:8090).
-- **No se encuentran los auriculares** al pulsar Buscar dispositivos.
-- **No hay sonido** aunque los auriculares están conectados.
+1. Descarga `/data/hearbridge/hearbridge.log` y `diag.txt` por FTP (por ejemplo [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv), puerto 2121). `diag.txt` también está en http://&lt;console-ip&gt;:8090/api/diag.
+2. Abre un [issue en GitHub](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose) con el modelo de consola, el firmware, el cargador, la versión de HearBridge y los registros.
 
-**Firmware 13.60:** prueba **HearBridge-PS5-1.0.2-fw13.60.elf** de la [versión v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). Es una versión experimental pensada para corregir el icono que falta en la pantalla de inicio y añade diagnósticos. Todavía no se ha probado en una consola real.
-
-**Obtener el registro:**
-
-1. Envía un payload de servidor FTP (por ejemplo [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)) con el mismo cargador que usas para HearBridge.
-2. Conéctate con FileZilla a la IP de la consola en el puerto que muestra el servidor (ftpsrv suele usar el **2121**).
-3. Descarga `/data/hearbridge/hearbridge.log` y, con la versión fw13.60, también `/data/hearbridge/diag.txt`.
-
-Con la versión fw13.60 también puedes abrir **http://&lt;console-ip&gt;:8090/api/diag** y copiar el texto.
-
-**Abre una [incidencia en GitHub](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose)** e incluye:
-
-- el modelo de la consola (número CFI, p. ej. CFI-1016A)
-- la versión del firmware
-- el cargador que usaste
-- si apareció la notificación **"HearBridge 1.0.2: http://…"**
-- si la página se abre
-- los archivos de registro (`hearbridge.log`, `diag.txt`)
-
-## Compilación
+## Compilar
 
 ```sh
-export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
-make ps5
+export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk   # ps5-payload-sdk v0.43
+make ps5      # dist/HearBridge-PS5-<version>.elf
 make test
+make send PS5_HOST=<console-ip>
 ```
 
 ## Licencia
