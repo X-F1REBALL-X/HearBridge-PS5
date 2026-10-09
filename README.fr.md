@@ -28,6 +28,23 @@ HearBridge PS5 est un payload (ELF) pour une PS5 jailbreakée. Il diffuse le son
 
 Renvoyer l'ELF remplace la copie en cours. **Stop HearBridge** sur la page l'arrête.
 
+## Quelle puce j'ai ?
+
+Cherche ton modèle dans le tableau. Les fat et les Slim ont l'une de deux puces Bluetooth, donc pour elles regarde le log.
+
+| Modèle | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+|---|---|---|
+| CFI-10xx (lancement) | ✅ fonctionne (testé, fw 10.20) | pas besoin |
+| CFI-11xx, CFI-12xx (fat) | ✅ si puce Marvell/NXP | ⚠️ si puce MediaTek (non testé) |
+| CFI-20xx, CFI-21xx (Slim, la plupart des Slim ont MediaTek*) | ✅ si puce Marvell/NXP | ⚠️ si puce MediaTek (non testé) |
+| CFI-70xx, CFI-71xx (Pro) | ❌ ne marche pas (MediaTek) | ✅ utilise celle-ci (non testé) |
+
+\* d'après des forums de réparation, non confirmé par Sony
+
+**Comment vérifier :** lance HearBridge une fois, ouvre `/data/hearbridge/hearbridge.log` et cherche la ligne `usb: /dev/ugen0.2 is XXXX:YYYY` (le numéro ugen peut changer). `1286` = Marvell/NXP, prends **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, prends **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+
+Sources: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
+
 ## Fonctions
 
 - **Appairer :** mettez le casque en mode appairage, appuyez sur **Scan for devices** (20 s), puis **Connect**.
