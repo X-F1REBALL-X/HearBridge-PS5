@@ -14,6 +14,10 @@
  * Returns 1 on success, 0 on failure (out is left zeroed). */
 int hci_usb_open(hci_t *out);
 
+/* Called (outside the USB completion loop) for every HCI Connection Request
+ * event the controller sends, and once per pump with ev NULL. Set by main. */
+extern void (*hci_usb_conn_req_hook)(hci_t hci, const unsigned char *ev, int n);
+
 /* Diagnostics: open every /dev/ugen* node read-only, log and report (diag.h)
  * its VID:PID, names, interfaces (class/subclass/protocol) and endpoints,
  * then close it again. Nothing is sent to any device. Call before

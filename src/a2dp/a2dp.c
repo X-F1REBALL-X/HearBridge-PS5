@@ -2,6 +2,7 @@
 #include "devclass.h"
 #include "../utf8.h"
 #include "hci_cmd.h"
+#include "acl_track.h"
 #include "log.h"
 #include "util.h"
 
@@ -150,8 +151,14 @@ long a2dp_scan_deadline_ms;
 
 /* Cancel a name request at the controller and wait for its completion,
  * so nothing is left outstanding before the next inquiry or page. */
+/* What of ours may still be running at the controller: the pair path
+ * cancels only that (a cancel of nothing fails 0x0c / 0x02). */
+static int g_inq_active, g_name_active;
+static unsigned char g_name_addr[6];
+
 static void name_req_cancel(hci_t hci, const unsigned char addr[6])
 {
+    g_name_active = 0;
     unsigned char ev[HCI_PKT_MAX];
     long w;
     int done = 0;
@@ -207,6 +214,8 @@ static void fetch_names(a2dp_session *s, a2dp_inq_dev *devs, int n)
             log_line("inquiry: Remote Name Request failed to start");
             continue;
         }
+        g_name_active = 1;
+        memcpy(g_name_addr, d->addr, 6);
 
         deadline = now_ms() + 2000;
         if (a2dp_scan_deadline_ms && deadline > a2dp_scan_deadline_ms)
@@ -231,6 +240,7 @@ static void fetch_names(a2dp_session *s, a2dp_inq_dev *devs, int n)
                         if (a2dp_inquiry_progress) a2dp_inquiry_progress(devs, n);
                     }
                     got = 1;
+                    g_name_active = 0;
                     break;
                 }
             }
@@ -373,6 +383,7 @@ static int inquiry_event(a2dp_inq_dev *out, int max, int *n,
                          const unsigned char *ev, int nEv)
 {
     if (ev[0] == 0x01) {
+        g_inq_active = 0;
         log_line("inquiry: complete (status %#04x)", nEv > 2 ? ev[2] : 0xFF);
         return 1;
     }
@@ -508,6 +519,7 @@ static int inquiry_once(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound
             goto fail;
         }
     } else {
+        g_inq_active = 1;
         {
             long lim = length_slots * 1280L + 3000;
             if (a2dp_scan_deadline_ms) {
@@ -522,6 +534,7 @@ static int inquiry_once(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound
         if (r == 0) {
             log_line("inquiry: no Inquiry Complete — cancelling ours");
             hci_cmd_sync(hci, HB_OP_INQUIRY_CANCEL, NULL, 0, NULL, NULL, 0);
+            g_inq_active = 0;
             (void)inquiry_listen(hci, out, max, &n, 1000, NULL, 0);
         }
     }
@@ -552,6 +565,7 @@ aborted:
          * before the caller pages anyone. */
         long w;
         hci_cmd_sync(hci, HB_OP_INQUIRY_CANCEL, NULL, 0, NULL, NULL, 0);
+        g_inq_active = 0;
         w = now_ms() + 500;
         while (now_ms() < w) {
             unsigned char ev[HCI_PKT_MAX];
@@ -570,6 +584,7 @@ aborted:
 lost:
     log_line("inquiry: transport lost / stop requested");
     if (started) hci.ops->cmd(hci.ctx, HB_OP_INQUIRY_CANCEL, NULL, 0);
+    g_inq_active = 0;
 fail:
     if (old_mode >= 0 && old_mode != 2) {
         unsigned char m = (unsigned char)old_mode;
@@ -740,6 +755,17 @@ static int save_headset_ini(const a2dp_pair_result *r)
 
 int a2dp_pair_keep_acl;
 
+/* Accept the headset's own call (we stream: become central). */
+static void pair_accept(hci_t hci, const unsigned char addr[6], long age)
+{
+    unsigned char ap[7];
+    memcpy(ap, addr, 6);
+    ap[6] = 0x00;
+    fire_cmd(hci, 0x0409, ap, 7);
+    acl_track_request_clear(addr);
+    log_line("pair: the headset is calling us (%ld ms ago) — accepting its call instead of paging", age);
+}
+
 int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out)
 {
     hci_t hci;
@@ -756,6 +782,7 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
     unsigned char key_type = 0;
     int purged = 0;
     int rc = 0;
+    int inbound = 0, io_replied = 0, io_resp = 0;
 
     if (!s || !target || !out) return 0;
     memset(out, 0, sizeof *out);
@@ -778,8 +805,14 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
          * makes Create Connection fail with 0x0b. Cancel both, wait for
          * their completion, settle. */
         long w;
-        (void)hci_cmd_sync(hci, HB_OP_INQUIRY_CANCEL, NULL, 0, NULL, NULL, 0);
-        (void)hci_cmd_sync(hci, 0x041A, target->addr, 6, NULL, NULL, 0);
+        if (g_inq_active) {
+            (void)hci_cmd_sync(hci, HB_OP_INQUIRY_CANCEL, NULL, 0, NULL, NULL, 0);
+            g_inq_active = 0;
+        }
+        if (g_name_active) {
+            (void)hci_cmd_sync(hci, 0x041A, g_name_addr, 6, NULL, NULL, 0);
+            g_name_active = 0;
+        }
         w = now_ms() + 300;
         while (now_ms() < w) {
             if (hci.ops->pump(hci.ctx, 30) < 0) break;
@@ -801,7 +834,16 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
     log_line("pair: CREATE_CONNECTION params %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
              p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12]);
 
-    if (!hci.ops->cmd(hci.ctx, HB_OP_CREATE_CONNECTION, p, 13)) {
+    {
+        /* The headset is calling us (e.g. it still knows us): take that
+         * call instead of paging (a page now only fails 0x0b). */
+        long age = acl_track_request_age(target->addr, now_ms());
+        if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(target->addr)) {
+            pair_accept(hci, target->addr, age);
+            inbound = 1;
+        }
+    }
+    if (!inbound && !hci.ops->cmd(hci.ctx, HB_OP_CREATE_CONNECTION, p, 13)) {
         log_line("pair: CREATE_CONNECTION transport fail");
         return 0;
     }
@@ -823,7 +865,10 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
             /* Command Status */
             if (ev[0] == 0x0F && nEv >= 6) {
                 unsigned rop = (unsigned)ev[4] | ((unsigned)ev[5] << 8);
-                if (rop == HB_OP_CREATE_CONNECTION) {
+                if (rop == 0x0409 && ev[2] != 0) {
+                    log_line("pair: Accept Connection Request status %#04x", ev[2]);
+                    if (inbound && !connected) goto done;
+                } else if (rop == HB_OP_CREATE_CONNECTION) {
                     if (ev[2] == 0) {
                         create_status_ok = 1;
                         log_line("pair: CREATE_CONNECTION accepted");
@@ -836,7 +881,10 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
                         }
                         {
                             long w = now_ms() + 1000;
-                            (void)hci_cmd_sync(hci, 0x041A, target->addr, 6, NULL, NULL, 0);
+                            if (g_name_active) {
+                                (void)hci_cmd_sync(hci, 0x041A, g_name_addr, 6, NULL, NULL, 0);
+                                g_name_active = 0;
+                            }
                             while (now_ms() < w) {
                                 hci.ops->pump(hci.ctx, 20);
                                 drain_acl(hci);
@@ -858,10 +906,25 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
                 continue;
             }
 
+            /* The headset calls us while we page it: take its call. */
+            if (ev[0] == 0x04 && nEv >= 12 && ev[11] == 0x01 && same_addr(ev + 2, target->addr) &&
+                !connected && !inbound) {
+                pair_accept(hci, target->addr, 0);
+                inbound = 1;
+                continue;
+            }
             /* Connection Complete: status, handle, addr, link_type, enc */
             if (ev[0] == 0x03 && nEv >= 13 && same_addr(ev + 5, target->addr)) {
                 if (ev[2] != 0) {
+                    long age = acl_track_request_age(target->addr, now_ms());
                     log_line("pair: Connection Complete fail status %#04x", ev[2]);
+                    if (ev[2] == 0x0B && inbound) continue;   /* our page lost to its call */
+                    if (ev[2] == 0x0B && age >= 0 && age < ACL_REQ_PENDING_MS) {
+                        pair_accept(hci, target->addr, age);  /* 0x0b: it is calling us */
+                        inbound = 1;
+                        t0 = now_ms();
+                        continue;
+                    }
                     goto done;
                 }
                 handle = (int)(le16(ev + 3) & 0x0FFF);
@@ -889,6 +952,7 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
                     log_line("pair: Authentication Complete OK");
                 } else {
                     log_line("pair: Authentication Complete fail %#04x", ev[2]);
+                    if (io_replied && !io_resp) out->need_pair_mode = 1;
                     goto done;
                 }
                 continue;
@@ -949,6 +1013,14 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
                 for (q = 0; q < 3; q++) rep[6 + q] = iocap[q];
                 fire_cmd(hci, HB_OP_IO_CAP_REPLY, rep, (int)sizeof rep);
                 log_line("pair: IO Cap Reply (NoInputNoOutput)");
+                io_replied = 1;
+                continue;
+            }
+
+            /* IO Capability Response: the headset is pairing. */
+            if (ev[0] == 0x32 && nEv >= 11 && same_addr(ev + 2, target->addr)) {
+                io_resp = 1;
+                log_line("pair: headset IO capability %u", ev[8]);
                 continue;
             }
 
@@ -991,6 +1063,12 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
         if (connected && now - t_conn > T_PAIR_SETUP_MS) {
             log_line("pair: setup timeout (auth=%d enc=%d key=%d)",
                      auth_ok, enc_on, key_ok);
+            if (io_replied && !io_resp) {
+                /* It never answered the pairing: it still holds an old key
+                 * and is not in pairing mode. */
+                out->need_pair_mode = 1;
+                log_line("pair: no answer to pairing — the headset is not in pairing mode");
+            }
             break;
         }
         (void)create_status_ok;

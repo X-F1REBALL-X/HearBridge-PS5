@@ -41,6 +41,7 @@ typedef struct {
     int encrypted;            /* Encryption Change enabled */
     unsigned char link_key[16];
     unsigned char key_type;
+    int need_pair_mode;       /* never answered pairing: not in pairing mode */
 } a2dp_pair_result;
 
 /* Opens transport + runs controller setup. Does not pair yet.
