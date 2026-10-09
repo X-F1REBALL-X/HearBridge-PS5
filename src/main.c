@@ -1113,7 +1113,7 @@ static void ctl_set_state(const char *st, const char *dev)
     CTL_UNLOCK(&g_ctl);
 }
 
-/* Base gain percent from GAIN_PATH; default 500 (x5) when absent. */
+/* Base gain percent from GAIN_PATH; default 250 (middle) when absent. */
 static int read_gain_pct(void)
 {
     FILE *f = fopen(GAIN_PATH, "r");

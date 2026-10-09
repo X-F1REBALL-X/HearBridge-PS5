@@ -57,8 +57,8 @@ int main(int argc, char **argv)
     CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/html") &&
           strstr(out, "HearBridge PS5"), "GET / serves the page");
     n = get(&c, "/api/status");
-    CHECK(n > 0 && strstr(out, "application/json") && strstr(out, "\"gain_pct\":500"),
-          "status JSON, default gain 500%");
+    CHECK(n > 0 && strstr(out, "application/json") && strstr(out, "\"gain_pct\":250"),
+          "status JSON, default gain 250%");
     CHECK(strstr(out, "\"why\":\"\""), "status: no disconnect reason until there is one");
     CHECK(strstr(out, "WF-\\\"1000\\\"XM6") != NULL, "device name JSON-escaped");
     if (argc > 1) {
@@ -134,8 +134,8 @@ int main(int argc, char **argv)
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "eq: no parameter -> 400");
     c.eq_on = 1; c.eq_db[0] = 6; c.gain_pct = 250; c.latency_ms = 1000; c.prefs_dirty = c.gain_dirty = 0;
     post(&c, "/api/clean");
-    CHECK(!c.eq_on && !c.eq_db[0] && c.gain_pct == 500 && c.latency_ms == 200 && c.prefs_dirty && c.gain_dirty,
-          "clean sound: EQ flat, gain 500, buffer 200, saved");
+    CHECK(!c.eq_on && !c.eq_db[0] && c.gain_pct == 250 && c.latency_ms == 200 && c.prefs_dirty && c.gain_dirty,
+          "clean sound: EQ flat, gain 250, buffer 200, saved");
     ctl_event(&c, "switch: now SBC");
     ctl_event(&c, "stream: link dropped");
     get(&c, "/api/status");
