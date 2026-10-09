@@ -43,7 +43,7 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث
 
 \* من تقارير منتديات الصيانة، غير مؤكد من Sony
 
-**طريقة الفحص:** شغّل HearBridge وانظر إلى **Chip** أسفل **Status** في الصفحة. أو افتح `/data/hearbridge/hearbridge.log` وابحث عن السطر `usb: /dev/ugen0.2 is XXXX:YYYY` (قد يختلف رقم ugen). `1286` = Marvell/NXP، استخدم **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek، استخدم **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**طريقة الفحص:** شغّل HearBridge مرة واحدة، افتح `/data/hearbridge/hearbridge.log` وابحث عن السطر `usb: /dev/ugen0.2 is XXXX:YYYY` (قد يختلف رقم ugen). `1286` = Marvell/NXP، استخدم **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek، استخدم **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
 
 المصادر: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

@@ -43,7 +43,7 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא משדר את הש�
 
 \* לפי דיווחים מפורומי תיקונים, לא מאושר על ידי Sony
 
-**איך בודקים:** הפעילו את HearBridge והסתכלו על **Chip** בתחתית **Status** בדף. או פתחו את `/data/hearbridge/hearbridge.log` וחפשו את השורה `usb: /dev/ugen0.2 is XXXX:YYYY` (מספר ה-ugen יכול להיות אחר). `1286` = Marvell/NXP, השתמשו ב-**[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, השתמשו ב-**[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**איך בודקים:** הפעילו את HearBridge פעם אחת, פתחו את `/data/hearbridge/hearbridge.log` וחפשו את השורה `usb: /dev/ugen0.2 is XXXX:YYYY` (מספר ה-ugen יכול להיות אחר). `1286` = Marvell/NXP, השתמשו ב-**[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, השתמשו ב-**[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
 
 מקורות: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

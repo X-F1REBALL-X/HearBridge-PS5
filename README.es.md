@@ -41,7 +41,7 @@ Busca tu modelo en la tabla. Las fat y las Slim traen uno de dos chips Bluetooth
 
 \* según foros de reparación, no confirmado por Sony
 
-**Cómo comprobarlo:** ejecuta HearBridge y mira **Chip** abajo en **Status** en la página. O abre `/data/hearbridge/hearbridge.log` y busca la línea `usb: /dev/ugen0.2 is XXXX:YYYY` (el número de ugen puede cambiar). `1286` = Marvell/NXP, usa **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, usa **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**Cómo comprobarlo:** ejecuta HearBridge una vez, abre `/data/hearbridge/hearbridge.log` y busca la línea `usb: /dev/ugen0.2 is XXXX:YYYY` (el número de ugen puede cambiar). `1286` = Marvell/NXP, usa **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, usa **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
 
 Fuentes: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

@@ -41,7 +41,7 @@ Procure seu modelo na tabela. Os fat e os Slim vêm com um de dois chips Bluetoo
 
 \* segundo fóruns de reparo, não confirmado pela Sony
 
-**Como verificar:** rode o HearBridge e veja **Chip** embaixo em **Status** na página. Ou abra `/data/hearbridge/hearbridge.log` e procure a linha `usb: /dev/ugen0.2 is XXXX:YYYY` (o número do ugen pode mudar). `1286` = Marvell/NXP, use **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, use **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**Como verificar:** rode o HearBridge uma vez, abra `/data/hearbridge/hearbridge.log` e procure a linha `usb: /dev/ugen0.2 is XXXX:YYYY` (o número do ugen pode mudar). `1286` = Marvell/NXP, use **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, use **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
 
 Fontes: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

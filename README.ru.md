@@ -41,7 +41,7 @@ HearBridge PS5 — это payload (ELF) для взломанной PS5. Он п
 
 \* по сообщениям с ремонтных форумов, Sony не подтверждала
 
-**Как проверить:** запустите HearBridge и посмотрите **Chip** внизу **Status** на странице. Или откройте `/data/hearbridge/hearbridge.log` и найдите строку `usb: /dev/ugen0.2 is XXXX:YYYY` (номер ugen может отличаться). `1286` = Marvell/NXP, берите **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, берите **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**Как проверить:** запустите HearBridge один раз, откройте `/data/hearbridge/hearbridge.log` и найдите строку `usb: /dev/ugen0.2 is XXXX:YYYY` (номер ugen может отличаться). `1286` = Marvell/NXP, берите **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, берите **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
 
 Источники: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
