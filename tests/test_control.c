@@ -283,6 +283,11 @@ int main(int argc, char **argv)
         get(&c, "/api/status");
         CHECK(!strncmp(out, "HTTP/1.1 200", 12), "reads stay GET");
     }
+    n = get(&c, "/fonts/he-700.woff");
+    CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "font/woff") &&
+          memmem(out, (size_t)n, "wOFF", 4), "hebrew font served");
+    n = get(&c, "/fonts/he-900.woff");
+    CHECK(!strncmp(out, "HTTP/1.1 404", 12), "unknown font -> 404");
     n = get(&c, "/nope");
     CHECK(!strncmp(out, "HTTP/1.1 404", 12), "404");
     n = http_handle(&c, "DELETE / HTTP/1.1\r\n\r\n", 21, out, sizeof out);

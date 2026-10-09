@@ -3,6 +3,7 @@
  * stream loop applies the requests. Developed by X-F1REBALL-X. */
 #include "http.h"
 #include "webpage.h"
+#include "font_he.h"
 #include "diag.h"
 #include "rate.h"
 #include "btchip.h"
@@ -147,8 +148,8 @@ static int status_json(hb_ctl *c, char *o, int max)
         chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "", ev);
 }
 
-static int respond(char *out, int max, int code, const char *ctype,
-                   const char *body, int blen)
+static int respond_c(char *out, int max, int code, const char *ctype,
+                     const char *body, int blen, const char *cache)
 {
     const char *reason = code == 200 ? "OK" : code == 404 ? "Not Found" :
                          code == 405 ? "Method Not Allowed" : code == 403 ? "Forbidden" :
@@ -156,11 +157,17 @@ static int respond(char *out, int max, int code, const char *ctype,
                          code == 500 ? "Internal Server Error" : "Bad Request";
     int n = snprintf(out, (size_t)max,
         "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
-        "Cache-Control: no-store\r\nConnection: close\r\n\r\n",
-        code, reason, ctype, blen);
+        "Cache-Control: %s\r\nConnection: close\r\n\r\n",
+        code, reason, ctype, blen, cache);
     if (n < 0 || n + blen > max) return 0;
     memcpy(out + n, body, (size_t)blen);
     return n + blen;
+}
+
+static int respond(char *out, int max, int code, const char *ctype,
+                   const char *body, int blen)
+{
+    return respond_c(out, max, code, ctype, body, blen, "no-store");
 }
 
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
@@ -192,6 +199,15 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
                 break;
             }
         return n;
+    }
+
+    /* Hebrew glyphs for the page: a clean console has no Hebrew font */
+    if (!strcmp(path, "/fonts/he-400.woff") || !strcmp(path, "/fonts/he-700.woff")) {
+        int bold = path[10] == '7';
+        return respond_c(out, max, 200, "font/woff",
+                         (const char *)(bold ? hb_font_he_700 : hb_font_he_400),
+                         bold ? (int)sizeof hb_font_he_700 : (int)sizeof hb_font_he_400,
+                         "max-age=86400");
     }
 
     is_api = !strncmp(path, "/api/", 5);
