@@ -7,7 +7,7 @@
 <title>HearBridge PS5</title>
 <style>
 :root{--ink:#f4efe6;--ink2:#cfc9be;--mute:#9a948a;--void:#0c0b0f;--deck:#15131a;--card:#1f1b26;--edge:#2c2833;--edge2:#3a3543;
---lime:#c8ff3d;--ember:#ff6a2b;--warn:#ffb23d;--bad:#ff3d5a;--sk:-12deg;
+--lime:#c8ff3d;--ember:#ff6a2b;--cyan:#3dd8ff;--violet:#b18cff;--blue:#5aa2ff;--teal:#8fc2bb;--warn:#ffb23d;--bad:#ff3d5a;--sk:-12deg;
 --s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.25rem;--gap:var(--s4)}
 *{box-sizing:border-box}
 html{background:var(--void);font-size:15px}
@@ -43,20 +43,21 @@ text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;transform:skewX(
 .msg:empty{display:none}
 /* dashboard: phone = one column (devices, volume, status, connection) */
 .grid{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:var(--gap);
-grid-template-areas:"dev" "log" "vol" "eq" "st" "conn"}
-.hero{grid-area:dev}.logp{grid-area:log}.vol{grid-area:vol}.status{grid-area:st}.conn{grid-area:conn}.eqp{grid-area:eq}
+grid-template-areas:"dev" "vol" "eq" "st" "conn"}
+.side{grid-area:dev;display:flex;flex-direction:column;min-width:0;min-height:0;gap:var(--gap)}
+.vol{grid-area:vol}.status{grid-area:st}.conn{grid-area:conn}.eqp{grid-area:eq}
 .panel{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;padding:var(--s3) var(--s5) var(--s4);
 background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0) 6rem),var(--deck);
-border:1px solid var(--edge);border-inline-start:4px solid var(--ember);
+border:1px solid var(--edge);border-inline-start:4px solid var(--acc,var(--ember));
 clip-path:polygon(0 0,calc(100% - 1.1rem) 0,100% 1.1rem,100% 100%,0 100%)}
 [dir=rtl] .panel{clip-path:polygon(1.1rem 0,100% 0,100% 100%,0 100%,0 1.1rem)}
-.hero{border-inline-start-color:var(--lime)}
+/* one accent per panel (left border, title dot, title text); red stays for Stop only */
+.hero{--acc:var(--lime)}.status{--acc:var(--cyan)}.vol{--acc:var(--ember)}.eqp{--acc:var(--violet)}.conn{--acc:var(--blue)}.logp{--acc:var(--teal)}
 /* panel header: one style everywhere */
-.label{order:-3;display:flex;align-items:center;margin:0 0 var(--s3);font-size:.78rem;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--ember);line-height:1.2}
+.label{order:-3;display:flex;align-items:center;margin:0 0 var(--s3);font-size:.78rem;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--acc,var(--ember));line-height:1.2}
 .label:before{content:"";flex:0 0 auto;width:.45rem;height:.45rem;margin-inline-end:var(--s2);background:currentColor;transform:rotate(45deg)}
 .label:after{content:"";flex:1;height:1px;margin-inline-start:var(--s3);background:linear-gradient(90deg,var(--edge2),transparent)}
 [dir=rtl] .label:after{background:linear-gradient(270deg,var(--edge2),transparent)}
-.hero .label{color:var(--lime)}
 .k{color:var(--mute)}
 .v{font-weight:800;direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 /* buttons: skewed plate drawn by ::before so focus glow is never clipped */
@@ -144,8 +145,6 @@ input[type=range]::-moz-range-thumb{width:.6rem;height:1.6rem;border:0;border-ra
 .vol .btns{margin-top:var(--s1)}.devbtns{margin-top:var(--s2);grid-template-columns:1fr}.devbtns button{min-width:0}
 /* equalizer: colour per band, live response curve */
 body{--b0:#ff6a2b;--b1:#ffb23d;--b2:#c8ff3d;--b3:#3dd6ff;--b4:#b06bff}
-.eqp{border-inline-start-color:var(--b3)}
-.eqp .label{color:var(--b3)}
 .eqhead{display:flex;align-items:center;justify-content:space-between;margin:0 0 var(--s2)}
 .eqhead button{min-height:2.3rem;min-width:6rem;font-size:.9rem}
 .curve{position:relative;height:5.2rem;margin:0 0 var(--s2);background:
@@ -172,6 +171,9 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .seg button{min-height:2.5rem;padding:.2rem .4rem;font-size:.88rem}
 .seg button[disabled],.seg button.no{color:var(--mute);opacity:.45;cursor:default;pointer-events:none}
 .cno{margin:0 0 var(--s2);color:var(--ink2)}.cno:empty{display:none}
+.apick{color:var(--lime);font-weight:800}
+.seg button{overflow:hidden;text-overflow:ellipsis}
+.seg button.cur:before{border-color:rgba(200,255,61,.75);box-shadow:inset 0 0 0 1px rgba(200,255,61,.35)}
 .evlog{margin:0;font-size:.78rem;line-height:1.4;color:var(--mute)}
 .evlog div{padding:.12rem 0;border-top:1px solid var(--edge)}
 .seg button[disabled]:before,.seg button.no:before{background:transparent;border-color:var(--edge);border-style:dashed}
@@ -227,7 +229,7 @@ background:linear-gradient(90deg,rgba(255,255,255,.07) 0 85%,rgba(255,61,90,.3) 
 background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25% - 1px) 25%,transparent 25% calc(50% - 1px),var(--deck) calc(50% - 1px) 50%,transparent 50% calc(75% - 1px),var(--deck) calc(75% - 1px) 75%,transparent 75%)}
 /* mid widths: two columns, page may scroll */
 @media(min-width:760px){
-.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "dev vol" "dev eq" "dev conn" "log log";grid-template-rows:auto auto auto 1fr auto}
+.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "dev vol" "dev eq" "dev conn";grid-template-rows:auto auto auto 1fr}
 .conn{align-self:start}
 }
 /* TV: one screen, no page scroll. Everything is rem, rem follows the viewport. */
@@ -235,8 +237,18 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 .wrap{height:100vh}
 .grid{flex:1;min-height:0;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr);
-grid-template-areas:"dev st eq" "dev vol conn" "log vol conn";grid-template-rows:minmax(0,1fr) auto auto}
-.logp .evlog{max-height:7.5rem;overflow-y:auto}
+grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) auto}
+/* left column: devices as tall as their content (found list ~3 rows, scrolls), the log takes the rest */
+.side .hero{flex:0 1 auto}
+.side .logp{flex:1 1 0;min-height:13rem}
+.side .hero{min-height:0}
+#devlist .dl,#savedlist .dl{min-height:2.9rem;padding-top:.2rem;padding-bottom:.2rem}
+.side #savedlist{flex:0 0 auto;max-height:none}
+.side #scan{min-height:2.9rem}.side .devbtns button{min-height:2.5rem}
+.side .hint{margin-top:var(--s1);margin-bottom:var(--s1)}
+#devlist .dl button{min-height:2.2rem}
+.logp .evlog div{padding:.06rem 0}
+.logp .evlog{flex:1 1 0;min-height:0;overflow-y:auto}
 .eqp{min-height:0}
 .eqp .presets button{min-height:1.9rem;margin:.1rem 0;padding:.1rem .65rem}
 .conn{align-self:stretch}
@@ -244,7 +256,7 @@ grid-template-areas:"dev st eq" "dev vol conn" "log vol conn";grid-template-rows
 /* one screen: the longer hints only show on phones and laptops */
 #codecnote,#latnote{display:none}
 .eqp .curve{flex:1 1 0;height:auto;min-height:1.4rem;max-height:6rem}.eqp .bands,.eqp .presets,.eqp .eqhead{flex:0 0 auto}
-#devlist{flex:1 1 0;min-height:4rem}
+#devlist{flex:0 1 auto;min-height:3.2rem;max-height:10rem}
 /* spare height goes to the status card (meters sit at its bottom, idle art fills it) */
 .status #stats{flex:1}.status .meters{margin-top:auto;padding-top:var(--s3)}
 .vol .ctl{margin-bottom:var(--s3)}
@@ -280,6 +292,7 @@ grid-template-areas:"dev st eq" "dev vol conn" "log vol conn";grid-template-rows
 </header>
 <div class="msg" id="msg"></div>
 <main class="grid">
+<div class="side">
 <section class="panel hero" id="devpanel"><p class="label" data-i18n="devices">Devices</p>
 <button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
 <div class="btns devbtns"><button id="reconnect" data-i18n="reconnect">Reconnect</button></div>
@@ -289,6 +302,7 @@ grid-template-areas:"dev st eq" "dev vol conn" "log vol conn";grid-template-rows
 </section>
 <section class="panel logp"><p class="label" data-i18n="log">Log</p>
 <div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section>
+</div>
 <section class="panel status"><p class="label" data-i18n="status">Status</p>
 <div id="stats" style="display:none">
 <div class="kv">
@@ -450,9 +464,16 @@ $('mute').className=S.muted?'ember':'';$('mute').textContent=t(S.muted?'unmute':
 $('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone');
 /* only what this headset's capabilities allow can be picked (the server refuses the rest too) */
 var CN=['','SBC','SBC HQ','SBC-XQ'],nos=[];
+/* Auto: show what it is actually streaming (button label, hint line, outline on that codec) */
+var auto=!(S.codec_pref|0),live=auto&&S.sample_rate>0&&S.codec?CN.indexOf(S.codec):-1;
+$('cd0').textContent=t('codecAuto')+(live>0?' · '+CN[live]:'');
+/* long languages (he, ar) on small screens: shrink the Auto label until it fits, never clip */
+var c0=$('cd0'),fs=['','.78rem','.7rem','.62rem'];for(var fi=0;fi<fs.length;fi++){c0.style.fontSize=fs[fi];if(c0.scrollWidth<=c0.clientWidth)break}
 for(var ci=0;ci<4;ci++){var cb=$('cd'+ci),ok=ci<2||!!(S.codec_avail&(1<<ci));cb.disabled=!ok;
-cb.className=!ok?'no':(S.codec_pref|0)==ci?'act':'';if(!ok)nos.push(CN[ci])}
-setHtml('codecno',!nos.length?'':S.codec_avail?esc(t('codecNo')+': '+nos.join(', ')):esc(t('codecWait')))
+cb.className=!ok?'no':(S.codec_pref|0)==ci?'act':ci==live?'cur':'';if(!ok)nos.push(CN[ci])}
+var ap=live>0?'<span class="apick">'+esc(t('autoPicked').replace('%s',CN[live]))+'</span>':'',
+cn=!nos.length?'':S.codec_avail?esc(t('codecNo')+': '+nos.join(', ')):esc(t('codecWait'));
+setHtml('codecno',ap&&cn?ap+' · '+cn:ap||cn)
 drawEq();drawLat()}
 /* latency: estimate from the stream loop (see hb_latency_estimate) */
 var busyL=0,latT=0,latAck=-1,latTouch=0,LATCOL=['var(--b0)','var(--b2)','var(--b3)','var(--b4)'];
@@ -499,8 +520,13 @@ busyE=1;eqPaint(PRESETS[p],1);eqSend(PRESETS[p],1)}})(pi);
 $('eqon').onclick=function(){var on=!(S&&S.eq&&S.eq.on);eqSend(eqVals(),on)};
 $('gain').oninput=function(){busyG=1;$('gv').textContent=pct(this.value)};
 $('gain').onchange=function(){act('/api/volume?pct='+this.value,function(){busyG=0})};
-$('hs').oninput=function(){busyH=1;$('hv').textContent=pct(this.value*100/127)};
-$('hs').onchange=function(){act('/api/headset?vol='+this.value,function(){busyH=0})};
+/* headset volume: send on release (any of these events; the PS5 browser may skip change),
+   and never keep the slider frozen: after 1.5 s without input it follows the headset again */
+var hsT=0,hsSent=-1;
+function hsPush(){var v=parseInt($('hs').value,10);if(v!==hsSent){hsSent=v;act('/api/headset?vol='+v,function(){busyH=0})}else busyH=0}
+$('hs').oninput=function(){busyH=1;hsT=Date.now();$('hv').textContent=pct(this.value*100/127)};
+$('hs').onchange=$('hs').onmouseup=$('hs').ontouchend=$('hs').onpointerup=hsPush;
+setInterval(function(){if(busyH&&Date.now()-hsT>1500)hsPush()},300);
 $('mute').onclick=function(){act('/api/mute?on='+(S&&S.muted?0:1))};
 $('tone').onclick=function(){act('/api/tone?on='+(S&&S.tone?0:1))};
 $('clean').onclick=function(){act('/api/clean')};

@@ -69,6 +69,8 @@ int a2dp_inquiry(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound);
 /* Orders headphones and speakers into order[] (see hb_dev_rank): prefer_addr first if
  * seen, then headphones/headset, speakers / portable audio, hands-free, headphone-like
  * names, then strongest RSSI. Everything else is left out. Returns the count. */
+/* Scan log: forget which devices were already logged (new scan). */
+void a2dp_rank_log_reset(void);
 int a2dp_rank_sinks(const a2dp_inq_dev *found, int n,
                     const unsigned char prefer_addr[6], int *order, int max);
 

@@ -196,7 +196,7 @@ static void fetch_names(a2dp_session *s, a2dp_inq_dev *devs, int n)
 
         if (d->name[0]) continue;
         /* Only audio devices that would be listed (no TVs) need a name. */
-        if (!d->audio_likely || hb_dev_rank(d->cod, "") < 0) continue;
+        if (!d->audio_likely || hb_dev_rank_class(d->cod) < 0) continue;
 
         memcpy(p, d->addr, 6);
         p[6] = 0x01; /* R1 page scan repetition (common default) */
@@ -622,6 +622,28 @@ static int prefer_set(const unsigned char prefer[6])
     return 0;
 }
 
+/* Scan log: each device's skip/candidate line once per scan, not on every
+ * live update (a2dp_rank_log_reset() at the start of a scan). */
+static unsigned char g_rank_logged[A2DP_INQ_MAX][6];
+static unsigned char g_rank_kind[A2DP_INQ_MAX];   /* 1 skipped, 2 candidate */
+static int g_rank_nlogged;
+void a2dp_rank_log_reset(void) { g_rank_nlogged = 0; }
+static int rank_log_once(const unsigned char addr[6], int kind)
+{
+    int i;
+    for (i = 0; i < g_rank_nlogged; i++)
+        if (!memcmp(g_rank_logged[i], addr, 6)) {
+            if (g_rank_kind[i] == kind) return 0;
+            g_rank_kind[i] = (unsigned char)kind;   /* e.g. a name arrived: log the change */
+            return 1;
+        }
+    if (g_rank_nlogged < A2DP_INQ_MAX) {
+        memcpy(g_rank_logged[g_rank_nlogged], addr, 6);
+        g_rank_kind[g_rank_nlogged++] = (unsigned char)kind;
+    }
+    return 1;
+}
+
 int a2dp_rank_sinks(const a2dp_inq_dev *found, int n,
                     const unsigned char prefer_addr[6], int *order, int max)
 {
@@ -632,8 +654,12 @@ int a2dp_rank_sinks(const a2dp_inq_dev *found, int n,
     for (i = 0; i < n && cnt < max; i++) {
         int r = sink_rank(found[i].cod, found[i].name);
         if (r < 0) {
-            log_line("pick: skip #%d CoD %06x (not an audio device)", i,
-                     (unsigned)found[i].cod);
+            if (rank_log_once(found[i].addr, 1)) {
+                char astr[18];
+                hci_addr_str(found[i].addr, astr);
+                log_line("pick: skip %s CoD %06x (not listed: %s)", astr, (unsigned)found[i].cod,
+                         found[i].name[0] ? "not headphones/speaker" : "no name yet");
+            }
             continue;
         }
         if (prefer_set(prefer_addr) && same_addr(found[i].addr, prefer_addr))
@@ -654,11 +680,13 @@ int a2dp_rank_sinks(const a2dp_inq_dev *found, int n,
         }
     }
     for (i = 0; i < cnt; i++)
+        if (rank_log_once(found[order[i]].addr, 2))
         log_line("pick: candidate %d = #%d CoD %06x \"%s\"%s", i, order[i],
                  (unsigned)found[order[i]].cod,
                  found[order[i]].name[0] ? found[order[i]].name : "-",
                  rk[i] == -2 ? " (headset.ini addr)" : "");
-    if (!cnt) log_line("pick: no audio device in inquiry (pairing mode?)");
+    if (!cnt && rank_log_once((const unsigned char *)"\0\0\0\0\0\0", 3))
+        log_line("pick: no audio device yet (pairing mode?)");
     return cnt;
 }
 

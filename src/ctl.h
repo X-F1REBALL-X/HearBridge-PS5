@@ -53,7 +53,7 @@ typedef struct {
     int bitpool_lo, bitpool_hi; /* adaptive range */
     long dropped;          /* media packets dropped (radio too slow) */
     int xq_low;            /* SBC-XQ held under HB_XQ_LOW_BP: tell the page */
-#define HB_EVENT_N   5
+#define HB_EVENT_N   10
 #define HB_EVENT_LEN 80
     char events[HB_EVENT_N][HB_EVENT_LEN]; /* last codec switches / disconnects */
     int event_n;

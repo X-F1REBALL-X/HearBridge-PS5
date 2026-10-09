@@ -61,6 +61,8 @@ check(html.indexOf('class="panel logp"') > html.indexOf('id="devlist"') && html.
 check(html.indexOf('id="reset"') < 0 && html.indexOf('/api/reset') < 0 &&
   html.indexOf('id="reconnect"') > html.indexOf('id="scan"') && html.indexOf('id="reconnect"') < html.indexOf('id="savedlist"'),
   'page: reconnect sits with Scan, no reset button');
+check(el('cd0').textContent === 'Auto · SBC-XQ' && el('cd3').className === 'cur' && /Auto picked SBC-XQ/.test(el('codecno').innerHTML),
+  'page: auto shows the codec it is streaming');
 check(el('cd0').className === 'act' && el('cd2').disabled && el('cd2').className === 'no' && !el('cd3').disabled && el('cd3').className !== 'no',
   'page: auto is on, a supported codec stays clickable, an unsupported one is grey');
 check(/\.seg button\[disabled\],\.seg button\.no\{color:var\(--mute\)/.test(html) && !/\.seg button\[disabled\],\.seg button\.no\{display:none\}/.test(html),
