@@ -28,6 +28,7 @@
 
 #include "acl_track.h"
 #include "hci_usb.h"
+#include "hcidbg.h"
 #include "usb_hci_desc.h"
 #include "log.h"
 #include "diag.h"
@@ -39,7 +40,12 @@ enum {
     /* The system stack reads the same endpoints; whoever has a transfer
      * pending gets the packet. Few reads in flight (1.0.0-1.0.2 used 4/4)
      * let it take our L2CAP signalling (e.g. the peer's CFG_REQ). Earlier
-     * working builds kept 40 event / 20 ACL reads in flight. */
+     * working builds kept 40 event / 20 ACL reads in flight. Pending
+     * transfers are served in order, so the system still takes about
+     * 1/(ours + 1) of the events (~2.7% measured on a MediaTek 0e8d:3603;
+     * lost Number Of Completed Packets are covered by the timed refill).
+     * 62 slots is the ceiling: on fw 13.60 the 63rd FS_OPEN fails with
+     * ENOMEM, so more event reads mean fewer ACL reads. */
     READS_EVT       = 40,
     READS_ACL       = 20,
     STALL_SWITCH_MS = 500,
@@ -255,7 +261,9 @@ static int reap(struct usb_hci *u)
 
 static int op_next_event(void *self, unsigned char *dst, int cap)
 {
-    return ring_take(&((struct usb_hci *)self)->evq, dst, cap);
+    int n = ring_take(&((struct usb_hci *)self)->evq, dst, cap);
+    if (n > 0) hcidbg_event(dst, n);
+    return n;
 }
 
 static int op_next_acl(void *self, unsigned char *dst, int cap)
@@ -303,6 +311,7 @@ static int op_cmd(void *self, unsigned op, const void *args, int nargs)
     unsigned char pkt[3 + 255];
     struct usb_ctl_request rq;
     if (u->dead || nargs < 0 || nargs > 255) return 0;
+    hcidbg_cmd(op, args, nargs);
     put16(pkt, op);
     pkt[2] = (unsigned char)nargs;
     if (nargs) memcpy(pkt + 3, args, (size_t)nargs);

@@ -75,6 +75,7 @@ What HearBridge itself adds (the headphones add their own buffering on top, whic
 | `remove_tile` | Create it to remove the icon once on the next start |
 | `tile_url` | Optional address the icon opens (`start` = built-in fallback page) |
 | `media_dump` | Debug, builds after 1.0.2: create it to write the first 200 media packets to `media_dump.bin` |
+| `hci_debug` | Debug, builds after 1.0.2: create it to get an HCI trace at `/api/hcilog` and raw HCI commands at `/api/hci` (POST, token) |
 
 ## Troubleshooting / reporting a problem
 
