@@ -14,7 +14,9 @@ int hb_connreq_decide(const hb_cr_in *in)
     if (in->saved) {
         if (in->held) return HB_CR_REJECT_BUSY;       /* disconnected by hand */
         if (in->streaming_other) return HB_CR_SWITCH; /* taken out of its case: newest wins */
-        if (in->busy_other) return HB_CR_REJECT_BUSY;
+        /* Out of its case while we only re-page another one in the
+         * background: it wins (that page stops for it). */
+        if (in->busy_other && !in->bg_page) return HB_CR_REJECT_BUSY;
         return HB_CR_TAKE;
     }
     if (!in->is_av) return HB_CR_LEAVE;               /* pads, phones, PCs */
