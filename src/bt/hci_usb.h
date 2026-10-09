@@ -14,6 +14,10 @@
  * Returns 1 on success, 0 on failure (out is left zeroed). */
 int hci_usb_open(hci_t *out);
 
+/* USB VID:PID of the opened controller (see btchip.h for the vendor).
+ * Returns 1 once hci_usb_open() succeeded, else 0 with both set to -1. */
+int hci_usb_chip(int *vid, int *pid);
+
 /* Called (outside the USB completion loop) for every HCI Connection Request
  * event the controller sends, and once per pump with ev NULL. Set by main. */
 extern void (*hci_usb_conn_req_hook)(hci_t hci, const unsigned char *ev, int n);
