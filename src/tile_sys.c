@@ -119,6 +119,8 @@ static void report(tile_report *r)
     (void)diag_save();
 }
 
+static int unregister_title(void);
+
 int tile_install(const char *url, tile_report *rep)
 {
     tile_report local;
@@ -131,6 +133,32 @@ int tile_install(const char *url, tile_report *rep)
     diag_set("tile url", "%s", url);
 
     r->legacy_marker = unlink(HB_TILE_LEGACY_MARK) == 0;
+    {
+        /* An icon installed by an older tile version (e.g. under Media):
+         * uninstall it so the new param.json (Games) is taken. */
+        char v[16] = "";
+        int have = 0;
+        FILE *f = fopen(HB_TILE_VER_PATH, "r");
+        if (f) { have = fgets(v, (int)sizeof v, f) != NULL; fclose(f); }
+        /* /user/appmeta is not readable on every firmware: AppExists too. */
+        int installed = meta_exists(HB_TILE_ID);
+        if (!installed) {
+            int (*init)(void) = (int (*)(void))appinst_nid(NID_Initialize);
+            int (*term)(void) = (int (*)(void))appinst_nid(NID_Terminate);
+            int (*exists)(const char *, int *) = (int (*)(const char *, int *))appinst_nid(NID_AppExists);
+            int e = 0;
+            if (init && term && exists && init() == 0) {
+                if (exists(HB_TILE_ID, &e) == 0 && e) installed = 1;
+                term();
+            }
+        }
+        if (tile_needs_reinstall(have ? v : NULL, installed)) {
+            int rc = unregister_title();
+            log_line("tile: icon from tile version %s, this is %s: reinstalling (unregister %#x)",
+                     have ? v : "1", HB_TILE_VERSION, (unsigned)rc);
+            if (!rc) usleep(2000 * 1000);
+        }
+    }
     errno = 0;
     if (tile_files_write(HB_TILE_ROOT, url, hb_icon_png, sizeof hb_icon_png,
                          hb_start_html, HB_START_HTML_LEN) != 0) {
@@ -162,13 +190,18 @@ int tile_install(const char *url, tile_report *rep)
     r->authid_before = kernel_get_ucred_authid(-1);
     (void)tile_register_fallback(&ops, r, raise_creds, lower_creds, &saved);
 
+    if (r->result == 0) {
+        FILE *f = fopen(HB_TILE_VER_PATH, "w");
+        if (f) { fprintf(f, "%s\n", HB_TILE_VERSION); fclose(f); }
+    }
     log_line("tile: register %s -> %s (opens %s)", HB_TILE_ID,
              r->result ? "FAILED" : r->already ? "ok (was already installed)" : "ok", url);
     report(r);
     return r->result;
 }
 
-int tile_uninstall(void)
+/* sceAppInstUtilAppUnInstall, with our own rights, then as ShellCore. */
+static int unregister_title(void)
 {
     hb_creds saved;
     int rc = -1;
@@ -193,9 +226,16 @@ int tile_uninstall(void)
             creds_restore(&saved, "tile");
         }
     }
+    return rc;
+}
+
+int tile_uninstall(void)
+{
+    int rc = unregister_title();
     log_line("tile: unregister %s -> %#x", HB_TILE_ID, (unsigned)rc);
     diag_set("tile", "removed on request (unregister %#x)", (unsigned)rc);
     unlink(HB_TILE_LEGACY_MARK);
+    unlink(HB_TILE_VER_PATH);
     tile_files_drop(HB_TILE_ROOT);
     return rc ? -1 : 0;
 }

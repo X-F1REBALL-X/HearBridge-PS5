@@ -6,6 +6,9 @@
 #include "diag.h"
 #include "rate.h"
 #include "btchip.h"
+#ifndef HB_HTTP_HOST_TEST
+#include "hcidbg.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,6 +88,7 @@ static int is_write_path(const char *path)
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
         "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean",
+        "/api/hci",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -127,7 +131,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,"
-        "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"mtk_build\":%d},\"events\":%s}",
+        "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},\"events\":%s}",
         c->version, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
@@ -139,7 +143,8 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->codec_pref, c->codec_avail,
         c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4],
         c->xq_low, cid[0], cid[1], chip_ok && cven ? cven : "",
-        chip_ok && btchip_is_mediatek(c->chip_vid), HB_MTK_BUILD, ev);
+        chip_ok && btchip_is_mediatek(c->chip_vid),
+        chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "", ev);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,
@@ -200,6 +205,23 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
             return respond(out, max, 403, "application/json", "{\"error\":\"token\"}", 17);
     }
 
+#ifndef HB_HTTP_HOST_TEST
+    if (!hcidbg_enabled() && (!strcmp(path, "/api/hcilog") || !strcmp(path, "/api/hci")))
+        return respond(out, max, 404, "application/json", "{\"error\":\"unknown\"}", 19);
+    if (!strcmp(path, "/api/hcilog")) {
+        /* HCI trace: "seq ms CMD op bytes" / "seq ms EVT bytes"; ?since=seq */
+        static char ht[120000];
+        int since = 0, n;
+        (void)query_int(q, "since", &since);
+        n = hcidbg_text(since > 0 ? (unsigned)since : 0, ht, (int)sizeof ht);
+        return respond(out, max, 200, "text/plain; charset=utf-8", ht, n);
+    }
+    if (!strcmp(path, "/api/hci")) {
+        /* Raw HCI command (debug): op=XXXX&p=HEX, sent from the stream loop. */
+        return hcidbg_queue(q) ? respond(out, max, 200, "application/json", "{\"ok\":1}", 8)
+                               : respond(out, max, 409, "application/json", "{\"error\":\"busy or bad\"}", 24);
+    }
+#endif
     if (!strcmp(path, "/api/diag")) {
         /* Plain-text diagnostics report (see diag.h), also in diag.txt. */
         static char dt[60000];

@@ -210,8 +210,6 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 /* controller chip: always shown, bottom of Status */
 .chiprow{order:2;display:flex;align-items:baseline;gap:var(--s3);margin-top:var(--s2);padding-top:var(--s1);border-top:1px solid var(--edge);font-size:.8rem}
 .chiprow .k{font-weight:700}.chiprow .v{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums;color:var(--ink)}
-.mtkhint{order:3;margin:var(--s1) 0 0;font-size:.82rem;font-weight:700;line-height:1.3}.mtkhint:empty{display:none}
-.mtkhint a{color:var(--warn)}
 .kv{display:grid;grid-template-columns:auto minmax(0,1fr);margin:0;border-top:1px solid var(--edge)}
 .kv>*{display:flex;align-items:center;flex-wrap:wrap;min-height:2.3rem;padding:var(--s1) 0;margin:0;border-bottom:1px solid var(--edge)}
 .kv>.k{padding-inline-end:var(--s5);font-size:.8rem;font-weight:700;line-height:1.2}
@@ -329,7 +327,6 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(min-con
 <div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
 <div class="idle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></div>
 <div class="chiprow"><span class="k" data-i18n="chip">Chip</span><span class="v" id="chipv">-</span></div>
-<p class="mtkhint" id="mtkhint"></p>
 </section>
 <section class="panel vol"><p class="label" data-i18n="volume">Volume</p>
 <div class="ctl"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
@@ -487,9 +484,8 @@ setHtml('fmt',S.sample_rate?chips([[S.codec||'SBC','hi n'],[S.sample_rate+' Hz',
 var av=S.avrcp||{},avUp=av.connected||av.absolute_volume||av.notifications||av.sink_volume;
 setHtml('av',!avUp?chips([[t('avrcpNone'),'off']]):chips([[av.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(av.notifications?[[t('notif')]]:[]).concat([[t(av.sink_volume?'volOnHeadset':'volSoftware'),av.sink_volume?'hi':'']])));
 setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
-/* Bluetooth chip: vendor (IDs); MediaTek on a build without its fixes -> point at the test build */
+/* Bluetooth chip: vendor (IDs) */
 var ch=S.chip||{};$('chipv').textContent=ch.vid?(ch.vendor?ch.vendor+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'-';
-setHtml('mtkhint',ch.mediatek&&!ch.mtk_build?'<a href="https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test" target="_blank" rel="noopener">'+esc(t('mtkHint'))+'</a>':'');
 var ev=S.events||[],eh='';
 if(!ev.length)eh='<div class="k">'+esc(t('logEmpty'))+'</div>';
 else for(var ei=0;ei<ev.length;ei++)eh+='<div class="'+evKind(ev[ei])+'">'+esc(ev[ei])+'</div>';
