@@ -520,7 +520,10 @@ static int try_node(struct usb_hci *u, const char *path)
     device_id(u->fd, id, sizeof id, &vid, &pid);
     log_line("usb: %s is %s", path, id);
     pick_endpoints(u->fd, &u->ifc);
-    mtk = vid == 0x0E8D;                  /* MediaTek (PS5 Pro) */
+    /* MediaTek (every Pro, some fat and Slim): its fixes only run there. */
+    mtk = btchip_profile(vid, btchip_get_override()) == BTCHIP_PROFILE_MEDIATEK;
+    log_line("hci_usb: chip profile %s%s", btchip_profile_name(mtk ? BTCHIP_PROFILE_MEDIATEK : BTCHIP_PROFILE_DEFAULT),
+             btchip_get_override() >= 0 ? " (override from the chip file)" : "");
     if (mtk) {
         usbhci_pair_out_with_in(&u->ifc);
         log_line("hci_usb: MediaTek controller: ACL out 0x%02x, system scan paused during page/scan",

@@ -168,12 +168,12 @@ int main(int argc, char **argv)
           "status: empty chip until the controller is open");
     c.chip_vid = 0x1286; c.chip_pid = 0x2059;
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"mediatek\":0,\"mtk_build\":0}") != NULL,
-          "status: Marvell chip");
+    CHECK(strstr(out, "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
+          "status: Marvell chip, default profile");
     c.chip_vid = 0x0e8d; c.chip_pid = 0x0608;
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"vid\":\"0e8d\",\"pid\":\"0608\",\"vendor\":\"MediaTek\",\"mediatek\":1,\"mtk_build\":0") != NULL,
-          "status: MediaTek chip on the regular build");
+    CHECK(strstr(out, "\"vid\":\"0e8d\",\"pid\":\"0608\",\"vendor\":\"MediaTek\",\"mediatek\":1,\"profile\":\"mediatek\"") != NULL,
+          "status: MediaTek chip, mediatek profile");
     c.chip_vid = 0xabcd; c.chip_pid = 0x0012;
     get(&c, "/api/status");
     CHECK(strstr(out, "\"vid\":\"abcd\",\"pid\":\"0012\",\"vendor\":\"\",\"mediatek\":0") != NULL,
