@@ -12,7 +12,7 @@ Développé par **X-F1REBALL-X**
 
 HearBridge PS5 est un payload (ELF) pour une PS5 jailbreakée. Il diffuse le son de la console via le Bluetooth de la PS5 elle-même vers un casque ou une enceinte Bluetooth ordinaire (A2DP). On le contrôle depuis une page web servie par la console. Il ne touche ni aux jeux, ni au firmware, ni au jailbreak.
 
-<p align="center"><img src="docs/img/ui-en.png" alt="Page web de HearBridge PS5" width="900"></p>
+<p align="center"><img src="docs/img/ui-fr.png" alt="Page web de HearBridge PS5" width="900"></p>
 
 ## Prérequis
 
