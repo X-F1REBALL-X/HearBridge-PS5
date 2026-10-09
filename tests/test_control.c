@@ -98,7 +98,13 @@ int main(int argc, char **argv)
     post(&c, "/api/latency?ms=120");
     CHECK(c.latency_ms == 120 && c.prefs_dirty, "latency: slider value set + saved per headset");
     post(&c, "/api/latency?ms=5");
-    CHECK(c.latency_ms == 60, "latency: clamped to 60 ms");
+    CHECK(c.latency_ms == 40, "latency: clamped to 40 ms");
+    c.prefs_dirty = 0;
+    post(&c, "/api/night?on=1");
+    CHECK(c.night == 1 && c.prefs_dirty, "night: on + saved per headset");
+    CHECK(get(&c, "/api/status") > 0 && strstr(out, "\"night\":{\"on\":1,"), "night: in the status");
+    post(&c, "/api/night?on=0");
+    CHECK(c.night == 0, "night: off");
     post(&c, "/api/latency?ms=99999");
     CHECK(c.latency_ms == 200, "latency: clamped to 200 ms");
     post(&c, "/api/latency?stable=0");

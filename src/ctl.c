@@ -65,6 +65,12 @@ void ctl_init(hb_ctl *c, const char *version)
     c->req_hs_volume = -1;
     c->hs_volume = -1;
     c->chip_vid = c->chip_pid = -1;
+    c->battery = -1;
+    c->link_rssi = 127;
+    c->link_lq = -1;
+    c->link_score = -1;
+    strcpy(c->state_dir, "/data/hearbridge");
+    strcpy(c->mnt_root, "/mnt");
     c->latency_ms = HB_QUEUE_LOW_MS;
     strncpy(c->version, version, sizeof c->version - 1);
     strcpy(c->state, "starting");
@@ -101,6 +107,11 @@ void ctl_clear_link(hb_ctl *c, int drop_device)
     if (drop_device) c->device[0] = 0;
     c->hs_volume = -1;
     c->avrcp = 0;
+    c->battery = -1;
+    c->link_rssi = 127;
+    c->link_lq = -1;
+    c->link_score = -1;
+    c->drops_min = 0;
     c->pkts = c->frames = c->empty_reads = c->dropped = 0;
     c->peak_milli = c->out_peak_milli = 0;
     c->codec[0] = 0;

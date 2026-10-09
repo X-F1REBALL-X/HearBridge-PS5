@@ -89,6 +89,8 @@ void hb_prefs_parse(hb_prefs *p, const char *t)
             if (end != v) p->latency_ms = clampi((int)ms, HB_LAT_MIN_MS, HB_LAT_MAX_MS);
         } else if (!strcmp(line, "eq")) {
             p->eq_on = !strcmp(v, "on");
+        } else if (!strcmp(line, "night")) {
+            p->night = !strcmp(v, "on");
         } else if (!strcmp(line, "held")) {
             char *col = strchr(v, ':');
             const char *end;
@@ -139,6 +141,8 @@ int hb_prefs_format(const hb_prefs *p, char *out, int max)
     /* Only a gain the user set is kept (an old automatic gain=500 is dropped). */
     if (p->gain_user && p->gain_pct >= 0 && n > 0 && n < max)
         n += snprintf(out + n, (size_t)(max - n), "gain=%d\ngain_user=1\n", p->gain_pct);
+    if (p->night && n > 0 && n < max)
+        n += snprintf(out + n, (size_t)(max - n), "night=on\n");
     if (p->hs_vol >= 0 && n > 0 && n < max)
         n += snprintf(out + n, (size_t)(max - n), "hs_vol=%d\n", p->hs_vol);
     if (p->held_codec >= HB_CODEC_SBC && p->held_bp > 0 && n > 0 && n < max)

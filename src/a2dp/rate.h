@@ -71,7 +71,7 @@ int hb_frames_per_packet(int mtu, int frame_len);
 int hb_media_queue_cap(int pkt_ms, int target_ms);
 
 /* Latency target picked on the page (per headset), ms. */
-#define HB_LAT_MIN_MS        60
+#define HB_LAT_MIN_MS        40
 #define HB_LAT_MAX_MS       200
 #define HB_QUEUE_FLOOR_PKTS   8   /* btlink never queues fewer packets */
 int hb_latency_clamp(int ms);
@@ -93,5 +93,22 @@ typedef struct {
  * (1/10 ms, 0 = none). */
 void hb_latency_estimate(hb_latency *o, int pkt_ms, int queue_x10, int radio_gap_ms,
                          int sink_x10);
+
+/* Low buffer targets (under HB_QUEUE_LOW_MS) use short packets; when the
+ * link then drops packets the target in effect steps back up by
+ * HB_LAT_STEP_MS after HB_LAT_BAD_S seconds with drops (never above
+ * HB_QUEUE_LOW_MS), and one step down again after HB_LAT_GOOD_S clean
+ * seconds. The slider value itself is never changed. */
+#define HB_LAT_STEP_MS   30
+#define HB_LAT_BAD_DPM    6     /* drops per minute that make a bad second */
+#define HB_LAT_BAD_S      5
+#define HB_LAT_GOOD_S    60
+typedef struct { int extra_ms, bad_s, good_s; } hb_lat_backoff;
+void hb_lat_backoff_init(hb_lat_backoff *b);
+/* Once a second: target = slider value, dpm = smoothed drops per minute.
+ * Returns the target in effect (target + step-back). */
+int  hb_lat_backoff_tick(hb_lat_backoff *b, int target_ms, int drops_per_min);
+/* Target in effect without a tick (after the slider moved). */
+int  hb_lat_effective(const hb_lat_backoff *b, int target_ms);
 
 #endif

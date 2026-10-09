@@ -27,6 +27,7 @@
 #define PDU_REG_NOTIFY 0x31
 #define PDU_SET_ABSVOL 0x50
 #define EV_VOLUME      0x0D
+#define EV_BATT        0x06
 
 int avrcp_reported(const avrcp_state *a)
 {
@@ -43,6 +44,35 @@ void avrcp_init(avrcp_state *a, int volume)
     a->volume = volume < 0 ? 0 : volume > 127 ? 127 : volume;
     a->notify_label = -1;
     a->our_label = 1;
+    a->battery = -1;
+    a->batt_label = -1;
+}
+
+const char *avrcp_battery_key(int s)
+{
+    switch (s) {
+    case AVRCP_BATT_NORMAL:   return "ok";
+    case AVRCP_BATT_WARNING:  return "low";
+    case AVRCP_BATT_CRITICAL: return "critical";
+    case AVRCP_BATT_EXTERNAL: return "charging";
+    case AVRCP_BATT_FULL:     return "full";
+    default:                  return "";
+    }
+}
+
+int avrcp_battery_level(int s)
+{
+    static const int lv[5] = { 60, 20, 5, -1, 100 };
+    if (s < 0 || s > 4) return -1;
+    return lv[s];
+}
+
+static void set_battery(avrcp_state *a, int s, const char *how)
+{
+    if (s < 0 || s > 4) return;
+    if (s != a->battery)
+        log_line("avrcp: headset battery %s (%s)", avrcp_battery_key(s), how);
+    a->battery = s;
 }
 
 static int hdr(unsigned char *o, int label, int cr, int ipid)
@@ -76,6 +106,10 @@ static int next_label(avrcp_state *a)
 {
     int l = a->our_label;
     a->our_label = (a->our_label + 1) & 0x0F;
+    if (l == a->batt_label) {              /* still waiting on battery: skip it */
+        l = a->our_label;
+        a->our_label = (a->our_label + 1) & 0x0F;
+    }
     return l;
 }
 
@@ -83,6 +117,15 @@ int avrcp_build_register_volume(avrcp_state *a, unsigned char *out, int max)
 {
     unsigned char p[5] = { EV_VOLUME, 0, 0, 0, 0 };
     return vendor(out, next_label(a), 0, CT_NOTIFY, PDU_REG_NOTIFY, p, 5, max);
+}
+
+int avrcp_build_register_battery(avrcp_state *a, unsigned char *out, int max)
+{
+    unsigned char p[5] = { EV_BATT, 0, 0, 0, 0 };
+    a->batt_tried = 1;
+    a->need_batt = 0;
+    a->batt_label = next_label(a);
+    return vendor(out, a->batt_label, 0, CT_NOTIFY, PDU_REG_NOTIFY, p, 5, max);
 }
 
 int avrcp_build_set_volume(avrcp_state *a, int vol, unsigned char *out, int max)
@@ -107,11 +150,26 @@ int avrcp_build_volume_changed(avrcp_state *a, unsigned char *out, int max)
 }
 
 /* Response from the headset to one of our commands. */
-static void on_response(avrcp_state *a, const unsigned char *av, int n)
+static void on_response(avrcp_state *a, int label, const unsigned char *av, int n)
 {
     unsigned char rc = av[0] & 0x0F;
     a->rx_rsps++;
     if (n < 10 || av[2] != OP_VENDOR) return;
+    if (av[6] == PDU_REG_NOTIFY && label == a->batt_label && av[10 < n ? 10 : 0] != EV_VOLUME) {
+        /* Battery registration: INTERIM/CHANGED carry the status; anything
+         * else (rejected) leaves it unknown and we do not ask again. */
+        const unsigned char *par = av + 10;
+        int np = n - 10;
+        if ((rc == RSP_INTERIM || rc == RSP_CHANGED) && np >= 2 && par[0] == EV_BATT) {
+            set_battery(a, par[1], rc == RSP_INTERIM ? "registered" : "changed");
+            if (rc == RSP_CHANGED) a->need_batt = 1;      /* one CHANGED per registration */
+            else return;
+        } else {
+            log_line("avrcp: headset does not report battery (%#x)", rc);
+        }
+        a->batt_label = -1;
+        return;
+    }
     {
         unsigned char pdu = av[6];
         const unsigned char *par = av + 10;
@@ -122,9 +180,11 @@ static void on_response(avrcp_state *a, const unsigned char *av, int n)
                 a->sink_renders = 1;
                 a->ct_registered = (rc == RSP_INTERIM);
                 if (rc == RSP_CHANGED) a->need_register = 1;
+                if (rc == RSP_INTERIM && !a->batt_tried) a->need_batt = 1;
                 if ((par[1] & 0x7F) != a->volume || rc == RSP_CHANGED) {
                     a->volume = par[1] & 0x7F;
                     a->changed = 1;
+                    if (rc == RSP_CHANGED) a->vol_from_headset++;
                 }
                 log_line("avrcp: headset volume %s %d/127",
                          rc == RSP_INTERIM ? "is" : "changed to", a->volume);
@@ -170,10 +230,11 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
     if (in[0] & 0x02) {                        /* a response to us */
         if ((av[0] & 0x0F) == RSP_NOT_IMPL && n >= 7 && av[2] == OP_VENDOR) {
             if (av[6] == PDU_SET_ABSVOL && !a->ct_registered) a->sink_renders = 0;
+            if (av[6] == PDU_REG_NOTIFY && label == a->batt_label) a->batt_label = -1;
             log_line("avrcp: headset does not implement PDU %#x", av[6]);
             return 0;
         }
-        on_response(a, av, n);
+        on_response(a, label, av, n);
         return 0;
     }
     a->rx_cmds++;
@@ -206,6 +267,7 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
             int v = a->volume + (key == 0x41 ? 8 : -8);
             a->volume = v < 0 ? 0 : v > 127 ? 127 : v;
             a->changed = 1;
+            a->vol_from_headset++;
             log_line("avrcp: volume key %s -> %d/127", key == 0x41 ? "up" : "down",
                      a->volume);
         }
@@ -246,14 +308,19 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
                 a->volume = par[0] & 0x7F;
                 a->remote_abs = 1;
                 a->changed = 1;
+                a->vol_from_headset++;
                 r[0] = (unsigned char)a->volume;
                 log_line("avrcp: headset SetAbsoluteVolume %d/127", a->volume);
                 return vendor(out, label, 1, RSP_ACCEPTED, pdu, r, 1, max);
             }
             r[0] = 0x01;
             return vendor(out, label, 1, RSP_REJECTED, pdu, r, 1, max);
-        case PDU_DISP_CHAR:
         case PDU_BATTERY:
+            /* InformBatteryStatusOfCT: the headset (as controller) tells us
+             * its own battery state. */
+            if (np >= 1) set_battery(a, par[0], "headset told us");
+            return vendor(out, label, 1, RSP_ACCEPTED, pdu, NULL, 0, max);
+        case PDU_DISP_CHAR:
             return vendor(out, label, 1, RSP_ACCEPTED, pdu, NULL, 0, max);
         default:
             r[0] = 0x00;                            /* invalid command */

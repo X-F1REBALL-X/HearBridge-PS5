@@ -17,8 +17,24 @@ typedef struct {
     int need_register;     /* re-register for VOLUME_CHANGED after a CHANGED */
     int sink_renders;      /* the headset applies the volume itself (it took our
                               SetAbsoluteVolume or answered our registration) */
+    int battery;           /* AVRCP battery status 0..4 (AVRCP_BATT_*), -1 unknown */
+    int batt_label;        /* label of our BATT_STATUS_CHANGED registration, -1 none */
+    int batt_tried;        /* registration sent once (headset refused = stays unknown) */
+    int need_batt;         /* send the battery registration (after volume worked) */
+    int vol_from_headset;  /* bumped on every volume change the headset made */
     unsigned long rx_cmds, rx_rsps;
 } avrcp_state;
+
+/* AVRCP 1.6 battery status (InformBatteryStatusOfCT 0x18 and
+ * EVENT_BATT_STATUS_CHANGED 0x06). There is no percentage in AVRCP. */
+enum { AVRCP_BATT_NORMAL = 0, AVRCP_BATT_WARNING = 1, AVRCP_BATT_CRITICAL = 2,
+       AVRCP_BATT_EXTERNAL = 3, AVRCP_BATT_FULL = 4 };
+/* Page key for a status: "ok", "low", "critical", "charging", "full"; "" unknown. */
+const char *avrcp_battery_key(int status);
+/* Rough level for the bar (0..100) from a status, -1 unknown. */
+int avrcp_battery_level(int status);
+/* Our registration for EVENT_BATT_STATUS_CHANGED toward the headset. */
+int avrcp_build_register_battery(avrcp_state *a, unsigned char *out, int max);
 
 void avrcp_init(avrcp_state *a, int volume);
 

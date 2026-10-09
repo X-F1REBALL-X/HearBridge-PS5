@@ -133,6 +133,11 @@ struct btlink {
     int rx_len, rx_need;
 
     int dead;
+    /* Link quality (HCI Read RSSI / Read Link Quality), polled while up. */
+    int rssi;                 /* signed, 127 = unknown */
+    int lq;                   /* 0..255, -1 unknown */
+    long lq_next;             /* next poll time */
+    int lq_turn;              /* alternate RSSI / link quality */
     int retry_create; /* set on ACL-already-exists 0x0b */
     int create_retries;
     int purge_fail; /* Disconnect transport/errno fail — stop cleanly */
@@ -933,6 +938,12 @@ static void avctp_reply(btlink *l, chan *c, const unsigned char *d, int len)
         n = avrcp_build_register_volume(&l->avrcp, r, (int)sizeof r);
         avrcp_send(l, r, n);
     }
+    if (l->avrcp.need_batt) {
+        /* Volume registration worked: ask for battery status too (AVRCP
+         * 1.6). A headset without it refuses and stays "unknown". */
+        n = avrcp_build_register_battery(&l->avrcp, r, (int)sizeof r);
+        avrcp_send(l, r, n);
+    }
 }
 
 static void on_frame(btlink *l, unsigned cid, const unsigned char *d, int len)
@@ -1183,6 +1194,20 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
 {
 
     if (nEv < 1) return;
+
+    if (ev[0] == 0x0E && nEv >= 9 && l->connected) {
+        /* Command Complete: Read Link Quality (0x1403) / Read RSSI (0x1405)
+         * for our handle: status, handle, value. */
+        unsigned cop = (unsigned)ev[3] | ((unsigned)ev[4] << 8);
+        unsigned h = ((unsigned)ev[6] | ((unsigned)ev[7] << 8)) & 0x0FFF;
+        if ((cop == 0x1403 || cop == 0x1405) && h == l->handle) {
+            if (ev[5] == 0) {
+                if (cop == 0x1405) l->rssi = (signed char)ev[8];
+                else l->lq = ev[8];
+            }
+            return;
+        }
+    }
 
     if (ev[0] == 0x0F && nEv >= 6) {
         unsigned rop = (unsigned)ev[4] | ((unsigned)ev[5] << 8);
@@ -1537,6 +1562,8 @@ btlink *btlink_create(hci_t hci, int acl_mtu, int acl_buffers)
     if (l->pool.limit < 1) l->pool.limit = 1;
     l->next_scid = 0x0040;
     avrcp_init(&l->avrcp, 64);
+    l->rssi = 127;
+    l->lq = -1;
     return l;
 }
 
@@ -1581,6 +1608,15 @@ int btlink_pump(btlink *l, int timeout_ms)
     tx_flush(l);
     drive_auth(l);
     now = now_ms();
+    if (l->connected && l->enc_on && now >= l->lq_next) {
+        /* One small read every second (RSSI, then link quality): cheap,
+         * answered by the controller itself, never sent to the headset. */
+        unsigned char hp[2];
+        put16(hp, l->handle);
+        (void)fire_cmd(l->hci, l->lq_turn ? 0x1403 : 0x1405, hp, 2);
+        l->lq_turn = !l->lq_turn;
+        l->lq_next = now + 1000;
+    }
     for (i = 0; i < BTLINK_CHAN_MAX; i++) {
         if (l->ch[i].st != CH_CLOSED)
             chan_tick(l, &l->ch[i], now);
@@ -2410,6 +2446,22 @@ int btlink_avrcp_state(const btlink *l)
      * the channel-open check is false (seen on Sony WF-1000XM6). */
     if (avrcp_reported(&l->avrcp)) st |= 1;
     return st;
+}
+
+int btlink_avrcp_battery(const btlink *l)
+{
+    return l ? l->avrcp.battery : -1;
+}
+
+int btlink_avrcp_headset_moves(const btlink *l)
+{
+    return l ? l->avrcp.vol_from_headset : 0;
+}
+
+void btlink_link_quality(const btlink *l, int *rssi, int *lq)
+{
+    if (rssi) *rssi = l ? l->rssi : 127;
+    if (lq) *lq = l ? l->lq : -1;
 }
 
 int btlink_avrcp_connect(btlink *l)
