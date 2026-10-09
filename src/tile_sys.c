@@ -140,7 +140,19 @@ int tile_install(const char *url, tile_report *rep)
         int have = 0;
         FILE *f = fopen(HB_TILE_VER_PATH, "r");
         if (f) { have = fgets(v, (int)sizeof v, f) != NULL; fclose(f); }
-        if (tile_needs_reinstall(have ? v : NULL, meta_exists(HB_TILE_ID))) {
+        /* /user/appmeta is not readable on every firmware: AppExists too. */
+        int installed = meta_exists(HB_TILE_ID);
+        if (!installed) {
+            int (*init)(void) = (int (*)(void))appinst_nid(NID_Initialize);
+            int (*term)(void) = (int (*)(void))appinst_nid(NID_Terminate);
+            int (*exists)(const char *, int *) = (int (*)(const char *, int *))appinst_nid(NID_AppExists);
+            int e = 0;
+            if (init && term && exists && init() == 0) {
+                if (exists(HB_TILE_ID, &e) == 0 && e) installed = 1;
+                term();
+            }
+        }
+        if (tile_needs_reinstall(have ? v : NULL, installed)) {
             int rc = unregister_title();
             log_line("tile: icon from tile version %s, this is %s: reinstalling (unregister %#x)",
                      have ? v : "1", HB_TILE_VERSION, (unsigned)rc);
