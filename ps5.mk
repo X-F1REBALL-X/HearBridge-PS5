@@ -21,7 +21,7 @@ LDLIBS  += -lSceSystemService -lpthread
 SRCS := \
 	src/util.c src/stop.c src/log.c src/lock.c src/notify.c src/avcap2.c \
 	src/diag.c src/creds.c src/sysinfo.c src/hsprefs.c \
-	src/bt/hci_usb.c src/bt/acl_track.c src/bt/usb_hci_desc.c src/bt/hci_evasm.c src/bt/hci_cmd.c \
+	src/bt/hci_usb.c src/bt/acl_track.c src/bt/usb_hci_desc.c src/bt/hci_evasm.c src/bt/hci_cmd.c src/bt/hcidbg.c \
 	src/a2dp/a2dp.c src/a2dp/btlink.c src/a2dp/acl_pool.c src/a2dp/sdp_a2dp.c src/a2dp/avdtp.c src/a2dp/avdtp_media.c src/a2dp/cswitch.c src/rejoin.c src/forgot.c src/bt/connreq.c \
 	src/a2dp/avrcp.c src/a2dp/sdp_server.c src/ctl.c src/gain.c src/http.c \
 	src/a2dp/headset_ini.c src/a2dp/sbc_enc.c src/a2dp/rate.c src/a2dp/eq.c src/tile.c src/tile_sys.c src/utf8.c src/a2dp/devclass.c src/a2dp/paired.c \

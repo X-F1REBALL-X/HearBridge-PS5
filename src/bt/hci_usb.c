@@ -28,7 +28,9 @@
 
 #include "acl_track.h"
 #include "hci_usb.h"
+#include "hcidbg.h"
 #include "usb_hci_desc.h"
+#include "hci_cmd.h"
 #include "log.h"
 #include "diag.h"
 #include "util.h"
@@ -39,7 +41,12 @@ enum {
     /* The system stack reads the same endpoints; whoever has a transfer
      * pending gets the packet. Few reads in flight (1.0.0-1.0.2 used 4/4)
      * let it take our L2CAP signalling (e.g. the peer's CFG_REQ). Earlier
-     * working builds kept 40 event / 20 ACL reads in flight. */
+     * working builds kept 40 event / 20 ACL reads in flight. Pending
+     * transfers are served in order, so the system still takes about
+     * 1/(ours + 1) of the events (~2.7% measured on a MediaTek 0e8d:3603;
+     * lost Number Of Completed Packets are covered by the timed refill).
+     * 62 slots is the ceiling: on fw 13.60 the 63rd FS_OPEN fails with
+     * ENOMEM, so more event reads mean fewer ACL reads. */
     READS_EVT       = 40,
     READS_ACL       = 20,
     STALL_SWITCH_MS = 500,
@@ -265,7 +272,9 @@ static int reap(struct usb_hci *u)
 
 static int op_next_event(void *self, unsigned char *dst, int cap)
 {
-    return ring_take(&((struct usb_hci *)self)->evq, dst, cap);
+    int n = ring_take(&((struct usb_hci *)self)->evq, dst, cap);
+    if (n > 0) hcidbg_event(dst, n);
+    return n;
 }
 
 static int op_next_acl(void *self, unsigned char *dst, int cap)
@@ -333,6 +342,7 @@ static int op_cmd(void *self, unsigned op, const void *args, int nargs)
     unsigned char pkt[3 + 255];
     struct usb_ctl_request rq;
     if (u->dead || nargs < 0 || nargs > 255) return 0;
+    hcidbg_cmd(op, args, nargs);
     put16(pkt, op);
     pkt[2] = (unsigned char)nargs;
     if (nargs) memcpy(pkt + 3, args, (size_t)nargs);
@@ -462,7 +472,7 @@ static void pick_endpoints(int fd, struct usbhci_iface *ifc)
 
 /* "1286:2059 \"product\" by \"vendor\"" for an open ugen fd (read-only
  * ioctls: nothing is sent to the device). */
-static void device_id(int fd, char *out, size_t cap)
+static void device_id(int fd, char *out, size_t cap, unsigned *vid)
 {
     struct usb_device_descriptor dd;
     struct usb_device_info di;
@@ -470,10 +480,12 @@ static void device_id(int fd, char *out, size_t cap)
 
     memset(&dd, 0, sizeof dd);
     memset(&di, 0, sizeof di);
-    if (ioctl(fd, USB_GET_DEVICE_DESC, &dd) == 0)
+    if (vid) *vid = 0;
+    if (ioctl(fd, USB_GET_DEVICE_DESC, &dd) == 0) {
+        if (vid) *vid = UGETW(dd.idVendor);
         n = snprintf(out, cap, "%04x:%04x class %02x", UGETW(dd.idVendor),
                      UGETW(dd.idProduct), dd.bDeviceClass);
-    else
+    } else
         n = snprintf(out, cap, "????:???? (device descriptor errno %d)", errno);
     if (n > 0 && (size_t)n < cap && ioctl(fd, USB_GET_DEVICEINFO, &di) == 0)
         snprintf(out + n, cap - (size_t)n, " \"%.40s\" by \"%.40s\"",
@@ -484,16 +496,23 @@ static int try_node(struct usb_hci *u, const char *path)
 {
     struct usb_fs_init in;
     char id[128];
-    int i;
+    unsigned vid = 0;
+    int i, mtk;
     u->fd = open(path, O_RDWR);
     if (u->fd < 0) {
         log_line("hci_usb: open %s: errno %d", path, errno);
         return 0;
     }
     snprintf(u->node, sizeof u->node, "%s", path);
-    device_id(u->fd, id, sizeof id);
+    device_id(u->fd, id, sizeof id, &vid);
     log_line("usb: %s is %s", path, id);
     pick_endpoints(u->fd, &u->ifc);
+    mtk = vid == 0x0E8D;                  /* MediaTek (PS5 Pro) */
+    if (mtk) {
+        usbhci_pair_out_with_in(&u->ifc);
+        log_line("hci_usb: MediaTek controller: ACL out 0x%02x, system scan paused during page/scan",
+                 u->ifc.out_ep);
+    }
 
     memset(&in, 0, sizeof in);
     in.pEndpoints = u->fsep;
@@ -509,6 +528,7 @@ static int try_node(struct usb_hci *u, const char *path)
 
     for (i = SLOT_EVT0; i < SLOT_OUT; i++) arm_read(u, i);
     u->tx_slot = SLOT_OUT;
+    hci_scan_pause_enable(mtk);
     log_line("hci_usb: opened %s (%d event / %d ACL reads in flight)", path,
              READS_EVT, READS_ACL);
     diag_set("bt controller", "%s %s; HCI iface %d evt 0x%02x in 0x%02x out 0x%02x", path, id,
@@ -568,7 +588,7 @@ static void survey_one(const char *path, int *count)
         (*count)++;
         return;
     }
-    device_id(fd, id, sizeof id);
+    device_id(fd, id, sizeof id, NULL);
     memset(&gd, 0, sizeof gd);
     gd.ugd_data = cfg;
     gd.ugd_maxlen = (uint16_t)sizeof cfg;
