@@ -16,7 +16,7 @@ HearBridge PS5 is a payload (ELF) for a jailbroken PS5. It streams the console's
 
 ## Requirements
 
-- A jailbroken PS5 with an ELF loader on port **9021** (elfldr). Tested on a PS5 fat (CFI-10xx), firmware **10.20**.
+- A jailbroken PS5 with an ELF loader on port **9021** (elfldr).
 - Bluetooth headphones or a speaker with A2DP (SBC, 48 kHz stereo).
 - A browser on the same network (PS5, phone or PC).
 
@@ -54,8 +54,7 @@ Sources: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/complian
 - **Equalizer:** 5 bands (±12 dB) with presets, saved per headset, with a limiter so boosts don't clip.
 - **Latency:** buffer target from 60 to 200 ms (default 200 ms) and a live estimate of the delay.
 - **Clean sound:** equalizer off, boost back to 250 %, buffer back to 200 ms.
-- **Log** on the page with every step, in color: green worked, red failed, blue for your presses. The page comes in 11 languages.
-- **Chip:** the bottom of **Status** shows your Bluetooth chip. On a MediaTek chip it links to the mediatek test build.
+- **Log** on the page with every step, in color: green worked, red failed, blue for your presses.
 
 ## Codecs
 
@@ -67,9 +66,8 @@ AAC, aptX and LDAC are not supported.
 ## Known limits
 
 - One headset at a time, no microphone. The TV keeps playing sound too.
-- Headphones must accept SBC at 48 kHz stereo.
 - Run only one Bluetooth payload at a time. The DualSense keeps working.
-- Only tested on fw 10.20 (PS5 fat, CFI-10xx). Other models and firmwares are untested. PS5 Pro and some 13.x setups did not start with older versions ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)); on a MediaTek chip try the mediatek test build.
+- Only tested on fw 10.20 (PS5 fat, CFI-10xx). Other models and firmwares are untested.
 - Headphones tested: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Troubleshooting / reporting a problem
@@ -93,7 +91,3 @@ make send PS5_HOST=<console-ip>
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
----
-
-<p align="center">Developed by X-F1REBALL-X</p>
