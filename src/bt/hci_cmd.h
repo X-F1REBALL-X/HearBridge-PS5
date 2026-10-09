@@ -38,6 +38,15 @@ int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
 int hci_cmd_status(hci_t hci, unsigned op, const void *params, int plen);
 
 /* Formats a Bluetooth address (little-endian as on the wire) into buf. */
+/* Radio time for our own pages and inquiries. The PS5 system stack keeps an
+ * interlaced page scan running at ~100% duty (window 0x14e every 0x29c
+ * slots); on the MediaTek 0e8d:3603 controller a page then takes 12-60 s
+ * or times out, and an inquiry hears almost nothing. With page/inquiry scan
+ * off, a page completes in ~1 s. pause() turns scanning off (nests);
+ * resume() puts the system's value back when the outermost pause ends. */
+void hci_scan_pause(hci_t hci, const char *why);
+void hci_scan_resume(hci_t hci);
+
 void hci_addr_str(const unsigned char addr[6], char buf[18]);
 
 #endif

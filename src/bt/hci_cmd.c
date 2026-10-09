@@ -106,3 +106,35 @@ int hci_cmd_status(hci_t hci, unsigned op, const void *params, int plen)
     if (hci.ops->diag) hci.ops->diag(hci.ctx);
     return 0;
 }
+
+static int g_scan_depth;
+static int g_scan_saved = -1;          /* system Scan_Enable while paused */
+
+void hci_scan_pause(hci_t hci, const char *why)
+{
+    unsigned char cc[16], off = 0;
+    int cc_len = 0;
+    if (g_scan_depth++ > 0) return;
+    g_scan_saved = -1;
+    if (hci_cmd_sync(hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) && cc_len >= 7)
+        g_scan_saved = cc[6];
+    if (g_scan_saved == 0) return;      /* nothing to pause */
+    if (hci_cmd_sync(hci, HB_OP_WRITE_SCAN_ENABLE, &off, 1, NULL, NULL, 0))
+        log_line("scan: system page/inquiry scan paused for %s (was %d)", why ? why : "-", g_scan_saved);
+    else
+        log_line("scan: could not pause the system page scan (%s)", why ? why : "-");
+    if (g_scan_saved < 0) g_scan_saved = 0x02;   /* unread: PS5 default */
+}
+
+void hci_scan_resume(hci_t hci)
+{
+    unsigned char v;
+    if (g_scan_depth <= 0 || --g_scan_depth > 0) return;
+    if (g_scan_saved <= 0) return;
+    v = (unsigned char)g_scan_saved;
+    if (!hci_cmd_sync(hci, HB_OP_WRITE_SCAN_ENABLE, &v, 1, NULL, NULL, 0))
+        log_line("scan: WARNING could not restore Scan_Enable %d", g_scan_saved);
+    else
+        log_line("scan: system page scan restored (%d)", g_scan_saved);
+    g_scan_saved = -1;
+}
