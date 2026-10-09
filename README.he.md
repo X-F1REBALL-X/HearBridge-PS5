@@ -41,7 +41,7 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא משדר את הש�
 | CFI-20xx, CFI-21xx (Slim) | בדקו את השבב: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 | CFI-70xx, CFI-71xx (Pro, תמיד MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-גרסת mediatek test עוד לא נבדקה. גרסה 1.1.0 נבדקה רק על CFI-10xx. נשמח לשמוע איך הלך.
+נבדק: 1.1.0 על PS5 fat ‏CFI-10xx ‏(Marvell/NXP), ‏mediatek test על PS5 Slim ‏CFI-2008 ‏(MediaTek). בדגמים אחרים נשמח לשמוע איך הלך.
 
 **איך בודקים:** הפעילו את 1.1.0 והסתכלו על השורה **Chip** בתחתית החלון **Status**. `Marvell/NXP (1286:…)` → נשארים עם 1.1.0. `MediaTek (0e8d:…)` → משתמשים ב-mediatek test (הדף מציג גם הודעה כתומה). או פתחו את `/data/hearbridge/hearbridge.log` וחפשו `usb: /dev/ugen0.2 is 1286:2059 …` (מספר ה-ugen יכול להיות אחר). ארבעת התווים הראשונים אחרי "is" הם השבב: `1286` = Marvell/NXP,‏ `0e8d` = MediaTek.
 
@@ -69,7 +69,6 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא משדר את הש�
 
 - אוזניה אחת בכל פעם, בלי מיקרופון. גם הטלוויזיה ממשיכה להשמיע.
 - הריצו רק מטען בלוטות' אחד בכל פעם. ה-DualSense ממשיך לעבוד.
-- נבדק רק על קושחה 10.20 (PS5 fat, ‏CFI-10xx). דגמים וקושחות אחרים לא נבדקו.
 - אוזניות שנבדקו: Sony WF-1000XM6, ‏OnePlus Buds Ace 2, ‏Xbox Wireless Headset.
 
 ## פתרון בעיות / דיווח על תקלה

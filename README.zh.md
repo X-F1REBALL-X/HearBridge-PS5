@@ -39,7 +39,7 @@ PS5 使用两种蓝牙芯片之一：Marvell/NXP 或 MediaTek。初代机型（C
 | CFI-20xx, CFI-21xx (Slim) | 查看芯片: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 | CFI-70xx, CFI-71xx (Pro，始终是 MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-mediatek test 版本尚未测试。1.1.0 仅在 CFI-10xx 上测试过。欢迎反馈结果。
+已测试：1.1.0 在 PS5 fat CFI-10xx（Marvell/NXP），mediatek test 在 PS5 Slim CFI-2008（MediaTek）。其他型号欢迎反馈结果。
 
 **如何检查：** 运行 1.1.0，查看 **Status** 面板底部的 **Chip** 行。`Marvell/NXP (1286:…)` → 继续用 1.1.0。`MediaTek (0e8d:…)` → 用 mediatek test（页面还会显示橙色提示）。或者打开 `/data/hearbridge/hearbridge.log`，找到 `usb: /dev/ugen0.2 is 1286:2059 …`（ugen 编号可能不同）。"is" 后面的前四个字符就是芯片：`1286` = Marvell/NXP，`0e8d` = MediaTek。
 
@@ -67,7 +67,6 @@ mediatek test 版本尚未测试。1.1.0 仅在 CFI-10xx 上测试过。欢迎�
 
 - 一次只能连一个耳机，没有麦克风。电视也会继续播放声音。
 - 一次只运行一个使用蓝牙的 payload。DualSense 照常工作。
-- 仅在固件 10.20（PS5 fat，CFI-10xx）上测试过。其他型号和固件未测试。
 - 已测试耳机：Sony WF-1000XM6、OnePlus Buds Ace 2、Xbox Wireless Headset。
 
 ## 故障排除 / 报告问题

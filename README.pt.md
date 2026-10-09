@@ -39,7 +39,7 @@ Os PS5 usam um de dois chips Bluetooth: Marvell/NXP ou MediaTek. Os fat (CFI-11x
 | CFI-20xx, CFI-21xx (Slim) | Veja o seu chip: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 | CFI-70xx, CFI-71xx (Pro, sempre MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-A versão mediatek test ainda não foi testada. A 1.1.0 só foi testada num CFI-10xx. Conte como foi.
+Testado: 1.1.0 no PS5 fat CFI-10xx (Marvell/NXP), mediatek test no PS5 Slim CFI-2008 (MediaTek). Outros modelos: conte como foi.
 
 **Como verificar:** rode a 1.1.0 e veja a linha **Chip** embaixo do painel **Status**. `Marvell/NXP (1286:…)` → fique com a 1.1.0. `MediaTek (0e8d:…)` → use mediatek test (a página também mostra um aviso laranja). Ou abra `/data/hearbridge/hearbridge.log` e procure `usb: /dev/ugen0.2 is 1286:2059 …` (o número do ugen pode mudar). Os quatro primeiros caracteres depois de "is" são o chip: `1286` = Marvell/NXP, `0e8d` = MediaTek.
 
@@ -67,7 +67,6 @@ AAC, aptX e LDAC não são suportados.
 
 - Um fone por vez, sem microfone. A TV continua tocando o som também.
 - Rode só um payload de Bluetooth por vez. O DualSense continua funcionando.
-- Testado só no fw 10.20 (PS5 fat, CFI-10xx). Outros modelos e firmwares não foram testados.
 - Fones testados: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Solução de problemas / relatar um problema
