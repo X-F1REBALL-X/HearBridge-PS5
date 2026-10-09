@@ -59,6 +59,12 @@ int  btlink_drop_handle(btlink *l, unsigned handle, int wait_ms);
 extern int (*btlink_abort_connect)(const unsigned char addr[6]);
 /* 1 if the pending page command is a Connect/Reconnect of this headset. */
 extern int (*btlink_press_is_for)(const unsigned char addr[6]);
+/* 1 if addr is one of our saved headsets (set by main). */
+extern int (*btlink_saved_peer)(const unsigned char addr[6]);
+/* Reject_Connection_Request for addr (reason 0x0D-0x0F); clears tracking. */
+void btlink_reject_request(hci_t hci, const unsigned char addr[6], unsigned char reason);
+/* 1 if this link was accepted from the headset (it called us). */
+int  btlink_is_incoming(const btlink *l);
 /* Idle: page scan on once (on=1), restored once (on=0). */
 void btlink_page_scan_hold(hci_t hci, int on);
 /* Called when an ACL comes up (page answered or incoming accepted). */

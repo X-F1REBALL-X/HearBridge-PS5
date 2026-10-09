@@ -45,8 +45,44 @@ int main(int argc, char **argv)
     CHECK(p.latency_ms == HB_LAT_DEFAULT_MS && p.codec == HB_CODEC_SBC_XQ,
           "new headset: buffer is 200 ms, the rest stays");
     p.gain_pct = 250;
-    CHECK(hb_prefs_format(&p, buf, sizeof buf) > 0 && strstr(buf, "gain=250\n") &&
-          strstr(buf, "latency_ms=200\n"), "format: gain and the 200 ms default");
+    p.gain_user = 1;
+    CHECK(hb_prefs_format(&p, buf, sizeof buf) > 0 && strstr(buf, "gain=250\ngain_user=1\n") &&
+          strstr(buf, "latency_ms=200\n"), "format: gain the user set and the 200 ms default");
+
+    /* Gain: remembered only when the user set it for this headset. */
+    hb_prefs_default(&q);
+    CHECK(hb_prefs_gain(&q) == 250 && hb_prefs_hs_volume(&q) == 64,
+          "new headset: gain 250, headset volume 64 (50%)");
+    hb_prefs_parse(&q, "codec=auto\nlatency_ms=200\neq=off\neq_db=0,0,0,0,0\ngain=500\n");
+    CHECK(q.gain_pct == 500 && !q.gain_user && hb_prefs_gain(&q) == 250,
+          "old file with an automatic gain=500: starts at 250");
+    CHECK(hb_prefs_format(&q, buf, sizeof buf) > 0 && !strstr(buf, "gain="),
+          "old automatic gain is dropped on the next save");
+    hb_prefs_default(&q);
+    hb_prefs_parse(&q, "gain=420\ngain_user=1\n");
+    CHECK(hb_prefs_gain(&q) == 420, "gain the user set is used");
+    hb_prefs_default(&q);
+    hb_prefs_parse(&q, "gain_user=1\n");
+    CHECK(hb_prefs_gain(&q) == 250, "gain_user without a value: 250");
+    hb_prefs_default(&q);
+    q.gain_pct = 480;            /* e.g. copied from another headset, never set here */
+    CHECK(hb_prefs_format(&q, buf, sizeof buf) > 0 && !strstr(buf, "gain=") && hb_prefs_gain(&q) == 250,
+          "a gain not set by the user is not written");
+
+    /* Headset volume: 50% until the user moves it, then kept. */
+    hb_prefs_default(&q);
+    CHECK(hb_prefs_format(&q, buf, sizeof buf) > 0 && !strstr(buf, "hs_vol="), "no user volume: not written");
+    q.hs_vol = 100;
+    CHECK(hb_prefs_format(&q, buf, sizeof buf) > 0 && strstr(buf, "hs_vol=100\n"), "user volume written");
+    hb_prefs_default(&p);
+    hb_prefs_parse(&p, buf);
+    CHECK(hb_prefs_hs_volume(&p) == 100, "user volume read back");
+    hb_prefs_parse(&p, "hs_vol=900\n");
+    CHECK(p.hs_vol == 127, "volume clamped to 127");
+    CHECK(hb_prefs_save(dir, addr, &q), "save with volume");
+    hb_prefs_default(&p);
+    CHECK(hb_prefs_load(dir, addr, &p) && hb_prefs_hs_volume(&p) == 100 && hb_prefs_gain(&p) == 250,
+          "load: volume kept, gain default");
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

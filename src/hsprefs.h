@@ -22,11 +22,23 @@ typedef struct {
     int eq_on;
     int eq_db[HB_EQ_BANDS];  /* -12..+12 dB per band */
     int gain_pct;            /* software gain, -1 = not in the file yet */
+    int gain_user;           /* 1 = the user set gain_pct for this headset */
+    int hs_vol;              /* headset volume 0..127 the user set, -1 none */
     int held_codec;          /* codec that actually held last time, 0 = none */
     int held_bp;             /* bitpool that held with it, 0 = none */
 } hb_prefs;
 
+/* Start values for a headset the user has not set: software gain in the
+ * middle of the slider, headset volume 50 %. */
+#define HB_PREFS_GAIN_DEFAULT 250
+#define HB_PREFS_HS_VOL_DEFAULT 64
+
 void hb_prefs_default(hb_prefs *p);
+/* Gain to use: the user's own for this headset, else HB_PREFS_GAIN_DEFAULT.
+ * Old files carry an automatically saved gain= with no gain_user=1: ignored. */
+int  hb_prefs_gain(const hb_prefs *p);
+/* Headset volume to send on connect: the user's, else 64 (50 %). */
+int  hb_prefs_hs_volume(const hb_prefs *p);
 /* A headset with no saved file: keep whatever else was copied off the page,
  * but the buffer target is the default (200 ms), not an old 1 s mode. */
 void hb_prefs_new_headset(hb_prefs *p);

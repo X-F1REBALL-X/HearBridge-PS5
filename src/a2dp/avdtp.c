@@ -760,12 +760,12 @@ void avdtp_teardown(avdtp_session *s)
     if (!s || !s->link) return;
     avdtp_dump_close(s);
     btlink_set_inbound_rx(s->link, BTLINK_PSM_AVDTP, NULL, NULL);
-    if (s->streaming && s->sig_scid && !s->remote_closed) {
+    if (s->streaming && s->sig_scid && !s->remote_closed && btlink_is_up(s->link)) {
         s->quick = 1;   /* shutting down: one short try */
         body[0] = (unsigned char)(s->sink.seid << 2);
         (void)avdtp_cmd(s, AV_CLOSE, body, 1, rsp, (int)sizeof rsp, &rsp_len);
-        s->streaming = 0;
     }
+    s->streaming = 0;                   /* closed, or the link is gone (no CLOSE on a dead link) */
     if (s->media_scid) btlink_chan_close(s->link, s->media_scid);
     if (s->sig_scid) btlink_chan_close(s->link, s->sig_scid);
     s->media_scid = s->sig_scid = 0;

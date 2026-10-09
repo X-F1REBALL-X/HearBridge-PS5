@@ -6,6 +6,10 @@
 
 #define TRACK_MAX 12
 
+/* Bumped on every Connection Complete (success) and Disconnection Complete
+ * seen for a handle, whoever reads the event afterwards. */
+static unsigned g_epoch[0x1000];
+
 static struct { unsigned char addr[6]; unsigned handle; long req_ms; int used; unsigned char psrm; unsigned clock; } g_t[TRACK_MAX];
 
 static int slot(const unsigned char a[6], int create)
@@ -28,6 +32,10 @@ void acl_track_event(const unsigned char *ev, int n, long now)
 {
     int i;
     if (!ev || n < 2) return;
+    if (ev[0] == 0x03 && n >= 13 && ev[2] == 0 && ev[11] == 0x01)
+        g_epoch[((unsigned)ev[3] | ((unsigned)ev[4] << 8)) & 0x0FFF]++;
+    else if (ev[0] == 0x05 && n >= 6 && ev[2] == 0)
+        g_epoch[((unsigned)ev[3] | ((unsigned)ev[4] << 8)) & 0x0FFF]++;
     if (ev[0] == 0x04 && n >= 12 && ev[11] == 0x01) {          /* Connection Request, ACL */
         i = slot(ev + 2, 1);
         if (i < 0) return;
@@ -35,10 +43,20 @@ void acl_track_event(const unsigned char *ev, int n, long now)
             log_line("acl: connection request from %02X:%02X:%02X:%02X:%02X:%02X",
                      ev[7], ev[6], ev[5], ev[4], ev[3], ev[2]);
         g_t[i].req_ms = now;
+    } else if (ev[0] == 0x03 && n >= 13 && ev[11] == 0x01 && ev[12] != 0x01) {
+        /* Connection Complete, ACL (byte 11 = link type). The handle block
+         * below only ever ran for byte 12 (encryption) == 1, i.e. almost
+         * never; it stays that way (handle tracking also drives drops and a
+         * stale handle could be a pad's). Here only the pending call ends,
+         * unless it is our own page failing 0x0b. */
+        i = slot(ev + 5, 0);
+        if (i >= 0 && ev[2] != 0x0B) g_t[i].req_ms = -1;
     } else if (ev[0] == 0x03 && n >= 13 && ev[12] == 0x01) {   /* Connection Complete, ACL */
         i = slot(ev + 5, ev[2] == 0);
         if (i < 0) return;
-        g_t[i].req_ms = -1;
+        /* 0x0b on OUR page to this address does not end the headset's own
+         * request: that one is still waiting at the controller. */
+        if (ev[2] != 0x0B) g_t[i].req_ms = -1;
         if (ev[2] == 0) {
             g_t[i].handle = ((unsigned)ev[3] | ((unsigned)ev[4] << 8)) & 0x0FFF;
             log_line("acl: link up handle %#05x (tracked)", g_t[i].handle);
@@ -95,4 +113,15 @@ long acl_track_request_age(const unsigned char addr[6], long now)
     int i = slot(addr, 0);
     if (i < 0 || g_t[i].req_ms < 0) return -1;
     return now - g_t[i].req_ms;
+}
+
+void acl_track_request_clear(const unsigned char addr[6])
+{
+    int i = slot(addr, 0);
+    if (i >= 0) g_t[i].req_ms = -1;
+}
+
+unsigned acl_track_handle_epoch(unsigned handle)
+{
+    return g_epoch[handle & 0x0FFF];
 }
