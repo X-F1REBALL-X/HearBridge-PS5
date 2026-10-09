@@ -22,26 +22,26 @@ HearBridge PS5 は脱獄した PS5 用のペイロード（ELF）です。本体
 
 ## インストールと起動
 
-1. [最新リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)から **HearBridge-PS5-1.1.0.elf** をダウンロード。
-2. ローダーに送信：`socat -u FILE:HearBridge-PS5-1.1.0.elf TCP:<console-ip>:9021`
+1. [最新リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)から **HearBridge-PS5-1.2.0.elf** をダウンロード。
+2. ローダーに送信：`socat -u FILE:HearBridge-PS5-1.2.0.elf TCP:<console-ip>:9021`
 3. **http://&lt;console-ip&gt;:8090** を開くか、ホーム画面の **HearBridge** タイルを開く。
 
 ELF をもう一度送ると、動作中のものと入れ替わります。ページの **Stop HearBridge** で終了します。
 
 ## どのチップ？
 
-PS5 の Bluetooth チップは Marvell/NXP か MediaTek のどちらかです。初期型（CFI-11xx/12xx）と Slim（CFI-20xx/21xx）は、同じ型番でもどちらのチップの場合もあります。
+1つのファイルで Marvell/NXP と MediaTek の両方の Bluetooth チップに対応します。HearBridge がチップを自動で判別し、**Status** パネルの **Chip** 行に表示します。
 
-| モデル | ダウンロード |
+| モデル | Bluetooth チップ |
 |---|---|
-| CFI-10xx (発売時モデル) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
-| CFI-11xx, CFI-12xx (初期型) | チップを確認: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-| CFI-20xx, CFI-21xx (Slim) | チップを確認: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-| CFI-70xx, CFI-71xx (Pro、常に MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-10xx (発売時モデル) | Marvell/NXP |
+| CFI-11xx, CFI-12xx (初期型) | Marvell/NXP または MediaTek |
+| CFI-20xx, CFI-21xx (Slim) | Marvell/NXP または MediaTek |
+| CFI-70xx, CFI-71xx (Pro) | MediaTek |
 
-テスト済み: 1.1.0 は PS5 fat CFI-10xx（Marvell/NXP）、mediatek test は PS5 Slim CFI-2008（MediaTek）。ほかのモデルは結果を報告してください。
+テスト済み: PS5 fat CFI-10xx（Marvell/NXP）、PS5 Slim CFI-2008（MediaTek）。ほかのモデルは結果を報告してください。
 
-**確認方法:** 1.1.0 を起動し、**Status** パネル下部の **Chip** 行を見ます。`Marvell/NXP (1286:…)` → 1.1.0 のまま。`MediaTek (0e8d:…)` → mediatek test を使用（ページにオレンジ色の案内も出ます）。または `/data/hearbridge/hearbridge.log` を開いて `usb: /dev/ugen0.2 is 1286:2059 …` を探します（ugen の番号は違うことがあります）。"is" の後の最初の 4 文字がチップです：`1286` = Marvell/NXP、`0e8d` = MediaTek。
+`/data/hearbridge/hearbridge.log` の `usb: /dev/ugen0.2 is 1286:2059 …` 行でも確認できます: `1286` = Marvell/NXP、`0e8d` = MediaTek。
 
 出典: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
