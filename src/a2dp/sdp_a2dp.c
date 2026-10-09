@@ -256,7 +256,7 @@ unsigned sdp_find_avdtp_psm(btlink *link, int timeout_ms)
 int sdp_probe_a2dp_sink(btlink *link, int timeout_ms, unsigned *psm)
 {
     unsigned p = sdp_find_avdtp_psm(link, timeout_ms);
-    if (psm) *psm = p;
+    if (psm) *psm = sdp_avdtp_psm_or_default(p);
     if (g_sdp_no_sink) return 0;
     if (!p || g_sdp_fallback) return -1;
     return 1;

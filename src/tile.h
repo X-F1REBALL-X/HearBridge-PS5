@@ -12,6 +12,17 @@
 #define HB_TILE_URL   "http://127.0.0.1:8090/"
 #define HB_TILE_ROOT  "/user/app"
 
+/* Bump when param.json changes in a way an installed tile only picks up by
+ * being installed again (2: moved from Media to Games). The installer keeps
+ * the version it last installed in HB_TILE_VER_PATH; a tile installed with
+ * another version is uninstalled and installed once more. */
+#define HB_TILE_VERSION  "2"
+#define HB_TILE_VER_PATH "/data/hearbridge/tile.ver"
+
+/* 1 when an installed tile (installed != 0) was put there by another tile
+ * version (stored: text of HB_TILE_VER_PATH, NULL if missing). */
+int tile_needs_reinstall(const char *stored, int installed);
+
 /* Fallback page written next to the tile (start.html): checks whether
  * HearBridge answers and either opens the control page or explains, in the
  * user's language, that the ELF must be loaded first. */

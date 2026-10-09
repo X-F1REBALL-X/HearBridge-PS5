@@ -26,7 +26,14 @@ int main(void)
     n = tile_manifest(js, sizeof js, NULL);
     CHECK(n > 0 && strstr(js, "\"titleId\": \"" HB_TILE_ID "\"") &&
           strstr(js, "\"deeplinkUri\": \"" HB_TILE_URL "\"") &&
-          strstr(js, "\"applicationCategoryType\": 65536"), "manifest fields");
+          strstr(js, "\"applicationCategoryType\": 0,") && strstr(js, "\"contentBadgeType\": 1,"),
+          "manifest fields (tile under Games)");
+    CHECK(!strstr(js, "65536"), "manifest: no longer a Media app");
+    CHECK(!tile_needs_reinstall(NULL, 0) && !tile_needs_reinstall("1", 0), "tile version: nothing installed, nothing to redo");
+    CHECK(tile_needs_reinstall(NULL, 1), "tile version: installed by 1.1.0 (no version file) -> reinstall once");
+    CHECK(tile_needs_reinstall("1\n", 1), "tile version: older version -> reinstall");
+    CHECK(!tile_needs_reinstall(HB_TILE_VERSION "\n", 1) && !tile_needs_reinstall(HB_TILE_VERSION "\r\n", 1),
+          "tile version: current version -> left alone");
     CHECK(strstr(js, "\"defaultLanguage\": \"en-US\"") && strstr(js, "\"he-IL\""), "manifest languages");
     CHECK(tile_manifest(small, sizeof small, NULL) == -1, "manifest refuses a short buffer");
     {

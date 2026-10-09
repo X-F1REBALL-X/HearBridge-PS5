@@ -22,26 +22,26 @@ HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带�
 
 ## 安装和运行
 
-1. 从[最新版本](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)下载 **HearBridge-PS5-1.1.0.elf**。
-2. 发送到加载器：`socat -u FILE:HearBridge-PS5-1.1.0.elf TCP:<console-ip>:9021`
+1. 从[最新版本](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)下载 **HearBridge-PS5-1.2.0.elf**。
+2. 发送到加载器：`socat -u FILE:HearBridge-PS5-1.2.0.elf TCP:<console-ip>:9021`
 3. 打开 **http://&lt;console-ip&gt;:8090**，或主屏幕上的 **HearBridge** 图标。
 
 再次发送 ELF 会替换正在运行的副本。页面上的 **Stop HearBridge** 可以停止它。
 
 ## 我的是哪种芯片？
 
-PS5 使用两种蓝牙芯片之一：Marvell/NXP 或 MediaTek。初代机型（CFI-11xx/12xx）和 Slim（CFI-20xx/21xx）两种都有可能，即使型号相同。
+一个文件同时支持 Marvell/NXP 和 MediaTek 两种蓝牙芯片。HearBridge 会自动识别芯片，并显示在 **Status** 面板的 **Chip** 行。
 
-| 型号 | 下载 |
+| 型号 | 蓝牙芯片 |
 |---|---|
-| CFI-10xx (首发) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
-| CFI-11xx, CFI-12xx (初代) | 查看芯片: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-| CFI-20xx, CFI-21xx (Slim) | 查看芯片: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-| CFI-70xx, CFI-71xx (Pro，始终是 MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-10xx (首发) | Marvell/NXP |
+| CFI-11xx, CFI-12xx (初代) | Marvell/NXP 或 MediaTek |
+| CFI-20xx, CFI-21xx (Slim) | Marvell/NXP 或 MediaTek |
+| CFI-70xx, CFI-71xx (Pro) | MediaTek |
 
-已测试：1.1.0 在 PS5 fat CFI-10xx（Marvell/NXP），mediatek test 在 PS5 Slim CFI-2008（MediaTek）。其他型号欢迎反馈结果。
+已测试：PS5 fat CFI-10xx（Marvell/NXP），PS5 Slim CFI-2008（MediaTek）。其他型号欢迎反馈结果。
 
-**如何检查：** 运行 1.1.0，查看 **Status** 面板底部的 **Chip** 行。`Marvell/NXP (1286:…)` → 继续用 1.1.0。`MediaTek (0e8d:…)` → 用 mediatek test（页面还会显示橙色提示）。或者打开 `/data/hearbridge/hearbridge.log`，找到 `usb: /dev/ugen0.2 is 1286:2059 …`（ugen 编号可能不同）。"is" 后面的前四个字符就是芯片：`1286` = Marvell/NXP，`0e8d` = MediaTek。
+在 `/data/hearbridge/hearbridge.log` 的 `usb: /dev/ugen0.2 is 1286:2059 …` 行也能看到：`1286` = Marvell/NXP，`0e8d` = MediaTek。
 
 来源: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

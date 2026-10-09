@@ -22,26 +22,26 @@ HearBridge PS5 est un payload (ELF) pour une PS5 jailbreakée. Il diffuse le son
 
 ## Installer et lancer
 
-1. Téléchargez **HearBridge-PS5-1.1.0.elf** depuis la [dernière version](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
-2. Envoyez-le au chargeur : `socat -u FILE:HearBridge-PS5-1.1.0.elf TCP:<console-ip>:9021`
+1. Téléchargez **HearBridge-PS5-1.2.0.elf** depuis la [dernière version](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+2. Envoyez-le au chargeur : `socat -u FILE:HearBridge-PS5-1.2.0.elf TCP:<console-ip>:9021`
 3. Ouvrez **http://&lt;console-ip&gt;:8090**, ou l'icône **HearBridge** de l'écran d'accueil.
 
 Renvoyer l'ELF remplace la copie en cours. **Stop HearBridge** sur la page l'arrête.
 
 ## Quelle puce j'ai ?
 
-Les PS5 utilisent l'une de deux puces Bluetooth : Marvell/NXP ou MediaTek. Les fat (CFI-11xx/12xx) et les Slim (CFI-20xx/21xx) peuvent avoir l'une ou l'autre, même avec le même numéro de modèle.
+Un seul fichier marche avec les deux puces Bluetooth, Marvell/NXP et MediaTek. HearBridge détecte la puce tout seul et l'affiche sur la ligne **Chip** du panneau **Status**.
 
-| Modèle | Téléchargement |
+| Modèle | Puce Bluetooth |
 |---|---|
-| CFI-10xx (lancement) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
-| CFI-11xx, CFI-12xx (fat) | Vérifie ta puce: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-| CFI-20xx, CFI-21xx (Slim) | Vérifie ta puce: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-| CFI-70xx, CFI-71xx (Pro, toujours MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-10xx (lancement) | Marvell/NXP |
+| CFI-11xx, CFI-12xx (fat) | Marvell/NXP ou MediaTek |
+| CFI-20xx, CFI-21xx (Slim) | Marvell/NXP ou MediaTek |
+| CFI-70xx, CFI-71xx (Pro) | MediaTek |
 
-Testé : 1.1.0 sur PS5 fat CFI-10xx (Marvell/NXP), mediatek test sur PS5 Slim CFI-2008 (MediaTek). Autres modèles : dis-nous comment ça se passe.
+Testé sur : PS5 fat CFI-10xx (Marvell/NXP), PS5 Slim CFI-2008 (MediaTek). Autres modèles : dis-nous comment ça se passe.
 
-**Comment vérifier :** lance la 1.1.0 et regarde la ligne **Chip** en bas du panneau **Status**. `Marvell/NXP (1286:…)` → garde la 1.1.0. `MediaTek (0e8d:…)` → prends mediatek test (la page affiche aussi un message orange). Ou ouvre `/data/hearbridge/hearbridge.log` et cherche `usb: /dev/ugen0.2 is 1286:2059 …` (le numéro ugen peut changer). Les quatre premiers caractères après « is » indiquent la puce : `1286` = Marvell/NXP, `0e8d` = MediaTek.
+Dans `/data/hearbridge/hearbridge.log`, la ligne `usb: /dev/ugen0.2 is 1286:2059 …` l'indique aussi : `1286` = Marvell/NXP, `0e8d` = MediaTek.
 
 Sources: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
