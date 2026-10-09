@@ -126,6 +126,7 @@ static int accept_one(btlink *link, const headset_ini *ini, int ms)
 /* After a hang-up right after encryption: wait this long for its own call. */
 #define HB_CALLBACK_MS 2500
 static int probe_after(hci_t hci, btlink *link, headset_ini *ini, btlink **linkp, unsigned *psm);
+static void turn_down_other_calls(hci_t hci, const unsigned char target[6]);
 
 static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
                              unsigned *psm, int timeout_ms)
@@ -144,6 +145,7 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
     }
     link = btlink_create(hci, 1021, 7);
     if (!link) return 0;
+    turn_down_other_calls(hci, ini->addr);   /* nothing else holds the radio */
     (void)btlink_drop_stale(link, ini->addr);
     (void)btlink_pump(link, 50);              /* take in queued events (tracking) */
     {
@@ -874,6 +876,23 @@ static int listen_any_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigne
 static int saved_peer(const unsigned char addr[6])
 {
     return paired_find(g_paired, g_npaired, addr) >= 0 || hb_forgot_has(addr);
+}
+
+/* Connecting to target: a call still waiting from another of our saved (or
+ * forgotten) headsets, e.g. the one just disconnected calling back, is
+ * turned down first so the controller is not busy with it. */
+static void turn_down_other_calls(hci_t hci, const unsigned char target[6])
+{
+    int i;
+    long now = now_ms();
+    for (i = 0; i < g_npaired + hb_forgot_count(); i++) {
+        const unsigned char *a = i < g_npaired ? g_paired[i].addr : hb_forgot_at(i - g_npaired);
+        long age;
+        if (!a || !memcmp(a, target, 6)) continue;
+        age = acl_track_request_age(a, now);
+        if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(a))
+            btlink_reject_request(hci, a, 0x0D);
+    }
 }
 
 /* Never leave a saved headset's call unanswered (it blocks our pages to it
@@ -2119,9 +2138,9 @@ done:
         btlink_destroy(link);
     }
     g_stream_up = 0;
-    if (rc == RUN_DROPPED || rc == RUN_AWAY) {
-        /* Turned off / out of range / case: AVDTP, AVRCP, L2CAP and our ACL
-         * handle went with the link above. Clear what outlives it, so the
+    if (rc == RUN_DROPPED || rc == RUN_AWAY || rc == RUN_PAUSED) {
+        /* Turned off / out of range / case, or Disconnect pressed: AVDTP,
+         * AVRCP, L2CAP and our ACL handle went with the link above. Clear what outlives it, so the
          * next connection starts clean; the key and settings stay saved. */
         if (ini->ok) acl_track_request_clear(ini->addr);   /* a call from before the drop */
         g_av_fail_ms = 0;

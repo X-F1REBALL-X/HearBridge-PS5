@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch
 
 all: ps5
 
@@ -91,7 +91,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -130,6 +130,11 @@ test-rejoin:
 	@mkdir -p $(BUILD)/host
 	cc -std=c11 -Wall -Wextra -O2 -Isrc tests/test_rejoin.c src/rejoin.c -o $(BUILD)/host/test_rejoin
 	$(BUILD)/host/test_rejoin
+
+test-switch:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_switch_ab.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_switch_ab
+	$(BUILD)/host/test_switch_ab
 
 test-forgot:
 	@mkdir -p $(BUILD)/host
