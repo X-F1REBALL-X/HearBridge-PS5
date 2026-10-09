@@ -752,6 +752,21 @@ int avdtp_send_media(avdtp_session *s, const unsigned char *sbc_frames, int len,
     return 1;
 }
 
+int avdtp_rebind(avdtp_session *s)
+{
+    unsigned char body[1], rsp[64];
+    int rsp_len = 0, sus, st;
+
+    if (!s || !s->link || !s->streaming || !s->sig_scid) return 0;
+    body[0] = (unsigned char)(s->sink.seid << 2);
+    log_line("avdtp: media channel was re-configured — SUSPEND + START so the headset takes the stream again");
+    sus = avdtp_cmd(s, AV_SUSPEND, body, 1, rsp, (int)sizeof rsp, &rsp_len);
+    st = avdtp_cmd(s, AV_START, body, 1, rsp, (int)sizeof rsp, &rsp_len);
+    log_line("avdtp: re-bind: suspend %s, start %s", sus == AV_MSG_ACCEPT ? "ok" : "refused",
+             st == AV_MSG_ACCEPT ? "ok" : "refused");
+    return st == AV_MSG_ACCEPT;
+}
+
 void avdtp_teardown(avdtp_session *s)
 {
     unsigned char body[1], rsp[64];

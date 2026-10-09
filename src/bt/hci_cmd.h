@@ -49,6 +49,11 @@ void hci_scan_pause(hci_t hci, const char *why);
  * MediaTek (hci_usb turns it on for USB vendor 0x0e8d). */
 void hci_scan_pause_enable(int on);
 void hci_scan_resume(hci_t hci);
+/* MediaTek controller (hci_usb sets it for USB vendor 0x0e8d). Its L2CAP
+ * replies take 0.4-2 s and some are read by the system stack, so btlink
+ * paces and repeats its config requests differently. 0 elsewhere. */
+void hci_set_mediatek(int on);
+int  hci_is_mediatek(void);
 
 void hci_addr_str(const unsigned char addr[6], char buf[18]);
 

@@ -25,6 +25,20 @@ enum {
 #define T_CFG_RESEND   1000
 #define T_CFG_DEFER_MS 40         /* wait briefly for peer CFG before ours (media) */
 #define CFG_TRIES      10
+/* MediaTek: config replies take 0.4-2 s (system scan on, the system stack
+ * reads part of what comes in). A request repeated after 1 s with a new
+ * ident reached the headset as a second config of an open channel (realme
+ * Buds T300: re-config of the media channel, then no sound). There: repeat
+ * after 4 s with the same ident and options (Core Vol 3 Part A 4: a resend
+ * keeps the identifier, the peer answers it as a duplicate), never once the
+ * peer sent its own CFG_REQ, and take ours as accepted when its reply does
+ * not reach us. Other controllers keep the 1 s / new ident behaviour. */
+#define T_CFG_RESEND_MTK 4000
+#define T_CFG_ASSUME_MTK 4000     /* peer configured, our CFG_RSP not seen */
+#define T_CFG_NUDGE      2000
+#define T_CFG_NUDGE_MTK  4000
+#define T_REBIND_SETTLE  300      /* media re-config done -> SUSPEND/START */
+#define REBIND_MAX       2        /* own CFG_REQs answering a peer re-config */
 #define CFG_OPT_MAX    16
 
 typedef enum { CH_CLOSED = 0, CH_CONNECTING, CH_CONFIG, CH_OPEN } chan_state;
@@ -40,6 +54,12 @@ typedef struct {
     unsigned peer_mtu; /* MTU from peer CFG_REQ, if any */
     int cfg_deferred; /* media: delay our CFG_REQ until peer CFG or timeout */
     int cfg_nudged;   /* re-sent our CFG_REQ once after a silent peer */
+    unsigned char cfg_id;  /* ident of our last CFG_REQ (MediaTek resends it) */
+    unsigned cfg_sent_mtu; /* MTU option in that CFG_REQ */
+    int cfg_answered; /* CFG_RSP seen (or assumed) for that CFG_REQ */
+    int reconf_wait;  /* open media channel re-configured: our CFG_RSP due */
+    int reconf_n;     /* own CFG_REQs sent for peer re-configs */
+    long rebind_at;   /* re-config done: SUSPEND/START due at this time (0 none) */
     long t_state, t_cfg;
     btlink_rx_fn rx;
     void *rx_ud;
@@ -130,6 +150,7 @@ struct btlink {
     int info_done;        /* Information Request exchange done on this ACL */
     unsigned char info_wait_id; /* ident of the INFO_REQ awaiting a reply */
     int info_got;         /* reply for info_wait_id arrived */
+    unsigned long flushes; /* HCI Flush Occurred on our handle */
 };
 
 static int g_connect_fail;
@@ -426,6 +447,9 @@ static void chan_send_cfg(btlink *l, chan *c)
     put16(r + 2, 0); /* flags / continuation */
     id = next_sig_id(l);
     c->cfg_deferred = 0;
+    c->cfg_id = id;
+    c->cfg_sent_mtu = mtu;
+    c->cfg_answered = 0;
     if (with_mtu) {
         r[4] = 0x01; r[5] = 0x02; /* MTU */
         put16(r + 6, mtu);
@@ -441,6 +465,24 @@ static void chan_send_cfg(btlink *l, chan *c)
                  id, c->scid, c->dcid, chan_is_avdtp_media(l, c),
                  c->cfg_ours_ok, c->cfg_theirs_ok, c->cfg_tries + 1);
     }
+    c->t_cfg = now_ms();
+    c->cfg_tries++;
+}
+
+/* MediaTek: repeat our last CFG_REQ as it was (same ident, same MTU), so
+ * the peer answers it as a duplicate instead of a new configuration. */
+static void chan_resend_cfg(btlink *l, chan *c)
+{
+    unsigned char r[8];
+    put16(r, c->dcid);
+    put16(r + 2, 0);
+    r[4] = 0x01; r[5] = 0x02;
+    put16(r + 6, c->cfg_sent_mtu ? c->cfg_sent_mtu : 672);
+    sig_send(l, L2SIG_CFG_REQ, c->cfg_id, r, 8);
+    log_line("l2cap: CFG_REQ id=%u scid %#x dcid %#x (MTU %u) media=%d "
+             "ours=%d theirs=%d try=%d (resend, same id)",
+             c->cfg_id, c->scid, c->dcid, c->cfg_sent_mtu ? c->cfg_sent_mtu : 672u,
+             chan_is_avdtp_media(l, c), c->cfg_ours_ok, c->cfg_theirs_ok, c->cfg_tries + 1);
     c->t_cfg = now_ms();
     c->cfg_tries++;
 }
@@ -734,6 +776,25 @@ static void on_signaling(btlink *l, const unsigned char *d, int len)
                 }
                 /* Accept their config (Basic). Echo MTU when present. */
                 chan_send_cfg_rsp(l, cc, ident, opt, optlen);
+                if (cc->st == CH_OPEN) {
+                    long now = now_ms();
+                    int media = chan_is_avdtp_media(l, cc);
+                    log_line("l2cap: peer re-configured open channel scid %#x (media=%d, our last CFG_REQ %ld ms ago)",
+                             cc->scid, media, cc->t_cfg ? now - cc->t_cfg : -1L);
+                    if (media && hci_is_mediatek()) {
+                        /* Its own re-config waits for our CFG_REQ too (Core
+                         * Vol 3 Part A 6.1). While our last CFG_REQ is still
+                         * unanswered this is its reply to it: send nothing. */
+                        if (!cc->reconf_wait && cc->reconf_n < REBIND_MAX &&
+                            cc->cfg_answered) {
+                            cc->reconf_n++;
+                            cc->reconf_wait = 1;
+                            chan_send_cfg(l, cc);
+                        } else if (!cc->reconf_wait) {
+                            cc->rebind_at = now + T_REBIND_SETTLE;
+                        }
+                    }
+                }
                 if (!cc->cfg_ours_ok && cc->cfg_tries == 0) {
                     chan_send_cfg(l, cc);
                 } else if (cc->cfg_deferred && !cc->cfg_ours_ok) {
@@ -764,6 +825,12 @@ static void on_signaling(btlink *l, const unsigned char *d, int len)
                     log_cfg_opts("CFG_RSP", cc->scid, pl + 6, optlen);
                 if (result == 0) {
                     cc->cfg_ours_ok = 1;
+                    if (ident == cc->cfg_id) cc->cfg_answered = 1;
+                    if (cc->st == CH_OPEN && cc->reconf_wait) {
+                        cc->reconf_wait = 0;
+                        cc->rebind_at = now_ms() + T_REBIND_SETTLE;
+                        log_line("l2cap: media channel re-config done (scid %#x)", cc->scid);
+                    }
                     chan_check_open(l, cc);
                 } else {
                     log_line("l2cap: config result %u on PSM %#x — retry MTU",
@@ -1292,6 +1359,15 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
         return;
     }
 
+    if (ev[0] == 0x11 && nEv >= 4 &&    /* Flush Occurred */
+        (le16(ev + 2) & 0x0FFF) == (l->handle & 0x0FFF)) {
+        l->flushes++;
+        if (l->flushes <= 5 || l->flushes % 100 == 0)
+            log_line("btlink: Flush Occurred on handle %#05x (%lu so far) — the controller dropped packets",
+                     l->handle, l->flushes);
+        return;
+    }
+
     if (ev[0] == 0x13 && nEv >= 3) {   /* Number Of Completed Packets */
         const unsigned char *e = ev + 3, *stop = ev + nEv;
         int left = ev[2];
@@ -1387,6 +1463,7 @@ static void drive_auth(btlink *l)
 
 static void chan_tick(btlink *l, chan *c, long now)
 {
+    int mtk = hci_is_mediatek();
     long cfg_lim = chan_is_avdtp_media(l, c) ? T_CFG_TIMEOUT_MEDIA :
                    (l->cfg_timeout_ms > 0 ? l->cfg_timeout_ms : T_CFG_TIMEOUT);
 
@@ -1401,8 +1478,28 @@ static void chan_tick(btlink *l, chan *c, long now)
                  c->psm, c->cfg_ours_ok, c->cfg_theirs_ok, c->cfg_tries,
                  chan_is_avdtp_media(l, c), c->scid, c->dcid, c->peer_mtu);
         chan_close_disc(l, c); /* P3: DISC before CLOSED — no zombie half-config */
+    } else if (c->st == CH_OPEN && c->reconf_wait &&
+               now - c->t_cfg >= T_CFG_ASSUME_MTK) {
+        /* Our CFG_REQ for its re-config got no reply we could see. */
+        c->reconf_wait = 0;
+        c->cfg_answered = 1;
+        c->rebind_at = now + T_REBIND_SETTLE;
+        log_line("l2cap: no CFG_RSP for the media re-config (scid %#x) — taking it as done",
+                 c->scid);
+    } else if (c->st == CH_CONFIG && mtk && !c->cfg_ours_ok && c->cfg_theirs_ok &&
+               !c->cfg_deferred && c->cfg_tries > 0) {
+        /* It sent its CFG_REQ, so ours reached it: wait for the answer, never
+         * ask again (that would re-configure). Not seen in time: the system
+         * stack read it, take ours as accepted. */
+        if (now - c->t_cfg >= T_CFG_ASSUME_MTK) {
+            log_line("l2cap: no CFG_RSP %ld ms after CFG_REQ id=%u, peer configured — taking ours as accepted (scid %#x)",
+                     now - c->t_cfg, c->cfg_id, c->scid);
+            c->cfg_ours_ok = 1;
+            c->cfg_answered = 1;
+            chan_check_open(l, c);
+        }
     } else if (c->st == CH_CONFIG && c->cfg_ours_ok && !c->cfg_theirs_ok &&
-               !c->cfg_nudged && now - c->t_cfg >= 2000) {
+               !c->cfg_nudged && now - c->t_cfg >= (mtk ? T_CFG_NUDGE_MTK : T_CFG_NUDGE)) {
         /* Peer accepted ours but has not configured its side: offer our
          * config once more (a fresh ident) so it can respond with its own. */
         c->cfg_nudged = 1;
@@ -1411,10 +1508,12 @@ static void chan_tick(btlink *l, chan *c, long now)
                  c->scid);
         chan_send_cfg(l, c);
     } else if (c->st == CH_CONFIG && !c->cfg_ours_ok && !c->cfg_deferred &&
-               now - c->t_cfg >= T_CFG_RESEND) {
+               now - c->t_cfg >= (mtk ? T_CFG_RESEND_MTK : T_CFG_RESEND)) {
         if (c->cfg_tries >= CFG_TRIES) {
             log_line("l2cap: PSM %#x config unanswered (scid %#x)", c->psm, c->scid);
             chan_close_disc(l, c);
+        } else if (mtk && c->cfg_tries > 0) {
+            chan_resend_cfg(l, c);       /* same ident and options */
         } else {
             /* Empty first; after 2 unanswered tries escalate to MTU (media especially). */
             if (c->cfg_tries >= 2 && !c->cfg_want_mtu) {
@@ -2168,6 +2267,20 @@ int btlink_wait_rx(btlink *l, unsigned scid, unsigned char *out, int max,
     }
     c->wait_armed = 0;
     c->wait_buf = NULL;
+    return 0;
+}
+
+int btlink_media_rebind_due(btlink *l, unsigned scid)
+{
+    int i;
+    if (!l || !scid) return 0;
+    for (i = 0; i < BTLINK_CHAN_MAX; i++) {
+        chan *c = &l->ch[i];
+        if (c->st != CH_OPEN || c->scid != scid || !c->rebind_at || c->reconf_wait) continue;
+        if (now_ms() < c->rebind_at) return 0;
+        c->rebind_at = 0;
+        return 1;
+    }
     return 0;
 }
 

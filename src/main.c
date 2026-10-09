@@ -1988,6 +1988,8 @@ stream_setup:
             rc = RUN_DROPPED;
             break;
         }
+        if (btlink_media_rebind_due(link, av.media_scid))
+            (void)avdtp_rebind(&av);
         if (btlink_ms_since_credit(link) > 4000) {
             note_event("stream: no packet acknowledged for 4 s — link lost");
             set_why("quiet");
