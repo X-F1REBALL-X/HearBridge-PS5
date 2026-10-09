@@ -53,6 +53,16 @@ int main(void)
         CHECK(strlen(small) < sizeof small && ((unsigned char)small[strlen(small) - 1] & 0xC0) != 0xC0,
               "long title cut on a character boundary");
     }
+    {
+        char p[96];
+        CHECK(hb_game_icon_path("PPSA01325", 0, p, sizeof p) && !strcmp(p, "/user/appmeta/PPSA01325/icon0.png"),
+              "icon: appmeta under /user first");
+        CHECK(hb_game_icon_path("PPSA01325", 1, p, sizeof p) && !strcmp(p, "/system_data/priv/appmeta/PPSA01325/icon0.png"),
+              "icon: then /system_data/priv");
+        CHECK(!hb_game_icon_path("PPSA01325", 2, p, sizeof p) && !p[0], "icon: two places only");
+        CHECK(!hb_game_icon_path("../../etc", 0, p, sizeof p) && !hb_game_icon_path("PPSA0132", 0, p, sizeof p),
+              "icon: only real title ids (no path tricks)");
+    }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

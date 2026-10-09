@@ -77,6 +77,10 @@ typedef struct {
     int game_profile;      /* a profile is saved for game_id */
     int game_active;       /* that profile is applied now */
     int req_game;          /* page: 1 save for this game, 2 forget it */
+    char req_game_drop[16]; /* page: forget this saved game (any, not just the running one) */
+    int games_n;           /* saved game profiles, newest first (for the Games list) */
+    char games_id[32][16];
+    char games_name[32][48];
     int lat_backoff_ms;    /* low buffer target stepped back this much (drops) */
     int lat_normal_ms;     /* last delay estimate at the default 200 ms target, 0 none */
     /* backup / restore */

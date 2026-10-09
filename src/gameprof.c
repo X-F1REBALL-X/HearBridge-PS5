@@ -171,3 +171,12 @@ int hb_game_json_title(const char *js, char *out, int max)
     out[n] = 0;
     return n > 0;
 }
+
+int hb_game_icon_path(const char *id, int i, char *out, int max)
+{
+    static const char *const roots[] = { "/user/appmeta/", "/system_data/priv/appmeta/" };
+    if (max > 0) out[0] = 0;
+    if (!hb_game_id_ok(id) || i < 0 || i >= (int)(sizeof roots / sizeof roots[0])) return 0;
+    snprintf(out, (size_t)max, "%s%s/icon0.png", roots[i], id);
+    return 1;
+}
