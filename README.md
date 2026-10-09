@@ -87,6 +87,10 @@ make test     # host tests: cc, ffmpeg, python3 + numpy (node optional)
 make send PS5_HOST=<console-ip>
 ```
 
+## Credits
+
+MediaTek scan-pause, ACL pipe and HCI debug code by [ZiZc3](https://github.com/ZiZc3) ([#6](https://github.com/X-F1REBALL-X/HearBridge-PS5/pull/6))
+
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
