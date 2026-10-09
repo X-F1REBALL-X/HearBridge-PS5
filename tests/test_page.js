@@ -19,7 +19,7 @@ class XHR {
   send() { calls.push({ m: this.m, p: this.p, h: this.h }); this.status = 200;
     this.responseText = JSON.stringify(STATUS); if (this.onload) this.onload(); }
 }
-const STATUS = { version: '1.0.2', state: 'streaming', connected: 1, device: 'X', gain_pct: 500, muted: 0, tone: 0,
+const STATUS = { version: '1.1.0', state: 'streaming', connected: 1, device: 'X', gain_pct: 500, muted: 0, tone: 0,
   paused: 0, headset_volume: 64, avrcp: { connected: 1 }, pkts: 1, frames: 1, peak: 0, out_peak: 0, sample_rate: 48000,
   bitpool: 35, bitpool_min: 2, bitpool_max: 53, per_packet: 8, backlog: 0, stable: 0, queue_ms: 200, detail: '',
   latency: { target_ms: 200, estimate_ms: 187, capture_ms: 21, packet_ms: 11, queue_ms: 20, radio_ms: 5, sink_ms: 130, sink_reported: 1 },
