@@ -20,6 +20,11 @@ int main(void)
     CHECK(hb_connreq_decide(&i) == HB_CR_TAKE, "saved headset, idle: accepted");
     i.busy_other = 1;
     CHECK(hb_connreq_decide(&i) == HB_CR_REJECT_BUSY, "saved headset while connecting another: rejected 0x0D");
+    i.bg_page = 1;
+    CHECK(hb_connreq_decide(&i) == HB_CR_TAKE, "saved headset out of its case while we only re-page another in the background: taken");
+    i.held = 1;
+    CHECK(hb_connreq_decide(&i) == HB_CR_REJECT_BUSY, "...unless it was just disconnected by hand");
+    i.held = 0; i.bg_page = 0;
     i.busy_other = 0; i.streaming_other = 1;
     CHECK(hb_connreq_decide(&i) == HB_CR_SWITCH, "saved headset B calls while A streams: switch to B");
     i.held = 1;
