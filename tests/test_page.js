@@ -9,7 +9,8 @@ js = js.replace(/HBTOKENx{25}/, 'deadbeefdeadbeefdeadbeefdeadbeef');
 const els = {};
 function el(id) {
   if (!els[id]) els[id] = { id, style: { setProperty(k, v) { this[k] = v; } }, className: '', textContent: '', innerHTML: '', value: 0,
-    attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute: () => null, getElementsByTagName: () => [] };
+    attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute: () => null, getElementsByTagName: () => [], parentNode: null,
+    appendChild(c) { c.parentNode = this; } };
   return els[id];
 }
 const calls = [];
@@ -55,12 +56,22 @@ check(el('latv').textContent === '≈ 187 ms' && el('latt').textContent === '200
 check(/Headset <em>130 ms/.test(el('lkeys').innerHTML) && /Queue <em>20 ms/.test(el('lkeys').innerHTML), 'page: latency breakdown, headset value from its report');
 calls.length = 0; el('lat').value = 120; el('lat').onchange.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=120' && calls[0].h['X-HB-Token'], 'page: latency slider -> POST with token');
-check(/id="lat" min="60" max="200" step="1"/.test(html), 'page: slider ends at 200 ms in 1 ms steps');
+check(/id="lat" min="40" max="200" step="1"/.test(html), 'page: slider goes 40-200 ms in 1 ms steps');
 calls.length = 0; el('lat').value = 150; el('lat').oninput.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150', 'page: moving the slider posts the buffer target');
-check(html.indexOf('class="panel logp"') > html.indexOf('id="devlist"') && html.indexOf('id="evbox"') < 0 &&
+check(html.indexOf('id="evlog"') > html.indexOf('id="pg5"') && html.indexOf('id="evlog"') > html.indexOf('id="setm"') &&
   html.indexOf('data-i18n="log"') > 0 && html.indexOf('data-i18n="logEmpty"') > 0,
-  'page: log is its own panel, not inside devices');
+  'page: log lives in Settings (Status & log), not on the main screen');
+{
+  const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+  check(main.indexOf('id="savedlist"') < 0 && main.indexOf('id="devlist"') < 0 && main.indexOf('id="codecs"') < 0 &&
+        main.indexOf('id="eq0"') < 0 && main.indexOf('id="bkdo"') < 0 && main.indexOf('id="evlog"') < 0 && main.indexOf('id="lqv"') < 0,
+        'page: main screen has no lists, codec, EQ bands, backup, log or link details');
+  check(main.indexOf('id="qs"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="gain"') > 0 && main.indexOf('id="hs"') > 0 &&
+        main.indexOf('id="lat"') > 0 && main.indexOf('id="lbar"') > 0 && main.indexOf('id="pr0"') > 0 && main.indexOf('id="night"') > 0,
+        'page: main screen has headset switch, battery, volume, latency + meter, EQ presets and night mode');
+  check(!/[\u2013\u2014]/.test(html) && !/[\u2013\u2014]/.test(i18n), 'page: no em / en dashes anywhere the user reads');
+}
 check(html.indexOf('id="reset"') < 0 && html.indexOf('/api/reset') < 0 &&
   html.indexOf('id="reconnect"') < 0 && /t\('reconnect'\)/.test(html),
   'page: no big Reconnect/Reset under Scan, per-row Reconnect kept');
@@ -131,6 +142,47 @@ check(el('chipv').textContent === 'abcd:0012', 'page: unknown chip shows only th
 STATUS.chip = { vid: '0e8d', pid: '3605', vendor: 'MediaTek', mediatek: 1, profile: 'mediatek' };
 global.hbTest.req('/api/status');
 check(el('chipv').textContent === 'MediaTek (0e8d:3605)', 'page: MediaTek chip');
+// battery: level when the headset reports it, "—" when it does not
+STATUS.battery = { status: '', level: -1 };
+global.hbTest.req('/api/status');
+check(el('batv').innerHTML === '-', 'page: battery shows "-" when unknown');
+STATUS.battery = { status: 'low', level: 20 };
+global.hbTest.req('/api/status');
+check(/Low/.test(el('batv').innerHTML) && /calc\(20%/.test(el('batv').innerHTML), 'page: battery shows state and gauge');
+// games: main screen only shows that a game's sound is on; Settings has save / remove
+STATUS.game = { avail: 1, id: '', name: '', profile: 0, active: 0 };
+global.hbTest.req('/api/status');
+check(el('gline').style.display === 'none' && el('gsave').disabled === true && el('gname').textContent === 'No game running',
+  'page: no game: nothing on the main screen, save is off');
+STATUS.game = { avail: 1, id: 'PPSA01325', name: 'ASTRO BOT', profile: 0, active: 0 };
+global.hbTest.req('/api/status');
+check(el('gline').style.display === 'none' && el('gname').textContent === 'ASTRO BOT' && !el('gsave').disabled &&
+  el('gdrop').style.display === 'none', 'page: game without a profile: can be saved, nothing to remove');
+STATUS.game = { avail: 1, id: 'PPSA01325', name: 'ASTRO BOT', profile: 1, active: 1 };
+global.hbTest.req('/api/status');
+check(el('gline').style.display === '' && /ASTRO BOT/.test(el('gltxt').textContent) && el('gdrop').style.display === '',
+  'page: game sound on: main screen says so, Settings can remove it');
+calls.length = 0; el('gsave').onclick.call(el('gsave'));
+check(calls[0] && calls[0].p === '/api/game?do=1' && calls[0].m === 'POST', 'page: save for this game -> POST');
+// night mode
+STATUS.night = { on: 0, db10: 0 };
+global.hbTest.req('/api/status');
+calls.length = 0; el('night').onclick();
+check(calls[0] && calls[0].p === '/api/night?on=1' && calls[0].h['X-HB-Token'] && el('night').className === 'night',
+  'page: night mode toggle -> POST on=1');
+STATUS.night = { on: 1, db10: 60 };
+global.hbTest.req('/api/status');
+check(el('night').className === 'night on', 'page: night mode shows on');
+// low battery toast text (the fake setTimeout clears it at once, so check the code path)
+check(/toast\(t\('battToast'\)\.replace\('%s',ba\.level\)\)/.test(html) && /hb_batt_seq/.test(html), 'page: low battery toast, once per heads-up');
+// merged latency slider: "Latency" label, ms value next to it, meter under it
+{
+  const m = html.match(/<div class="latm">([\s\S]*?)<div class="lkeys"/)[1];
+  const lp = html.slice(html.indexOf('class="panel latp"'), html.indexOf('class="panel eqp"'));
+  check(lp.indexOf('data-i18n="latency"') > 0 && m.indexOf('id="lat"') < m.indexOf('id="latv"') && m.indexOf('id="latt"') > m.indexOf('id="lat"'),
+    'page: "Latency" panel, slider with its ms value, live meter under it');
+  check(!/llseg|latMode|\/api\/lowlat/.test(html), 'page: no separate low latency mode');
+}
 {
   const fs = require('fs');
   const html = fs.readFileSync(require('path').join(__dirname, '..', 'src', 'web', 'index.html'), 'utf8');
