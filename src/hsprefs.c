@@ -26,6 +26,17 @@ void hb_prefs_default(hb_prefs *p)
     p->codec = HB_CODEC_AUTO;
     p->latency_ms = HB_LAT_DEFAULT_MS;
     p->gain_pct = -1;
+    p->hs_vol = -1;
+}
+
+int hb_prefs_gain(const hb_prefs *p)
+{
+    return p && p->gain_user && p->gain_pct >= 0 ? p->gain_pct : HB_PREFS_GAIN_DEFAULT;
+}
+
+int hb_prefs_hs_volume(const hb_prefs *p)
+{
+    return p && p->hs_vol >= 0 ? p->hs_vol : HB_PREFS_HS_VOL_DEFAULT;
 }
 
 void hb_prefs_new_headset(hb_prefs *p)
@@ -95,6 +106,12 @@ void hb_prefs_parse(hb_prefs *p, const char *t)
             const char *end;
             long g = parse_long(v, &end);
             if (end != v) p->gain_pct = clampi((int)g, 0, 500);
+        } else if (!strcmp(line, "gain_user")) {
+            p->gain_user = !strcmp(v, "1");
+        } else if (!strcmp(line, "hs_vol")) {
+            const char *end;
+            long hv = parse_long(v, &end);
+            if (end != v) p->hs_vol = clampi((int)hv, 0, 127);
         } else if (!strcmp(line, "eq_db")) {
             int i;
             const char *s = v, *end;
@@ -119,8 +136,11 @@ int hb_prefs_format(const hb_prefs *p, char *out, int max)
     for (i = 0; i < HB_EQ_BANDS && n > 0 && n < max; i++)
         n += snprintf(out + n, (size_t)(max - n), "%s%d", i ? "," : "", p->eq_db[i]);
     if (n > 0 && n < max) n += snprintf(out + n, (size_t)(max - n), "\n");
-    if (p->gain_pct >= 0 && n > 0 && n < max)
-        n += snprintf(out + n, (size_t)(max - n), "gain=%d\n", p->gain_pct);
+    /* Only a gain the user set is kept (an old automatic gain=500 is dropped). */
+    if (p->gain_user && p->gain_pct >= 0 && n > 0 && n < max)
+        n += snprintf(out + n, (size_t)(max - n), "gain=%d\ngain_user=1\n", p->gain_pct);
+    if (p->hs_vol >= 0 && n > 0 && n < max)
+        n += snprintf(out + n, (size_t)(max - n), "hs_vol=%d\n", p->hs_vol);
     if (p->held_codec >= HB_CODEC_SBC && p->held_bp > 0 && n > 0 && n < max)
         n += snprintf(out + n, (size_t)(max - n), "held=%s:%d\n",
                       hb_codec_key(p->held_codec), p->held_bp);
