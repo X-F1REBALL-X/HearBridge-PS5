@@ -394,11 +394,30 @@ function bars(r){if(r==null)return '';var n=r>-60?4:r>-70?3:r>-80?2:1,h='<span c
 for(var i=1;i<=4;i++)h+='<i'+(i<=n?' class="on"':'')+'></i>';return h+'</span>'}
 function getj(p,cb){var x=new XMLHttpRequest();x.open('GET',p,true);x.timeout=4000;x.onload=function(){try{cb(JSON.parse(x.responseText))}catch(e){}};x.send()}
 function row(icon,name,meta,btns,cls,sig){return '<div class="dl'+(cls?' '+cls:'')+'"><span class="ico">'+icon+'</span><span class="nm"><b>'+esc(name)+'</b><span class="k meta">'+meta+'</span></span><span class="sig">'+(sig||'')+'</span><span class="acts">'+btns+'</span></div>'}
-function wire(id){var b=$(id).getElementsByTagName('button');for(var i=0;i<b.length;i++)b[i].onclick=function(){
-var a=this.getAttribute('data-addr'),f=this.getAttribute('data-forget');
+function wire(id){wireEl($(id))}
+function wireEl(el){var b=el.getElementsByTagName('button');for(var i=0;i<b.length;i++)b[i].onclick=function(){
+var a=this.getAttribute('data-addr'),f=this.getAttribute('data-forget'),r=this.parentNode&&this.parentNode.parentNode;
 if(this.getAttribute('data-disc')){act('/api/disconnect');return}
 if(f){if(confirm(t('forgetConfirm')))act('/api/forget?addr='+a,saved);return}
-act('/api/select?addr='+a);this.textContent=t('connecting')+'…'}}
+act('/api/select?addr='+a);this.textContent=t('connecting')+'…';
+/* the label comes back from the list after a few seconds if nothing changed */
+if(r)setTimeout(function(){r.hbHtml=''},5000)}}
+/* Lists are patched in place, keyed by address: an unchanged row keeps its
+   DOM (so a hovered/focused button stays put, no blink every poll); only a
+   changed row is swapped, and the signal bars are updated on their own. */
+function patchList(id,rows,empty){var box=$(id),i,r,el,nx,keep={},cur=box.firstChild;
+if(!rows.length){if(box.hbHtml!==empty){box.hbHtml=empty;box.innerHTML=empty}return}
+if(box.hbHtml!=null&&box.hbHtml!==''){box.innerHTML='';cur=null}box.hbHtml='';
+for(i=0;i<rows.length;i++)keep[rows[i].k]=1;
+for(el=box.firstChild;el;el=nx){nx=el.nextSibling;if(!el.hbKey||!keep[el.hbKey])box.removeChild(el)}
+cur=box.firstChild;
+for(i=0;i<rows.length;i++){r=rows[i];el=null;
+for(nx=box.firstChild;nx;nx=nx.nextSibling)if(nx.hbKey===r.k){el=nx;break}
+if(el&&el.hbHtml!==r.h){var tmp=document.createElement('div');tmp.innerHTML=r.h;var ne=tmp.firstChild;
+ne.hbKey=r.k;ne.hbHtml=r.h;wireEl(ne);box.replaceChild(ne,el);el=ne}
+if(!el){var tmp2=document.createElement('div');tmp2.innerHTML=r.h;el=tmp2.firstChild;el.hbKey=r.k;el.hbHtml=r.h;wireEl(el)}
+if(el!==cur)box.insertBefore(el,cur);cur=el.nextSibling;
+var sg=el.querySelector('.sig');if(sg&&sg.hbHtml!==(r.s||'')){sg.hbHtml=r.s||'';sg.innerHTML=r.s||''}}}
 var SAVL=null;
 function stOf(){return S?(S.paused?'paused':S.state):''}
 function linked(){var st=stOf();return st=='streaming'||st=='connected'}
@@ -409,21 +428,20 @@ if(st=='paused')return '<span class="badge off">'+esc(t('notConnected'))+'</span
 if(st=='disconnected')return '<span class="badge off">'+esc(t('notConnected'))+'</span>';
 if(st=='connecting'||st=='pairing')return '<span class="badge warn">'+esc(t('connecting'))+'</span>';
 return '<span class="badge off">'+esc(t('notConnected'))+'</span>'}
-function drawSaved(){if(!SAVL)return;var h='',i,d,on=linked(),st=stOf(),busy=st=='connecting'||st=='pairing';
+function drawSaved(){if(!SAVL)return;var rows=[],i,d,on=linked(),st=stOf(),busy=st=='connecting'||st=='pairing';
 for(i=0;i<SAVL.length;i++){d=SAVL[i];
-h+=row(icon(d.kind),d.name||d.addr,badge(d.current)+'<span class="addr">'+esc(d.addr)+'</span>',
+rows.push({k:d.addr,h:row(icon(d.kind),d.name||d.addr,badge(d.current)+'<span class="addr">'+esc(d.addr)+'</span>',
 (d.current&&on?'<button type="button" data-disc="1">'+esc(t('disconnect'))+'</button>'
 :d.current&&busy?'':'<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('reconnect'))+'</button>')
 +'<button type="button" class="red" data-forget="1" data-addr="'+esc(d.addr)+'">'+esc(t('forget'))+'</button>',
-d.current&&on?'on':d.current&&busy?'busy':'')}
-var k=h+'|'+LANG;if(k==drawSaved.last)return;drawSaved.last=k;
-$('savedlist').innerHTML=h||'<p class="k">'+esc(t('noSaved'))+'</p>';wire('savedlist')}
+d.current&&on?'on':d.current&&busy?'busy':'')})}
+patchList('savedlist',rows,'<p class="k">'+esc(t('noSaved'))+'</p>')}
 function saved(){getj('/api/saved',function(j){var i;SAVL=j.devices;SAV={};for(i=0;i<SAVL.length;i++)SAV[SAVL[i].addr]=1;drawSaved()})}
 var SAV={},SHOW={headphones:1,headset:1,speaker:1,portable:1,hifi:1,handsfree:1},HEAD={headphones:1,headset:1};
-function devices(){getj('/api/devices',function(j){var h='',i,d,k;
+function devices(){getj('/api/devices',function(j){var rows=[],i,d,k;
 for(i=0;i<j.devices.length;i++){d=j.devices[i];if(SAV[d.addr])continue;k=d.kind||kindOf(d.cod);if(!SHOW[k]||(!d.name&&!HEAD[k]))continue;
-h+=row(icon(k),d.name||d.addr,'<span class="addr">'+esc(d.addr)+'</span>','<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('connectTo'))+'</button>','',bars(d.rssi))}
-$('devlist').innerHTML=h||'<p class="k">'+esc(t('noDevices'))+'</p>';wire('devlist')})}
+rows.push({k:d.addr,h:row(icon(k),d.name||d.addr,'<span class="addr">'+esc(d.addr)+'</span>','<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('connectTo'))+'</button>',''),s:bars(d.rssi)})}
+patchList('devlist',rows,'<p class="k">'+esc(t('noDevices'))+'</p>')})}
 function pct(v){return Math.round(v)+'%'}
 function chips(a){var h='',i;for(i=0;i<a.length;i++)h+='<span class="chip'+(a[i][1]?' '+a[i][1]:'')+'">'+esc(a[i][0])+'</span>';return h}
 function setHtml(id,h){var e=$(id);if(e.hbHtml!==h){e.hbHtml=h;e.innerHTML=h}}
