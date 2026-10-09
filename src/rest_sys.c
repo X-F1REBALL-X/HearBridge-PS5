@@ -4,6 +4,7 @@
  * without clearing, so the system's own handling is not touched. */
 #include "rest_sys.h"
 #include "diag.h"
+#include "dynmod.h"
 #include "log.h"
 
 #include <ps5/kernel.h>
@@ -26,22 +27,36 @@ static int g_init, g_ok;
 
 static void init(void)
 {
-    static const char *const libs[] = { "libkernel_sys.sprx", "libkernel.sprx", "libkernel_web.sprx" };
-    fn_open op = 0;
-    uint32_t h = 0;
-    unsigned i;
+    fn_open op;
+    uint32_t h1 = 0, h2 = 0;
+    int rv = -1;
     if (g_init) return;
     g_init = 1;
-    for (i = 0; i < sizeof libs / sizeof libs[0] && !op; i++) {
-        h = 0;
-        if (kernel_dynlib_handle(-1, libs[i], &h) != 0 || !h) continue;
-        op = (fn_open)kernel_dynlib_resolve(-1, h, NID_OpenEventFlag);
-        g_poll = (fn_poll)kernel_dynlib_resolve(-1, h, NID_PollEventFlag);
+    op = (fn_open)hb_kernel_sym(NID_OpenEventFlag, "sceKernelOpenEventFlag", &h1);
+    g_poll = (fn_poll)hb_kernel_sym(NID_PollEventFlag, "sceKernelPollEventFlag", &h2);
+    if (!op || !g_poll) {
+        /* not in the libkernel we see by name: ask the loader for libkernel_sys */
+        char how[128];
+        uint32_t h = hb_mod_open("libkernel_sys.sprx", how, sizeof how);
+        log_line("rest: libkernel_sys.sprx %s", how);
+        if (!op) { op = (fn_open)hb_mod_sym(h, NID_OpenEventFlag, "sceKernelOpenEventFlag"); h1 = h; }
+        if (!g_poll) { g_poll = (fn_poll)hb_mod_sym(h, NID_PollEventFlag, "sceKernelPollEventFlag"); h2 = h; }
     }
-    if (op && g_poll && op(&g_ef, SSM_FLAG_NAME) == 0 && g_ef) g_ok = 1;
-    diag_set("rest mode watch", "%s", g_ok ? "on (system state flag)"
-             : op ? "off: system state flag not open" : "off: event flag calls not found");
-    log_line("rest: watch %s", g_ok ? "on" : "off — resume is still handled after the wake");
+    log_line("rest: open event flag %p (handle %#x), poll %p (handle %#x)", (void *)op, h1, (void *)g_poll, h2);
+    if (op && g_poll) {
+        rv = op(&g_ef, SSM_FLAG_NAME);
+        g_ok = rv == 0 && g_ef;
+        log_line("rest: open %s -> %#x", SSM_FLAG_NAME, (unsigned)rv);
+    }
+    if (g_ok)
+        diag_set("rest mode watch", "on (system state flag; open %p h %#x, poll %p h %#x)", (void *)op, h1, (void *)g_poll, h2);
+    else if (op && g_poll)
+        diag_set("rest mode watch", "off: system state flag not open (%#x; open %p h %#x, poll %p h %#x)",
+                 (unsigned)rv, (void *)op, h1, (void *)g_poll, h2);
+    else
+        diag_set("rest mode watch", "off: event flag calls not found (open %p h %#x, poll %p h %#x)",
+                 (void *)op, h1, (void *)g_poll, h2);
+    log_line("rest: watch %s", g_ok ? "on" : "off, resume is still handled after the wake");
 }
 
 int hb_rest_sys_avail(void)
