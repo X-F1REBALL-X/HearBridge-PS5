@@ -12,6 +12,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+static void hung(int sig) { (void)sig; printf("FAIL accept: hung on a link the headset already dropped\n"); fflush(stdout); _exit(1); }
 
 void log_line(const char *fmt, ...) { (void)fmt; }
 
@@ -20,6 +25,7 @@ static int evlen[64], evh, evt;
 static unsigned ops[256]; static unsigned char opargs[256][16]; static int nops;
 static unsigned next_handle = 2;
 static int swallow_disc;          /* Disconnection Complete read by someone else */
+static int drop_accept;           /* the headset hangs up right after our accept */
 
 static void push(const unsigned char *e, int n)
 {
@@ -49,7 +55,13 @@ static int f_cmd(void *s, unsigned op, const void *a, int n)
         cstatus(op); push(e, 6);
     } else if (op == 0x0409) {                           /* Accept Connection Request */
         unsigned char e[13] = { 0x03, 11, 0, (unsigned char)next_handle, 0 };
-        cstatus(op); memcpy(e + 5, p, 6); e[11] = 1; e[12] = 0; push(e, 13); next_handle++;
+        cstatus(op); memcpy(e + 5, p, 6); e[11] = 1; e[12] = 0; push(e, 13);
+        if (drop_accept) {                               /* 0x06 before encryption */
+            unsigned char d[6] = { 0x05, 4, 0, (unsigned char)next_handle, 0, 0x06 };
+            push(d, 6);
+            drop_accept = 0;
+        }
+        next_handle++;
     } else if (op == 0x040A) {                           /* Reject Connection Request */
         unsigned char e[13] = { 0x03, 11, 0, 0, 0 };
         cstatus(op); e[2] = p[6]; memcpy(e + 5, p, 6); e[11] = 1; push(e, 13);
@@ -176,6 +188,38 @@ int main(void)
         btlink_disconnect(b);
         btlink_destroy(b);
         CHECK(!btlink_own_acl_pending(), "switch: no leftover ACL of ours at the end");
+    }
+    /* Idle, out of the case: the headset takes our accept, hangs up before
+     * encryption (build 20 log, 0x06) and calls again. The accept must give
+     * up at once, not sit on the dead link until the page sends a command,
+     * and the next call must be taken (as peripheral) and come up. */
+    {
+        unsigned char req[12] = { 0x04, 10 };
+        unsigned char ab[1][6], kb[1][16], ktb[1] = { 4 };
+        int which = -1, ok, again = -1;
+        memcpy(ab[0], B, 6); memcpy(kb[0], key, 16);
+        memcpy(req + 2, B, 6); req[8] = 0x04; req[9] = 0x04; req[10] = 0x24; req[11] = 1;
+        signal(SIGALRM, hung);
+        alarm(20);
+        mark = nops;
+        push(req, 12);
+        drop_accept = 1;
+        b = btlink_create(hci, 1021, 7);
+        t0 = now_ms();
+        ok = btlink_accept(b, (const unsigned char (*)[6])ab, (const unsigned char (*)[16])kb, ktb, 1, 3000, &which);
+        dt = now_ms() - t0;
+        CHECK(!ok && dt < 1500, "dropped accept: gives up at once (no dead wait)");
+        btlink_destroy(b);
+        push(req, 12);                                         /* it calls again */
+        CHECK(acl_track_request_age(B, now_ms()) >= 0, "dropped accept: its new call is waiting to be taken");
+        b = btlink_create(hci, 1021, 7);
+        ok = btlink_accept(b, (const unsigned char (*)[6])ab, (const unsigned char (*)[16])kb, ktb, 1, 3000, &which);
+        for (i = mark; i < nops; i++) if (ops[i] == 0x0409) again = i;
+        CHECK(ok && which == 0 && btlink_is_up(b), "dropped accept: the next call is taken, link up and encrypted");
+        CHECK(again >= 0 && opargs[again][6] == 0x01, "dropped accept: the next call is taken as peripheral");
+        btlink_disconnect(b);
+        btlink_destroy(b);
+        alarm(0);
     }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;

@@ -124,6 +124,7 @@ struct btlink {
     int cc_fail;   /* Connection Complete failure status (not 0x0b) */
     /* Incoming connections (btlink_accept): saved devices we accept. */
     int acc_n, acc_got;
+    int acc_dropped;      /* the accepted ACL came up and went down before encryption */
     unsigned char acc_addr[8][6], acc_key[8][16], acc_kt[8];
     unsigned drop_hint; /* handle from Connection Complete 0x0b if any */
     int info_done;        /* Information Request exchange done on this ACL */
@@ -1248,6 +1249,7 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
         if (l->connected && dh == (l->handle & 0x0FFF)) {
             log_line("btlink: disconnected (reason %#04x)", ev[5]);
             g_disc_reason = ev[5];
+            if (l->acc_n && l->acc_got && !l->enc_on) l->acc_dropped = 1;
             l->connected = 0;
         }
         if (g_last_acl_handle == dh) g_last_acl_handle = 0;   /* whichever link reads it */
@@ -1516,6 +1518,7 @@ static void link_reset(btlink *l)
     l->retry_create = l->create_retries = l->purge_fail = 0;
     l->need_drop = 0;
     l->cc_fail = 0;
+    l->acc_dropped = 0;
     l->drop_hint = 0;
     l->pending_disc = 0;
     l->pending_disc_done = 0;
@@ -1562,7 +1565,7 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
                   int n, int timeout_ms, int *which)
 {
     unsigned char se = 0, cc[8];
-    int cc_len = 0, old = -1, ok = 0, k;
+    int cc_len = 0, old = -1, ok = 0, k, dropped = 0;
     long deadline;
 
     if (!l || n <= 0) return 0;
@@ -1604,6 +1607,20 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
     deadline = now_ms() + timeout_ms;
     while (now_ms() < deadline) {
         if (btlink_pump(l, 40) < 0) break;
+        if (l->acc_got && l->acc_dropped && !l->connected) {
+            /* The headset took our accept, then hung up before encryption
+             * (build 20 log: WF-1000XM6, 0x06, as central). Waiting on here hung
+             * the idle loop with a dead link: its next call was never taken
+             * and the buds sat "connected" without sound until the page sent
+             * a command. Give up now; its next call is taken by the caller
+             * as a new one, as peripheral. */
+            dropped = 1;
+            memcpy(g_acc_peri_addr, l->acc_addr[l->acc_got - 1], 6);
+            g_acc_peri = 1;
+            log_line("btlink: incoming link dropped before encryption (reason %#04x) — taking its next call as peripheral",
+                     g_disc_reason);
+            break;
+        }
         if (btlink_abort_connect) {
             int stop = 0;
             for (k = 0; k < l->acc_n && !stop; k++) stop = btlink_abort_connect(l->acc_addr[k]);
@@ -1645,9 +1662,9 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
         if (which) *which = l->acc_got - 1;
         log_line("btlink: incoming link ready (encrypted)");
         acl_track_request_clear(l->acc_addr[l->acc_got - 1]);
-    } else if (l->acc_got) {
+    } else if (l->acc_got && !dropped) {
         acl_track_request_clear(l->acc_addr[l->acc_got - 1]);   /* tried: do not retry it */
-    }
+    }   /* dropped: the accepted call was cleared then; one waiting now is a new call */
     l->acc_n = 0;
     return ok;
 }
