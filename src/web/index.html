@@ -7,7 +7,7 @@
 <title>HearBridge PS5</title>
 <style>
 :root{--ink:#f4efe6;--ink2:#cfc9be;--mute:#9a948a;--void:#0c0b0f;--deck:#15131a;--card:#1f1b26;--edge:#2c2833;--edge2:#3a3543;
---lime:#c8ff3d;--ember:#ff6a2b;--cyan:#3dd8ff;--violet:#b18cff;--blue:#5aa2ff;--teal:#8fc2bb;--warn:#ffb23d;--bad:#ff3d5a;--sk:-12deg;
+--lime:#c8ff3d;--ember:#ff6a2b;--cyan:#3dd8ff;--violet:#b18cff;--blue:#5aa2ff;--teal:#8fc2bb;--rose:#ff7ad9;--warn:#ffb23d;--bad:#ff3d5a;--sk:-12deg;
 --s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.25rem;--gap:var(--s4)}
 *{box-sizing:border-box}
 html{background:var(--void);font-size:15px}
@@ -41,18 +41,16 @@ text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;transform:skewX(
 /* toast for errors: never pushes the layout */
 .msg{position:fixed;z-index:80;top:4.2rem;left:50%;transform:translateX(-50%);max-width:90vw;padding:.5rem 1.2rem;background:var(--bad);color:var(--void);font-weight:800;box-shadow:0 .6rem 2rem rgba(0,0,0,.6)}
 .msg:empty{display:none}
-/* dashboard: phone = one column (devices, volume, status, connection) */
-.grid{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:var(--gap);
-grid-template-areas:"dev" "vol" "eq" "st" "conn"}
-.side{grid-area:dev;display:flex;flex-direction:column;min-width:0;min-height:0;gap:var(--gap)}
-.vol{grid-area:vol}.status{grid-area:st}.conn{grid-area:conn}.eqp{grid-area:eq}
+/* main screen: only the essentials. phone = one column */
+.grid{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:var(--gap);grid-template-areas:"hs" "vol" "lat" "eq"}
+.hs{grid-area:hs}.vol{grid-area:vol}.latp{grid-area:lat}.eqp{grid-area:eq}
 .panel{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;padding:var(--s3) var(--s5) var(--s4);
 background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0) 6rem),var(--deck);
 border:1px solid var(--edge);border-inline-start:4px solid var(--acc,var(--ember));
 clip-path:polygon(0 0,calc(100% - 1.1rem) 0,100% 1.1rem,100% 100%,0 100%)}
 [dir=rtl] .panel{clip-path:polygon(1.1rem 0,100% 0,100% 100%,0 100%,0 1.1rem)}
 /* one accent per panel (left border, title dot, title text); red stays for Stop only */
-.hero{--acc:var(--lime)}.status{--acc:var(--cyan)}.vol{--acc:var(--ember)}.eqp{--acc:var(--violet)}.conn{--acc:var(--blue)}.logp{--acc:var(--teal)}
+.hs{--acc:var(--lime)}.vol{--acc:var(--ember)}.latp{--acc:var(--cyan)}.eqp{--acc:var(--violet)}
 /* panel header: one style everywhere */
 .label{order:-3;display:flex;align-items:center;margin:0 0 var(--s3);font-size:.78rem;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--acc,var(--ember));line-height:1.2}
 .label:before{content:"";flex:0 0 auto;width:.45rem;height:.45rem;margin-inline-end:var(--s2);background:currentColor;transform:rotate(45deg)}
@@ -192,6 +190,9 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .lt{display:grid;grid-template-columns:auto minmax(0,1fr) 4.2rem;grid-gap:var(--s3);align-items:center;margin-top:var(--s2)}
 .lt .v{text-align:end}
 .latm .lt input[type=range]{margin:0}
+.latm .lt1{grid-template-columns:minmax(0,1fr) auto;margin:0 0 var(--s3)}.latm .lname{font-size:.78rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
+.latm .lt1 .v{font-size:1.15rem;color:var(--lime)}
+[dir=rtl] .latm .lname{letter-spacing:0}
 /* connection */
 .conn .cbox{display:grid;grid-template-columns:auto minmax(0,1fr);grid-gap:var(--s4);align-items:center}
 .conn .note{margin:0;font-size:.8rem;line-height:1.3}
@@ -231,53 +232,125 @@ background:linear-gradient(90deg,rgba(255,255,255,.07) 0 85%,rgba(255,61,90,.3) 
 [dir=rtl] .meter div{margin-left:auto}
 .meter:after{content:"";position:absolute;top:0;bottom:0;left:0;right:0;
 background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25% - 1px) 25%,transparent 25% calc(50% - 1px),var(--deck) calc(50% - 1px) 50%,transparent 50% calc(75% - 1px),var(--deck) calc(75% - 1px) 75%,transparent 75%)}
-/* mid widths: two columns, page may scroll */
+/* battery + link rows (status) */
+.batt{display:inline-flex;align-items:center;gap:var(--s2)}
+.bat{position:relative;display:inline-block;width:1.9rem;height:.95rem;border:2px solid var(--ink2);direction:ltr}
+.bat:after{content:"";position:absolute;right:-.3rem;top:.18rem;width:.18rem;height:.35rem;background:var(--ink2)}
+.bat i{position:absolute;left:1px;top:1px;bottom:1px;background:var(--lime)}
+.bat.low i{background:var(--warn)}.bat.crit i{background:var(--bad)}.bat.chg i{background:var(--cyan)}
+.lq{display:inline-flex;align-items:center;gap:var(--s2)}.lq .bars{height:1.05rem}
+.lq small{font-size:.74rem;font-weight:700;color:var(--ink2)}
+.bars.b2 i.on{background:var(--warn)}.bars.b1 i.on{background:var(--bad)}
+/* headset volume moved on the headset itself */
+.sync{display:inline-block;margin-inline-start:.5rem;padding:0 .4rem;font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--void);background:var(--ember);opacity:0;transition:opacity .4s}
+.sync.on{opacity:1}
+/* running game strip (equalizer) */
+.game{display:flex;align-items:center;gap:var(--s2);min-width:0;margin:0 0 var(--s2);padding:var(--s1) 0 var(--s1) var(--s2);background:rgba(255,122,217,.06);border:1px solid rgba(255,122,217,.35)}
+.game .gbtns{margin-inline-start:auto}.game.on{background:rgba(255,122,217,.14);border-color:var(--rose)}.game .gbtns button{min-height:2.2rem;min-width:0;padding:.15rem .8rem;font-size:.86rem}
+.game .gi{flex:0 0 auto;width:1.15rem;height:1.15rem;color:var(--violet)}
+.game b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}
+.gchip{flex:0 0 auto;padding:0 .4rem;font-size:.66rem;font-weight:900;text-transform:uppercase;color:var(--void);background:var(--rose)}
+.game .gbtns{display:flex;flex:0 0 auto}
+/* what a low buffer target saves (or that it stepped back on drops) */
+.llsave{display:inline-block;margin-inline-start:.4rem;padding:0 .35rem;font-size:.7rem;font-weight:900;color:var(--void);background:var(--lime);direction:ltr;unicode-bidi:isolate;vertical-align:middle}
+.llsave:empty{display:none}.llsave.back{background:var(--warn)}
+/* backup / restore dialog */
+#bkbtn{min-height:2.5rem;font-size:.85rem;text-transform:uppercase;margin-inline-end:.3rem}
+#bkbtn:before{background:var(--deck)}
+.hdr{display:flex;align-items:center}
+.modal{position:fixed;z-index:90;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;background:rgba(6,5,9,.78)}
+.modal.show{display:flex}
+.modal .panel{--acc:var(--rose);width:34rem;max-width:calc(100vw - 2rem);max-height:calc(100vh - 2rem);overflow-y:auto;box-shadow:0 1.5rem 3rem rgba(0,0,0,.7)}
+.modal .seg button.act:before{background:var(--rose);border-color:var(--rose)}
+.bkgo{display:grid;grid-template-columns:1fr 1fr;grid-gap:var(--s3);margin:var(--s3) 0 var(--s2)}
+.bkgo button{min-height:3.4rem;font-size:1.2rem}
+.bkgo button.act:before{background:var(--rose);border-color:var(--rose)}
+.bkmsg{min-height:1.3rem;margin:var(--s2) 0;font-weight:700;color:var(--ink2)}
+.bkmsg.good{color:var(--lime)}.bkmsg.bad{color:#ff8a8a}
+.bklist button{display:block;width:100%;min-height:2.6rem;margin-bottom:var(--s1);text-align:start;font-variant-numeric:tabular-nums}
+.bkfoot{display:flex;justify-content:flex-end;margin-top:var(--s2)}
+/* headset panel */
+.hs .now{margin-bottom:var(--s2)}
+.hs.off .nowico{color:var(--mute);background:var(--card);box-shadow:inset 0 0 0 1px var(--edge2)}
+.hsinfo{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);margin:0 0 var(--s1)}
+.hsi{display:inline-flex;align-items:center;gap:var(--s2);font-size:.95rem}.hsi .k{font-weight:700;font-size:.82rem}
+.qs{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));grid-gap:var(--s2);margin:0 0 var(--s3)}
+.qs button{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-height:3.6rem;padding:.3rem 1.3rem;text-align:start;overflow:hidden}
+.qs button b{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:1.05rem;direction:ltr;unicode-bidi:isolate}
+.qs button small{font-size:.74rem;font-weight:700;color:var(--mute)}
+.qs button.act small{color:rgba(12,11,15,.7)}
+.qs button.cur:before{border-color:rgba(200,255,61,.7)}
+.qs p{grid-column:1/-1;margin:0;padding:var(--s2) var(--s3);font-size:.9rem;color:var(--mute);border:1px dashed var(--edge2)}
+.hsb{margin-top:auto}
+.btns.one{grid-template-columns:1fr}
+/* sound panel */
+.eqhead .cl{font-size:.82rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+[dir=rtl] .eqhead .cl{letter-spacing:0}
+.eqp .presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-gap:var(--s1);margin:0 0 var(--s3)}
+.eqp .presets button{min-height:2.9rem;margin:0;padding:.2rem .4rem;font-size:.92rem;overflow:hidden;text-overflow:ellipsis}
+.eqp.off .presets button.act{color:var(--ink)}.eqp.off .presets button.act:before{background:var(--card);border-color:var(--b3)}
+.gline{display:flex;align-items:center;gap:var(--s2);margin:0 0 var(--s2);padding:var(--s1) var(--s2);font-size:.88rem;font-weight:700;color:var(--ink);background:rgba(255,122,217,.1);border:1px solid rgba(255,122,217,.45)}
+.gline .gi,.game .gi{flex:0 0 auto;width:1.15rem;height:1.15rem;color:var(--rose)}
+.gline span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.night{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:4.2rem;padding:.4rem 1.5rem;text-align:start;margin-top:auto}
+.night .nt{display:flex;flex-direction:column;min-width:0}.night b{font-size:1.2rem}.night small{font-size:.8rem;font-weight:700;color:var(--mute);white-space:normal}
+.sw{flex:0 0 auto;position:relative;width:3.4rem;height:1.6rem;margin-inline-start:var(--s3);background:var(--void);border:2px solid var(--edge2)}
+.sw:after{content:"";position:absolute;top:.15rem;left:.2rem;width:1.1rem;height:1rem;background:var(--mute)}
+[dir=rtl] .sw:after{left:auto;right:.2rem}
+button.night.on:before{background:linear-gradient(90deg,rgba(177,140,255,.28),rgba(177,140,255,.12));border-color:var(--violet)}
+.night.on .sw{border-color:var(--violet)}.night.on .sw:after{left:1.85rem;background:var(--violet);box-shadow:0 0 .6rem var(--violet)}
+[dir=rtl] .night.on .sw:after{left:auto;right:1.85rem}
+.night.on small{color:var(--ink2)}
+/* info toast (battery): amber, goes away by itself */
+.toast{position:fixed;z-index:85;top:4.2rem;left:50%;transform:translateX(-50%);max-width:90vw;padding:.6rem 1.4rem;background:var(--warn);color:var(--void);font-weight:900;font-size:1.05rem;box-shadow:0 .6rem 2rem rgba(0,0,0,.6)}
+.toast:empty{display:none}
+/* settings: one overlay, tabs on the side, one page at a time */
+#setbtn{min-height:2.5rem;font-size:.85rem;text-transform:uppercase;margin-inline-end:.3rem}
+#setbtn:before{background:var(--deck)}
+#setbtn .gear{width:1rem;height:1rem;margin-inline-end:.45rem;vertical-align:-.15rem}
+.modal.set .panel.setp{--acc:var(--ink2);width:76rem;max-width:calc(100vw - 2rem);height:calc(100vh - 3rem);max-height:none;padding-bottom:var(--s3);overflow:hidden}
+.sethead{display:flex;align-items:center;gap:var(--s3)}.sethead .label{flex:1;margin:0}
+.sethead button{min-height:2.5rem}
+.setbody{flex:1;min-height:0;display:grid;grid-template-columns:15rem minmax(0,1fr);grid-gap:var(--s5);margin-top:var(--s3)}
+.tabs{display:flex;flex-direction:column;gap:var(--s2);overflow-y:auto;padding:4px}
+.tabs button{min-height:3.3rem;text-align:start;padding-inline-start:1.4rem;white-space:normal;line-height:1.15}
+.tabs button:after{content:"";position:absolute;top:.5rem;bottom:.5rem;inset-inline-start:.55rem;width:4px;background:var(--acc);transform:skewX(var(--sk))}
+.tabs button.on{color:var(--void)}.tabs button.on:before{background:var(--acc);border-color:var(--acc)}.tabs button.on:after{background:var(--void)}
+.pages{min-height:0;overflow-y:auto;padding:4px var(--s2) var(--s3) 4px}
+.pg{display:none}.pg.on{display:block}
+.pg .sub:first-child,.pg>.note:first-child{margin-top:0}
+.pg .list{max-height:none;overflow:visible}
+.pg .note{font-size:.9rem;line-height:1.35;margin:0 0 var(--s3)}
+.pg .btns{margin-top:var(--s3)}
+.pg .curve{height:9rem}
+.pg .bands{grid-gap:.6rem}.pg .band{grid-template-columns:7rem minmax(0,1fr) 4rem}
+.pg .chiprow{margin:var(--s4) 0}.pg .chiprow .diag{margin-inline-start:auto}
+.pg .cbox{display:grid;grid-template-columns:auto minmax(0,1fr);grid-gap:var(--s4);align-items:center;margin-top:var(--s4)}
+.pg .seg button.act:before{background:var(--acc);border-color:var(--acc)}
+.pg .game{padding:var(--s2) var(--s3);margin:0}
+.game.none{background:none;border-style:dashed;border-color:var(--edge2)}.game.none b{color:var(--mute);font-weight:700}
+#pg4 .bkgo button.act:before{background:var(--warn);border-color:var(--warn)}
+#pg5 .evlog{margin-top:var(--s1)}
+.tabs button:focus,.qs button:focus{transform:scale(1.02)}
+/* two columns from tablet width */
 @media(min-width:760px){
-.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "dev vol" "dev eq" "dev conn";grid-template-rows:auto auto auto 1fr}
-.conn{align-self:start}
+.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"hs vol" "lat eq"}
 }
-/* TV: one screen, no page scroll. Everything is rem, rem follows the viewport. */
+/* TV: one screen, no page scroll, everything big. rem follows the viewport. */
 @media(min-width:1180px) and (min-height:600px){
 html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 .wrap{height:100vh}
-.grid{flex:1;min-height:0;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr);
-grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(min-content,1fr) auto}
-/* left column: takes the height the grid gives it and never stretches the rows (height:0 keeps it out of row sizing, min-height:100% fills its area) */
-.side{height:0;min-height:100%}
-/* bottom row panels never shrink below their content (page scrolls on a very short screen instead of overlapping) */
-.vol,.conn{min-height:min-content;padding-bottom:var(--s3)}
-/* devices as tall as their content (found list ~3 rows, scrolls), the log takes the rest */
-.side .hero{flex:0 1 auto}
-.side .logp{flex:1 1 0;min-height:13rem}
-.side .hero{min-height:0}
-#devlist .dl,#savedlist .dl{min-height:2.9rem;padding-top:.2rem;padding-bottom:.2rem}
-.side #savedlist{flex:0 0 auto;max-height:none}
-.side #scan{min-height:2.9rem}
-.side .hint{margin-top:var(--s1);margin-bottom:var(--s1)}
-#devlist .dl button{min-height:2.2rem}
-.logp .evlog div{padding:.06rem 0}
-.logp .evlog{flex:1 1 0;min-height:0;overflow-y:auto}
-.eqp{min-height:0}
-.eqp .presets button{min-height:1.9rem;margin:.1rem 0;padding:.1rem .65rem}
-.conn{align-self:stretch}
-#savedlist{flex:0 1 auto;max-height:34%}
-/* one screen: the longer hints only show on phones and laptops */
-#codecnote,#latnote{display:none}
-.eqp .curve{flex:1 1 0;height:auto;min-height:1.4rem;max-height:6rem}.eqp .bands,.eqp .presets,.eqp .eqhead{flex:0 0 auto}
-#devlist{flex:0 1 auto;min-height:3.2rem;max-height:10rem}
-/* spare height goes to the status card (meters sit at its bottom, idle art fills it) */
-.status #stats{flex:1 0 auto}.status .meters{margin-top:auto;padding-top:var(--s3)}
-/* status rows a bit tighter so long labels (de) still fit one screen */
-.kv>*{min-height:1.9rem}
-.vol .ctl{margin-bottom:var(--s3)}
+.grid{flex:1;min-height:0;grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
+.panel{min-height:0}
 .big{font-size:2.6rem}
-.vol input[type=range],.vol input[type=range]::-webkit-slider-runnable-track,.vol input[type=range]::-webkit-slider-thumb,.vol input[type=range]::-moz-range-track,.vol input[type=range]::-moz-range-progress,.vol input[type=range]::-moz-range-thumb{height:2rem}
-.vol .btns button{min-height:3rem}
-.idle svg{height:70%;max-height:9rem}
-}
-/* below TV width: saved-device actions go on their own line under the name */
-@media(max-width:1179px){
-#savedlist .dl{grid-template-columns:auto minmax(0,1fr);grid-row-gap:var(--s2)}#savedlist .ico{grid-row:1}#savedlist .nm{grid-column:2;grid-row:1}#savedlist .sig{display:none}#savedlist .acts{grid-column:1/-1;grid-row:2;grid-auto-columns:1fr}
+.vol .ctl{margin-bottom:var(--s3)}
+.vol input[type=range],.vol input[type=range]::-webkit-slider-runnable-track,.vol input[type=range]::-webkit-slider-thumb,.vol input[type=range]::-moz-range-track,.vol input[type=range]::-moz-range-progress,.vol input[type=range]::-moz-range-thumb,
+.latp input[type=range],.latp input[type=range]::-webkit-slider-runnable-track,.latp input[type=range]::-webkit-slider-thumb,.latp input[type=range]::-moz-range-track,.latp input[type=range]::-moz-range-progress,.latp input[type=range]::-moz-range-thumb{height:2rem}
+.vol .btns{margin-top:auto}.vol .btns button{min-height:3.2rem}
+.latp .latm{padding:var(--s3) var(--s4)}.latp .lt1 .v{font-size:1.6rem}
+.latp .latm .big{font-size:2.4rem}.latp .lbar{height:1rem}
+.latp .lkeys{font-size:.84rem}
+.qs{overflow-y:auto;min-height:0;flex:0 1 auto;padding:4px;margin:-4px -4px var(--s3)}
 }
 @media(max-width:759px){
 .bar{flex-wrap:wrap}.brand{width:100%;margin-bottom:.7rem}
@@ -287,56 +360,75 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(min-con
 .kv{grid-template-columns:minmax(0,1fr)}.kv>.k{min-height:0;padding:var(--s2) 0 0;border-bottom:0}.kv>.v,.kv>.chips{min-height:0;padding:var(--s1) 0 var(--s2)}
 .dl button{min-width:0}
 .meters{grid-template-columns:1fr;grid-gap:var(--s2)}
-.conn .cbox{grid-template-columns:1fr}
+.pg .cbox{grid-template-columns:1fr}
 #stop{width:100%;min-width:0}
-.msg{top:.6rem}
+.msg,.toast{top:.6rem}
+.setbody{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+.tabs{flex-direction:row;overflow-x:auto}.tabs button{flex:0 0 auto;min-height:2.8rem;white-space:nowrap}
+.modal.set .panel.setp{height:calc(100vh - 1rem);max-width:calc(100vw - 1rem)}
+#setbtn span{display:none}#setbtn .gear{margin:0}
+.eqp .presets{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
 <body><div class="wrap">
 <header class="bar">
 <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span>
-<div><h1>Hear<b>Bridge</b> PS5</h1><div class="meta"><span class="ver" id="ver">-</span><span class="by">Developed by X-F1REBALL-X</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div></div></div>
+<div><h1>Hear<b>Bridge</b> PS5</h1><div class="meta"><span class="ver" id="ver">-</span><span class="by">Developed by X-F1REBALL-X</span></div></div></div>
 <div class="live" id="live"><i></i><span id="state">-</span></div>
-<div id="langbox"><button type="button" id="langbtn" aria-haspopup="true"><span data-i18n="language">Language</span></button><div id="langlist" role="menu"></div></div>
+<div class="hdr"><button type="button" id="setbtn"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9L2 13.7v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg><span data-i18n="settings">Settings</span></button>
+<div id="langbox"><button type="button" id="langbtn" aria-haspopup="true"><span data-i18n="language">Language</span></button><div id="langlist" role="menu"></div></div></div>
 </header>
-<div class="msg" id="msg"></div>
+<div class="msg" id="msg"></div><div class="toast" id="toast"></div>
 <main class="grid">
-<div class="side">
-<section class="panel hero" id="devpanel"><p class="label" data-i18n="devices">Devices</p>
-<button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
-<p class="k hint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p>
-<p class="sub" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div>
-<p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div>
-</section>
-<section class="panel logp"><p class="label" data-i18n="log">Log</p>
-<div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section>
-</div>
-<section class="panel status"><p class="label" data-i18n="status">Status</p>
-<div id="stats" style="display:none">
-<div class="kv">
-<span class="k" data-i18n="packets">Packets / SBC frames</span><span class="v" id="pk">-</span>
-<span class="k" data-i18n="avrcp">AVRCP</span><span class="chips" id="av">-</span>
-<span class="k" data-i18n="format">Format</span><span class="chips" id="fmt">-</span>
-</div>
-<div class="meters">
-<div><div class="mrow"><span class="k" data-i18n="capPeak">Capture peak</span><span class="v" id="pkv">-</span></div><div class="meter"><div id="m1"></div></div></div>
-<div><div class="mrow"><span class="k" data-i18n="outPeak">Output peak</span><span class="v" id="opv">-</span></div><div class="meter"><div id="m2"></div></div></div>
-</div>
-</div>
+<section class="panel hs" id="hspanel"><p class="label" data-i18n="headsetPanel">Headset</p>
 <div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
-<div class="idle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></div>
-<div class="chiprow"><span class="k" data-i18n="chip">Chip</span><span class="v" id="chipv">-</span></div>
+<div class="hsinfo"><span class="hsi"><span class="k" data-i18n="battery">Battery</span><span class="v" id="batm">-</span></span><span class="hsi"><span class="k" data-i18n="signal">Signal</span><span class="v" id="lqm">-</span></span></div>
+<p class="sub" data-i18n="switchHs">Switch headset</p>
+<div class="qs" id="qs"></div>
+<div class="btns hsb"><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div>
 </section>
 <section class="panel vol"><p class="label" data-i18n="volume">Volume</p>
 <div class="ctl"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
 <input type="range" id="gain" min="0" max="500" step="10"></div>
-<div class="ctl"><div class="row"><span class="cl" data-i18n="headset">Headset volume (AVRCP)</span><span class="big" id="hv">-</span></div>
+<div class="ctl"><div class="row"><span class="cl"><span data-i18n="headset">Headset volume (AVRCP)</span><span class="sync" id="hsync" data-i18n="fromHeadset">from headset</span></span><span class="big" id="hv">-</span></div>
 <input type="range" id="hs" min="0" max="127" step="1"></div>
-<div class="btns"><button id="mute" data-i18n="mute">Mute</button><button id="tone" data-i18n="tone">Test tone</button><button id="clean" data-i18n="clean">Clean sound</button></div>
+<div class="btns one"><button id="mute" data-i18n="mute">Mute</button></div>
 </section>
-<section class="panel eqp" id="eqp"><p class="label" data-i18n="equalizer">Equalizer</p>
-<div class="eqhead"><span class="k note" data-i18n="eqHint">Saved for this headset.</span><button id="eqon" data-i18n="eqOff">Off</button></div>
+<section class="panel latp"><p class="label" data-i18n="latency">Latency</p>
+<div class="latm"><div class="lt lt1"><input type="range" id="lat" min="40" max="200" step="1"><span class="v" id="latt">-</span></div>
+<div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big"><span id="latv">-</span><span class="llsave" id="llsave"></span></span></div>
+<div class="lbar" id="lbar"><i id="lb0" style="background:var(--b0)"></i><i id="lb1" style="background:var(--b2)"></i><i id="lb2" style="background:var(--b3)"></i><i id="lb3" style="background:var(--b4)"></i></div>
+<div class="lkeys" id="lkeys"></div></div>
+<p class="k note" id="latnote" data-i18n="latHint">Lower: less delay. Higher: fewer dropouts when the radio is busy. Saved for this headset.</p>
+</section>
+<section class="panel eqp" id="eqp"><p class="label" data-i18n="sound">Sound</p>
+<div class="gline" id="gline" style="display:none"><svg class="gi" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10a5 5 0 0 1 4.6 7l-1 2.3a2.5 2.5 0 0 1-4.2.6L14.6 15H9.4l-1.8 1.9a2.5 2.5 0 0 1-4.2-.6l-1-2.3A5 5 0 0 1 7 7z" fill="currentColor"/></svg><span id="gltxt">-</span></div>
+<div class="eqhead" id="eqhead"><span class="cl" data-i18n="equalizer">Equalizer</span><button id="eqon" data-i18n="eqOff">Off</button></div>
+<div class="presets"><button id="pr0" data-i18n="prFlat">Flat</button><button id="pr1" data-i18n="prBassBoost">Bass boost</button><button id="pr2" data-i18n="prBassCut">Bass cut</button><button id="pr3" data-i18n="prTreble">Treble boost</button><button id="pr4" data-i18n="prVoice">Voice / footsteps</button><button id="prc" data-i18n="eqCustom">Custom</button></div>
+<button type="button" class="night" id="night"><span class="nt"><b data-i18n="night">Night mode</b><small data-i18n="nightHint">Quieter explosions, clearer voices</small></span><span class="sw" id="nightsw"></span></button>
+</section>
+</main>
+</div>
+<div class="modal set" id="setm" role="dialog" aria-modal="true"><section class="panel setp">
+<div class="sethead"><p class="label" data-i18n="settings">Settings</p><button type="button" id="setclose" data-i18n="close">Close</button></div>
+<div class="setbody"><nav class="tabs" id="tabs">
+<button type="button" id="tb0" style="--acc:var(--lime)" data-i18n="tabHeadsets">Headsets</button>
+<button type="button" id="tb1" style="--acc:var(--violet)" data-i18n="equalizer">Equalizer</button>
+<button type="button" id="tb2" style="--acc:var(--rose)" data-i18n="tabGames">Games</button>
+<button type="button" id="tb3" style="--acc:var(--blue)" data-i18n="connection">Connection</button>
+<button type="button" id="tb4" style="--acc:var(--warn)" data-i18n="bkTitle">Backup &amp; restore</button>
+<button type="button" id="tb5" style="--acc:var(--teal)" data-i18n="tabInfo">Status &amp; log</button>
+</nav>
+<div class="pages">
+<div class="pg" id="pg0" style="--acc:var(--lime)">
+<button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
+<p class="k hint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p>
+<p class="sub" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div>
+<p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div>
+</div>
+<div class="pg" id="pg1" style="--acc:var(--violet)">
+<p class="k note" id="eqhint" data-i18n="eqHint">Saved for this headset.</p>
 <div class="curve"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eqg" x1="0" x2="1" y1="0" y2="0">
 <stop offset="0" stop-color="#ff6a2b"/><stop offset=".3" stop-color="#ffb23d"/><stop offset=".5" stop-color="#c8ff3d"/><stop offset=".72" stop-color="#3dd6ff"/><stop offset="1" stop-color="#b06bff"/></linearGradient></defs>
 <path id="eqfill" fill="url(#eqg)" fill-opacity=".18" d=""/><path id="eqline" fill="none" stroke="url(#eqg)" stroke-width="2.5" vector-effect="non-scaling-stroke" d=""/></svg></div>
@@ -347,25 +439,49 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(min-con
 <div class="band" style="--c:var(--b3)"><span class="bn"><i></i><span data-i18n="eqPresence">Presence</span></span><input type="range" id="eq3" min="-12" max="12" step="1"><span class="bv" id="eqv3">0</span></div>
 <div class="band" style="--c:var(--b4)"><span class="bn"><i></i><span data-i18n="eqTreble">Treble</span></span><input type="range" id="eq4" min="-12" max="12" step="1"><span class="bv" id="eqv4">0</span></div>
 </div>
-<div class="presets"><button id="pr0" data-i18n="prFlat">Flat</button><button id="pr1" data-i18n="prBassBoost">Bass boost</button><button id="pr2" data-i18n="prBassCut">Bass cut</button><button id="pr3" data-i18n="prTreble">Treble boost</button><button id="pr4" data-i18n="prVoice">Voice / footsteps</button></div>
-</section>
-<section class="panel conn"><p class="label" data-i18n="connection">Connection</p>
+<div class="btns"><button id="tone" data-i18n="tone">Test tone</button><button id="clean" data-i18n="clean">Clean sound</button></div>
+</div>
+<div class="pg" id="pg2" style="--acc:var(--rose)">
+<p class="k note" data-i18n="gamesHint">Save the sound you like for a game. It turns on by itself when that game starts, and your usual sound comes back when it closes.</p>
+<div class="game" id="game"><svg class="gi" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10a5 5 0 0 1 4.6 7l-1 2.3a2.5 2.5 0 0 1-4.2.6L14.6 15H9.4l-1.8 1.9a2.5 2.5 0 0 1-4.2-.6l-1-2.3A5 5 0 0 1 7 7z" fill="currentColor"/></svg><b id="gname">-</b><span class="gchip" id="gon" data-i18n="gameOn">game profile</span></div>
+<div class="btns" id="gbtns"><button id="gsave" class="act" data-i18n="gameSave">Save for this game</button><button id="gdrop" class="red" data-i18n="gameRemove">Remove</button></div>
+</div>
+<div class="pg" id="pg3" style="--acc:var(--blue)">
 <p class="sub" data-i18n="codec">Codec</p>
 <div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
 <p class="k note cno" id="codecno"></p>
 <p class="k note cno" id="xqnote"></p>
 <p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p>
-<p class="sub" data-i18n="latency">Latency</p>
-<div class="latm"><div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big" id="latv">-</span></div>
-<div class="lbar" id="lbar"><i id="lb0" style="background:var(--b0)"></i><i id="lb1" style="background:var(--b2)"></i><i id="lb2" style="background:var(--b3)"></i><i id="lb3" style="background:var(--b4)"></i></div>
-<div class="lkeys" id="lkeys"></div>
-<div class="lt"><span class="cl" data-i18n="latTarget">Buffer target</span><input type="range" id="lat" min="60" max="200" step="1"><span class="v" id="latt">-</span></div></div>
-<p class="k note" id="latnote" data-i18n="latHint">Lower: less delay. Higher: fewer dropouts when the radio is busy. Saved for this headset.</p>
+<div class="chiprow"><span class="k" data-i18n="chip">Chip</span><span class="v" id="chipv">-</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div>
 <div class="cbox"><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
 <p class="k note" data-i18n="footer">Closing this page leaves HearBridge running.</p></div>
-</section>
-</main>
 </div>
+<div class="pg" id="pg4" style="--acc:var(--warn)">
+<p class="k note" data-i18n="bkHint">Saved headsets (with their pairing), their settings and game profiles in one file.</p>
+<p class="sub" data-i18n="bkWhere">Where</p>
+<div class="seg" id="bkseg"><button id="bkusb" data-i18n="bkUsb">USB drive</button><button id="bkint" data-i18n="bkConsole">Console</button><button id="bkdev" data-i18n="bkDevice">This device</button></div>
+<div class="bkgo"><button id="bkdo" class="act" data-i18n="backup">Back up</button><button id="rsdo" data-i18n="restore">Restore</button></div>
+<p class="bkmsg" id="bkmsg"></p><div class="bklist" id="bklist"></div>
+<input type="file" id="bkfile" accept=".json,application/json" style="display:none">
+</div>
+<div class="pg" id="pg5" style="--acc:var(--teal)">
+<div id="stats" style="display:none">
+<div class="kv">
+<span class="k" data-i18n="packets">Packets / SBC frames</span><span class="v" id="pk">-</span>
+<span class="k" data-i18n="avrcp">AVRCP</span><span class="chips" id="av">-</span>
+<span class="k" data-i18n="format">Format</span><span class="chips" id="fmt">-</span>
+<span class="k" data-i18n="battery">Battery</span><span class="v" id="batv">-</span>
+<span class="k" data-i18n="link">Link quality</span><span class="v" id="lqv">-</span>
+</div>
+<div class="meters">
+<div><div class="mrow"><span class="k" data-i18n="capPeak">Capture peak</span><span class="v" id="pkv">-</span></div><div class="meter"><div id="m1"></div></div></div>
+<div><div class="mrow"><span class="k" data-i18n="outPeak">Output peak</span><span class="v" id="opv">-</span></div><div class="meter"><div id="m2"></div></div></div>
+</div>
+</div>
+<p class="sub" data-i18n="log">Log</p>
+<div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div>
+</div>
+</div></div></section></div>
 <script>
 var I18N=/*I18N*/;
 var S=null,busyG=0,busyH=0,LANG='en',TOKEN='HBTOKENxxxxxxxxxxxxxxxxxxxxxxxxx';
@@ -448,7 +564,18 @@ rows.push({k:d.addr,h:row(icon(d.kind),d.name||d.addr,badge(d.current)+'<span cl
 :d.current&&busy?'':'<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('reconnect'))+'</button>')
 +'<button type="button" class="red" data-forget="1" data-addr="'+esc(d.addr)+'">'+esc(t('forget'))+'</button>',
 d.current&&on?'on':d.current&&busy?'busy':'')})}
-patchList('savedlist',rows,'<p class="k">'+esc(t('noSaved'))+'</p>')}
+patchList('savedlist',rows,'<p class="k">'+esc(t('noSaved'))+'</p>');drawQs(on,busy)}
+/* main screen: one tap on a saved headset switches to it */
+function drawQs(on,busy){var h='',i,d,cur=null;
+for(i=0;i<SAVL.length;i++){d=SAVL[i];if(d.current)cur=d;
+var cls=d.current?(on?'act':'cur'):'',sub=d.current?(on?t('playing'):busy?t('connecting')+'…':t('notConnected')):t('tapSwitch');
+h+='<button type="button" class="'+cls+'" data-q="'+esc(d.addr)+'"'+(d.current&&on?' data-on="1"':'')+'><b>'+esc(d.name||d.addr)+'</b><small>'+esc(sub)+'</small></button>'}
+if(!SAVL.length)h='<p>'+esc(t('noSaved'))+'</p>';
+if($('qs').hbHtml!==h){$('qs').hbHtml=h;$('qs').innerHTML=h;var b=$('qs').getElementsByTagName('button');
+for(i=0;i<b.length;i++)b[i].onclick=function(){if(this.getAttribute('data-on'))return;
+act('/api/select?addr='+this.getAttribute('data-q'));this.getElementsByTagName('small')[0].textContent=t('connecting')+'…'}}
+var hc=$('hsconn');hc.style.visibility=cur&&!busy?'':'hidden';hc.textContent=t(on?'disconnect':'connect');hc.className=on?'':'act';hc.hbOn=on}
+$('hsconn').onclick=function(){act(this.hbOn?'/api/disconnect':'/api/connect')};
 function saved(){getj('/api/saved',function(j){var i;SAVL=j.devices;SAV={};for(i=0;i<SAVL.length;i++)SAV[SAVL[i].addr]=1;drawSaved()})}
 var SAV={},SHOW={headphones:1,headset:1,speaker:1,portable:1,hifi:1,handsfree:1},HEAD={headphones:1,headset:1};
 function devices(){getj('/api/devices',function(j){var rows=[],i,d,k;
@@ -458,8 +585,9 @@ patchList('devlist',rows,'<p class="k">'+esc(t('noDevices'))+'</p>')})}
 function pct(v){return Math.round(v)+'%'}
 function chips(a){var h='',i;for(i=0;i<a.length;i++)h+='<span class="chip'+(a[i][1]?' '+a[i][1]:'')+'">'+esc(a[i][0])+'</span>';return h}
 /* log line colour: problems soft red, success lime, presses cyan, the rest white */
-function evKind(s){return /fail|no answer|busy|hung up|lost|dropped|refused|not an audio|unstable|stuck|went away|closed/i.test(s)?'bad':
-/pressed|scan started/i.test(s)?'press':/playing|turned on|answered|secured|connected in|worked|now /i.test(s)?'good':''}
+function evKind(s){return /could not|did not|didn't|busy|hung up|lost|not an audio|unstable|out of range|stopped the audio|weak signal|battery at/i.test(s)?'bad':
+/^playing|turned on|connected securely|reconnected|is back|^connecting to|signal good|night mode on|game sound on|^saved|restored|backup saved|downloaded/i.test(s)?'good':
+/^(connecting|disconnecting|reconnecting|forgetting|scan started)/i.test(s)?'press':''}
 function setHtml(id,h){var e=$(id);if(e.hbHtml!==h){e.hbHtml=h;e.innerHTML=h}}
 function draw(){
 $('msg').textContent='';
@@ -471,7 +599,7 @@ if(whyTxt)det=whyTxt;
 $('state').textContent={reconnecting:1,disconnected:1,paused:1,error:1,idle:1,'waiting-selection':1}[st]?t('notConnected')+(det?' ('+det+')':''):(t(st)==st?st:t(st));
 $('live').className='live '+(st=='streaming'||st=='connected'?'ok':(st=='paused'||st=='disconnected'||st=='error'?'bad':'wait'));
 var on=!!S.connected&&fresh(),link=on||((st=='connecting'||st=='pairing')&&S.device);
-$('dev').textContent=link?(S.device||'-'):t('notConnected');$('stats').style.display=on?'':'none';
+$('dev').textContent=link?(S.device||'-'):t('notConnected');$('stats').style.display=on?'':'none';$('hspanel').className='panel hs'+(on?'':' off');
 if(!on){S.pkts=S.frames=S.backlog=S.sample_rate=0;S.peak=S.out_peak=0;S.avrcp={}}
 if(st=='scanning')scanLive=Date.now()+12000;
 if(scanLive&&(st=='waiting-selection'||st=='streaming'||st=='connected'||st=='connecting'||st=='error'||st=='paused'))scanLive=0;
@@ -480,7 +608,7 @@ if(Date.now()-devT>3000){devT=Date.now();devices();saved()}
 drawSaved();
 $('pk').textContent=S.pkts+' / '+S.frames+(S.backlog?' ('+t('queue')+' '+S.backlog+')':'');
 
-setHtml('fmt',S.sample_rate?chips([[S.codec||'SBC','hi n'],[S.sample_rate+' Hz','n'],['bitpool '+S.bitpool+(S.bitpool_max>S.bitpool_min?' ('+S.bitpool_min+'–'+S.bitpool_max+')':''),'n'],[S.per_packet+' '+t('perPkt')]]):'-');
+setHtml('fmt',S.sample_rate?chips([[S.codec||'SBC','hi n'],[S.sample_rate+' Hz','n'],['bitpool '+S.bitpool+(S.bitpool_max>S.bitpool_min?' ('+S.bitpool_min+'-'+S.bitpool_max+')':''),'n'],[S.per_packet+' '+t('perPkt')]]):'-');
 var av=S.avrcp||{},avUp=av.connected||av.absolute_volume||av.notifications||av.sink_volume;
 setHtml('av',!avUp?chips([[t('avrcpNone'),'off']]):chips([[av.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(av.notifications?[[t('notif')]]:[]).concat([[t(av.sink_volume?'volOnHeadset':'volSoftware'),av.sink_volume?'hi':'']])));
 setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
@@ -497,6 +625,10 @@ $('opv').textContent=S.out_peak.toFixed(3);$('m2').style.width=Math.min(100,S.ou
 if(!busyG)$('gain').value=S.gain_pct;$('gv').textContent=pct(S.gain_pct);
 if(!busyH&&S.headset_volume>=0)$('hs').value=S.headset_volume;
 $('hv').textContent=S.headset_volume<0?'-':pct(S.headset_volume*100/127);
+/* moved on the headset itself: the slider follows and says so for a moment;
+   the next page move is always sent, even back to the last value we sent */
+if(S.hs_moves!=null){if(hsMoves>=0&&S.hs_moves!==hsMoves){hsSent=-1;$('hsync').className='sync on';clearTimeout(hsT2);hsT2=setTimeout(function(){$('hsync').className='sync'},2500)}hsMoves=S.hs_moves}
+drawExtras();
 
 $('mute').className=S.muted?'ember':'';$('mute').textContent=t(S.muted?'unmute':'mute');
 $('tone').className=S.tone?'act':'';$('tone').textContent=t(S.tone?'toneOn':'tone');
@@ -513,14 +645,77 @@ var ap=live>0?'<span class="apick">'+esc(t('autoPicked').replace('%s',CN[live]))
 cn=!nos.length?'':S.codec_avail?esc(t('codecNo')+': '+nos.join(', ')):esc(t('codecWait'));
 setHtml('codecno',ap&&cn?ap+' · '+cn:ap||cn)
 drawEq();drawLat()}
+/* battery, link meter, running game, latency mode */
+var hsMoves=-1,hsT2=0,BATK={ok:'batOk',low:'batLow',critical:'batCritical',charging:'batCharging',full:'batFull'};
+function drawExtras(){var b=S.battery||{},l=S.link||{},g=S.game||{},L=S.lat_extra||{},bh='-',nm=S.night||{};
+if(b.status){var lv=b.level>=0?b.level:100,c=b.status=='low'?' low':b.status=='critical'?' crit':b.status=='charging'?' chg':'';
+bh='<span class="batt"><span class="bat'+c+'"><i style="width:calc('+lv+'% - 2px)"></i></span>'+esc(t(BATK[b.status]))+'</span>'}
+setHtml('batv',bh);setHtml('batm',S.connected?bh:'-');
+var lh='-',lm='-';if(l.score>=0){var n=l.score>=80?4:l.score>=55?3:l.score>=30?2:1,bb='<span class="bars b'+n+'">';for(var i=1;i<=4;i++)bb+='<i'+(i<=n?' class="on"':'')+'></i>';bb+='</span>';
+lh='<span class="lq">'+bb+l.score+'%<small>'+(l.lq>=0||l.rssi?'RSSI '+l.rssi+' · ':'')+esc(t('drops').replace('%s',l.drops_min|0))+'</small></span>';
+lm='<span class="lq">'+bb+t(['','sigWeak','sigFair','sigGood','sigGreat'][n])+'</span>'}
+setHtml('lqv',lh);setHtml('lqm',S.connected?lm:'-');
+/* games: main screen only says when a game's sound is on; saving lives in Settings */
+var gon=!!g.id;$('gline').style.display=gon&&g.active?'':'none';if(gon&&g.active)$('gltxt').textContent=t('gameSoundOn').replace('%s',g.name||g.id);
+$('game').className='game'+(gon?(g.active?' on':''):' none');$('gname').textContent=gon?(g.name||g.id):t(g.avail===0?'gameNoDetect':'noGame');$('gon').style.display=gon&&g.active?'':'none';
+$('gsave').textContent=t(g.profile?'gameUpdate':'gameSave');$('gsave').disabled=!gon;$('gsave').className=gon?'act':'no';$('gdrop').style.display=gon&&g.profile?'':'none';
+$('night').className='night'+(nm.on?' on':'');
+/* low headset battery: a toast once per heads-up (20 %, then 10 %) */
+var ba=S.batt_alert||{};if(ba.seq>0&&ba.level){var seen=-1;try{seen=parseInt(localStorage.getItem('hb_batt_seq'),10)}catch(e){}
+if(isNaN(seen)||ba.seq<seen)seen=0;if(ba.seq>seen){try{localStorage.setItem('hb_batt_seq',ba.seq)}catch(e){}toast(t('battToast').replace('%s',ba.level))}}
+/* a low buffer target: what it saves against the 200 ms default measured
+   this run, or that it stepped back for now because the link dropped */
+var on=S.connected&&S.latency&&S.latency.estimate_ms>0,sv=$('llsave'),low=S.latency&&S.latency.target_ms<200;
+if(on&&low&&L.backoff_ms>0){sv.className='llsave back';sv.textContent='+'+L.backoff_ms+' ms'}
+else if(on&&low&&L.normal_ms>S.latency.estimate_ms){sv.className='llsave';sv.textContent='−'+(L.normal_ms-S.latency.estimate_ms)+' ms'}
+else{sv.className='llsave';sv.textContent=''}}
+var toastT=0;function toast(m){$('toast').textContent=m;clearTimeout(toastT);toastT=setTimeout(function(){$('toast').textContent=''},7000)}
+$('gsave').onclick=function(){if(!this.disabled)act('/api/game?do=1')};
+$('night').onclick=function(){act('/api/night?on='+(S&&S.night&&S.night.on?0:1))};
+/* settings overlay */
+var TAB=0;function setTab(n){TAB=n;for(var i=0;i<6;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}}
+function setOpen(n){$('setm').className='modal set show';setTab(n==null?TAB:n);$('tb'+TAB).focus();if(TAB==4)bkCheck()}
+function setClose(){$('setm').className='modal set';$('setbtn').focus()}
+for(var ti=0;ti<6;ti++)$('tb'+ti).onclick=(function(n){return function(){setTab(n);if(n==4)bkCheck()}})(ti);
+$('setbtn').onclick=function(){setOpen()};$('setclose').onclick=setClose;
+if(document.addEventListener)document.addEventListener('keydown',function(e){if((e.key=='Escape'||e.keyCode==27)&&$('setm').className.indexOf('show')>0)setClose()});
+$('prc').onclick=function(){setOpen(1)};
+$('addhs').onclick=function(){setOpen(0);act('/api/scan');armScan()};
+$('gdrop').onclick=function(){if(confirm(t('gameRemoveConfirm')))act('/api/game?do=2')};
+/* backup / restore: USB drive (default), the console, or this device (download / upload) */
+var BKW='usb',bkUsb=1;
+function postj(p,body,cb){var x=new XMLHttpRequest();x.open('POST',p,true);x.timeout=15000;x.setRequestHeader('X-HB-Token',TOKEN);
+x.onload=function(){var j=null;try{j=JSON.parse(x.responseText)}catch(e){}cb(x.status,j,x.responseText)};x.onerror=x.ontimeout=function(){cb(0,null,'')};x.send(body||null)}
+function bkMsg(s,c){$('bkmsg').textContent=s;$('bkmsg').className='bkmsg'+(c?' '+c:'')}
+function bkSeg(){var ids={usb:'bkusb',internal:'bkint',device:'bkdev'};for(var k in ids){var b=$(ids[k]);b.className=k==BKW?'act':(k=='usb'&&!bkUsb?'no':'')}
+$('bkusb').textContent=bkUsb?t('bkUsb'):t('bkNoUsb')}
+function bkCheck(){bkMsg('');setHtml('bklist','');getj('/api/backups?where=usb',function(j){bkUsb=j.avail?1:0;if(!bkUsb&&BKW=='usb')BKW='internal';bkSeg()});bkSeg()}
+function bkOpen(){setOpen(4)}
+function bkPick(w){if(w=='usb'&&!bkUsb){bkMsg(t('bkNoUsb'),'bad');return}BKW=w;bkSeg();bkMsg('');setHtml('bklist','')}
+$('bkusb').onclick=function(){bkPick('usb')};$('bkint').onclick=function(){bkPick('internal')};$('bkdev').onclick=function(){bkPick('device')};
+$('bkdo').onclick=function(){setHtml('bklist','');bkMsg('…');
+if(BKW=='device'){postj('/api/backup?where=download',null,function(st,j,txt){if(st!=200){bkMsg(t('bkFail'),'bad');return}
+try{var a=document.createElement('a'),u=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.href=u;a.download='hearbridge-backup.json';document.body.appendChild(a);a.click();
+setTimeout(function(){URL.revokeObjectURL(u);a.parentNode.removeChild(a)},1000);bkMsg(t('bkDownloaded'),'good')}catch(e){bkMsg(t('bkFail'),'bad')}});return}
+postj('/api/backup?where='+BKW,null,function(st,j){if(st==200&&j&&j.ok)bkMsg(t('bkSaved').replace('%s',j.name),'good');else if(st==409)bkMsg(t('bkNoUsb'),'bad');else bkMsg(t('bkFail'),'bad')})};
+function bkRestored(st,j){if(st==200&&j&&j.ok){bkMsg(t('bkRestored'),'good');setHtml('bklist','');saved()}else bkMsg(t('bkFail'),'bad')}
+$('rsdo').onclick=function(){bkMsg('');setHtml('bklist','');
+if(BKW=='device'){$('bkfile').value='';$('bkfile').click();return}
+getj('/api/backups?where='+BKW,function(j){var f=j.files||[],h='',i;if(!j.avail){bkMsg(t('bkNoUsb'),'bad');return}
+if(!f.length){bkMsg(t('bkNone'));return}bkMsg(t('bkPick'));
+for(i=0;i<f.length;i++)h+='<button type="button" data-n="'+esc(f[i].name)+'">'+esc(f[i].when||t('bkLatest'))+'</button>';
+setHtml('bklist',h);var b=$('bklist').getElementsByTagName('button');
+for(i=0;i<b.length;i++)b[i].onclick=function(){if(!confirm(t('restoreConfirm')))return;bkMsg('…');postj('/api/restore?where='+BKW+'&name='+this.getAttribute('data-n'),null,bkRestored)};b.length&&b[0].focus()})};
+$('bkfile').onchange=function(){var f=this.files&&this.files[0];if(!f)return;if(!confirm(t('restoreConfirm')))return;
+var r=new FileReader();r.onload=function(){bkMsg('…');postj('/api/restore?where=upload',r.result,bkRestored)};r.readAsText(f)};
 /* latency: estimate from the stream loop (see hb_latency_estimate) */
 var busyL=0,latT=0,latAck=-1,latTouch=0,LATCOL=['var(--b0)','var(--b2)','var(--b3)','var(--b4)'];
-function pushLat(v){v=parseInt(v,10);if(!(v>=60&&v<=200)||v===latAck)return;latAck=v;latTouch=0;busyL=1;
+function pushLat(v){v=parseInt(v,10);if(!(v>=40&&v<=200)||v===latAck)return;latAck=v;latTouch=0;busyL=1;
 $('latt').textContent=v+' ms';act('/api/latency?ms='+v,function(){busyL=0})}
 function drawLat(){var L=S.latency;if(!L)return;
-var ms=L.target_ms;if(ms>200)ms=200;if(ms<60)ms=60;
+var ms=L.target_ms;if(ms>200)ms=200;if(ms<40)ms=40;
 var cur=parseInt($('lat').value,10);
-if(latTouch&&cur>=60&&cur<=200&&cur!==ms)pushLat(cur);
+if(latTouch&&cur>=40&&cur<=200&&cur!==ms)pushLat(cur);
 else if(!busyL){$('lat').value=ms;latAck=ms}
 $('latt').textContent=(latTouch||busyL?$('lat').value:ms)+' ms';
 var on=S.connected&&L.estimate_ms>0;$('latv').textContent=on?'≈ '+L.estimate_ms+' ms':'-';
@@ -546,7 +741,7 @@ $('eqline').setAttribute('d',d);$('eqfill').setAttribute('d',d+'L300 50L0 50Z');
 for(i=0;i<5;i++){var v=db[i],p=(v+12)/24*100,lo=Math.min(50,p),hi=Math.max(50,p);
 $('eqv'+i).textContent=(v>0?'+':'')+v+' dB';
 $('eq'+i).style.setProperty('--trk','linear-gradient(90deg,#0c0b0f '+lo+'%,'+EQCOL[i]+'aa '+lo+'%,'+EQCOL[i]+'aa '+hi+'%,#0c0b0f '+hi+'%)')}
-for(i=0;i<PRESETS.length;i++)$('pr'+i).className=PRESETS[i].join()==db.join()?'act':'';
+var anyp=0;for(i=0;i<PRESETS.length;i++){var m=PRESETS[i].join()==db.join();$('pr'+i).className=m?'act':'';if(m)anyp=1}$('prc').className=anyp?'':'act';
 $('eqp').className='panel eqp'+(on?'':' off');$('eqon').className=on?'act':'';$('eqon').textContent=t(on?'eqOn':'eqOff')}
 function drawEq(){if(!S.eq)return;if(!busyE&&Date.now()-eqT>1500){var i;for(i=0;i<5;i++)$('eq'+i).value=S.eq.db[i];EQ=S.eq}
 eqPaint(busyE?eqVals():S.eq.db,S.eq.on)}
