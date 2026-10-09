@@ -10,77 +10,66 @@ Entwickelt von **X-F1REBALL-X**
 
 </div>
 
-HearBridge PS5 ist ein Payload (ELF) für eine gejailbreakte PS5. Er nimmt den Ton der Konsole auf und überträgt ihn über das konsoleneigene Bluetooth-Funkmodul an normale Bluetooth-Kopfhörer oder -Lautsprecher (A2DP, SBC). Gesteuert wird er über eine Webseite, die die Konsole bereitstellt. Spiele, Firmware und Jailbreak bleiben unverändert.
+HearBridge PS5 ist ein Payload (ELF) für eine gejailbreakte PS5. Er überträgt den Ton der Konsole über das eigene Bluetooth der PS5 an normale Bluetooth-Kopfhörer oder -Lautsprecher (A2DP). Gesteuert wird er über eine Webseite, die die Konsole bereitstellt. Spiele, Firmware und Jailbreak bleiben unberührt.
 
 <p align="center"><img src="docs/img/ui-en.png" alt="Webseite von HearBridge PS5" width="520"></p>
 
 ## Voraussetzungen
 
-- Eine gejailbreakte PS5 mit einem ELF-Loader auf Port **9021** (elfldr).
-- Bluetooth-Kopfhörer oder ein Lautsprecher mit **A2DP** (SBC).
-- Der PS5-Browser, ein Handy oder ein PC im selben Netzwerk.
+- Eine gejailbreakte PS5 mit ELF-Loader auf Port **9021** (elfldr). Getestet auf einer PS5 fat (CFI-10xx) mit Firmware **10.20**.
+- Bluetooth-Kopfhörer oder -Lautsprecher mit A2DP (SBC, 48 kHz Stereo).
+- Ein Browser im selben Netzwerk (PS5, Handy oder PC).
 
-## Installation und Start
+## Installieren und starten
 
-1. Lade **HearBridge-PS5-1.0.2.elf** aus dem [Release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2) herunter.
-2. Sende sie an den Loader der Konsole, zum Beispiel:
-   `socat -u FILE:HearBridge-PS5-1.0.2.elf TCP:<console-ip>:9021`
-3. Öffne **http://&lt;console-ip&gt;:8090** (oder die Kachel **HearBridge**, die beim ersten Start zum Startbildschirm hinzugefügt wird).
+1. Lade **HearBridge-PS5-1.1.0.elf** aus dem [neuesten Release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest) herunter.
+2. Schicke es an den Loader: `socat -u FILE:HearBridge-PS5-1.1.0.elf TCP:<console-ip>:9021`
+3. Öffne **http://&lt;console-ip&gt;:8090** oder die **HearBridge**-Kachel auf dem Startbildschirm.
 
-## Bedienung
+Erneutes Senden des ELF ersetzt die laufende Kopie. **Stop HearBridge** auf der Seite beendet es.
 
-- **Koppeln:** Versetze die Kopfhörer in den Kopplungsmodus, drücke **Nach Geräten suchen** (etwa 20 s) und dann **Verbinden** daneben. Sie werden gespeichert und der Ton startet.
-- **Verbinden:** Gespeicherte Geräte verbinden sich nur, wenn du in ihrer Zeile **Verbinden** drückst. Im Hintergrund verbindet sich nichts.
-- **Trennen:** beendet die Verbindung; das Gerät bleibt gespeichert. Kommen die Kopfhörer zurück ins Etui oder aus der Reichweite, zeigt die Seite **Nicht verbunden**, bis du erneut Verbinden drückst.
-- **Entfernen:** löscht das Gerät samt Kopplungsschlüssel.
-- **Lautstärke:** der Verstärkungsregler (Software-Verstärkung bis 500 %) und die Kopfhörer-Lautstärke (AVRCP absolute Lautstärke, folgt auch den Tasten der Kopfhörer). **Stumm** und **Testton** helfen beim Prüfen.
-- **HearBridge beenden** beendet den Payload sauber. Vor dem erneuten Laden der ELF verwenden.
+## Funktionen
 
-Die Seite gibt es in 11 Sprachen, darunter Hebräisch und Arabisch (von rechts nach links).
+- **Koppeln:** Kopfhörer in den Kopplungsmodus versetzen, **Scan for devices** drücken (20 s), dann **Connect**.
+- **Auto-Verbindung:** gespeicherte Kopfhörer verbinden sich von selbst, wenn du sie einschaltest oder aus dem Case nimmst. Ein anderes gespeichertes Paar herausnehmen wechselt zu diesem. Nach manuellem **Disconnect** warten sie auf **Connect**.
+- **Disconnect / Forget:** Disconnect trennt die Verbindung, die Kopfhörer bleiben gespeichert. Forget trennt und löscht sie.
+- **Lautstärke:** Boost (Software-Verstärkung bis 500 %, Start bei 250 %) und Kopfhörerlautstärke (AVRCP, Start bei 50 %). Pro Kopfhörer gespeichert, sobald du sie änderst. **Mute** und **Test tone** zum Prüfen.
+- **Equalizer:** 5 Bänder (±12 dB) mit Presets, pro Kopfhörer gespeichert, mit Limiter, damit der Boost nicht übersteuert.
+- **Latenz:** Pufferziel von 60 bis 200 ms (Standard 200 ms) und eine Live-Schätzung der Verzögerung.
+- **Clean sound:** Equalizer aus, Boost zurück auf 250 %, Puffer zurück auf 200 ms.
+- **Log** auf der Seite mit jedem Schritt. Die Seite gibt es in 11 Sprachen.
 
-## Hinweise
+## Codecs
 
-- Nutzt das eingebaute Bluetooth der PS5; der DualSense funktioniert weiter. Immer nur einen Payload mit Bluetooth gleichzeitig ausführen.
-- Nur SBC-Codec, ein Gerät zur Zeit, kein Mikrofon. Der Fernseher gibt den Ton weiterhin aus.
-- Getestet mit Sony WF-1000XM6, OnePlus Buds Ace 2 und Xbox Wireless Headset.
-- Einstellungen, gespeicherte Geräte und das Log liegen in `/data/hearbridge/` (`hearbridge.log` protokolliert jeden Schritt).
+- **Auto:** einfaches SBC, funktioniert mit allem.
+- **SBC HQ** und **SBC-XQ:** manuell wählbar, nur wenn die Kopfhörer sie unterstützen. Nicht unterstützte sind ausgegraut.
+
+AAC, aptX und LDAC werden nicht unterstützt.
+
+## Bekannte Grenzen
+
+- Ein Kopfhörer gleichzeitig, kein Mikrofon. Der Fernseher spielt den Ton weiter.
+- Kopfhörer müssen SBC mit 48 kHz Stereo annehmen.
+- Immer nur einen Bluetooth-Payload laufen lassen. Der DualSense funktioniert weiter.
+- Nur auf fw 10.20 (PS5 fat) getestet. Andere Modelle und Firmwares sind ungetestet; laut Berichten starten PS5 Pro und manche 13.x-Setups nicht ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)).
+- Getestete Kopfhörer: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Fehlerbehebung / Problem melden
 
-**Getestet auf:** HearBridge wurde auf einer PS5 Fat (Originalmodell, CFI-10xx) mit Firmware 10.20 entwickelt und getestet. Andere Modelle (Slim, Pro, spätere Fat-Revisionen) und andere Firmwares sind ungetestet und können einen anderen Bluetooth-Chip haben – Berichte von diesen Konsolen sind daher willkommen.
+Beim Start des Payloads sollte die Meldung **"HearBridge &lt;version&gt;: starting"** erscheinen. Wenn nicht, hat der Loader ihn nicht gestartet.
 
-Häufige Probleme:
+Einstellungen, gespeicherte Kopfhörer und das Log liegen in `/data/hearbridge/`. So meldest du ein Problem:
 
-- **Kein HearBridge-Symbol auf dem Startbildschirm** nach dem Start der ELF.
-- **Die Seite öffnet sich nicht** (http://&lt;console-ip&gt;:8090).
-- **Kopfhörer werden nicht gefunden**, wenn du Nach Geräten suchen drückst.
-- **Kein Ton**, obwohl die Kopfhörer verbunden sind.
-
-**Firmware 13.60:** Probiere **HearBridge-PS5-1.0.2-fw13.60.elf** aus dem [Release v1.0.2](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2). Das ist ein experimenteller Build, der das fehlende Symbol auf dem Startbildschirm beheben soll und Diagnosedaten hinzufügt. Er wurde noch nicht auf einer echten Konsole getestet.
-
-**Log holen:**
-
-1. Sende einen FTP-Server-Payload (zum Beispiel [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)) mit demselben Loader, den du für HearBridge nutzt.
-2. Verbinde dich mit FileZilla mit der IP der Konsole auf dem Port, den der Server anzeigt (ftpsrv nutzt meist **2121**).
-3. Lade `/data/hearbridge/hearbridge.log` herunter und, mit dem fw13.60-Build, auch `/data/hearbridge/diag.txt`.
-
-Mit dem fw13.60-Build kannst du auch **http://&lt;console-ip&gt;:8090/api/diag** öffnen und den Text kopieren.
-
-**Eröffne ein [GitHub-Issue](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose)** mit:
-
-- dem Konsolenmodell (CFI-Nummer, z. B. CFI-1016A)
-- der Firmware-Version
-- dem verwendeten Loader
-- ob die Meldung **„HearBridge 1.0.2: http://…“** erschienen ist
-- ob sich die Seite öffnet
-- den Log-Dateien (`hearbridge.log`, `diag.txt`)
+1. Lade `/data/hearbridge/hearbridge.log` und `diag.txt` per FTP herunter (z. B. [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv), Port 2121). `diag.txt` gibt es auch unter http://&lt;console-ip&gt;:8090/api/diag.
+2. Öffne ein [GitHub-Issue](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose) mit Konsolenmodell, Firmware, Loader, HearBridge-Version und den Logdateien.
 
 ## Bauen
 
 ```sh
-export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
-make ps5
+export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk   # ps5-payload-sdk v0.43
+make ps5      # dist/HearBridge-PS5-<version>.elf
 make test
+make send PS5_HOST=<console-ip>
 ```
 
 ## Lizenz
