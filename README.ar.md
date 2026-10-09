@@ -41,7 +41,7 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث
 | CFI-20xx, CFI-21xx (Slim) | افحص الشريحة: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 | CFI-70xx, CFI-71xx (Pro، دائمًا MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-إصدار mediatek test لم يُختبر بعد. الإصدار 1.1.0 مختبر فقط على CFI-10xx. أخبرنا كيف سار الأمر.
+تم الاختبار: 1.1.0 على PS5 fat ‏CFI-10xx ‏(Marvell/NXP)، و mediatek test على PS5 Slim ‏CFI-2008 ‏(MediaTek). الطرازات الأخرى: أخبرنا كيف سار الأمر.
 
 **طريقة الفحص:** شغّل 1.1.0 وانظر إلى سطر **Chip** أسفل لوحة **Status**. `Marvell/NXP (1286:…)` → ابقَ على 1.1.0. `MediaTek (0e8d:…)` → استخدم mediatek test (تعرض الصفحة أيضًا تنبيهًا برتقاليًا). أو افتح `/data/hearbridge/hearbridge.log` وابحث عن `usb: /dev/ugen0.2 is 1286:2059 …` (قد يختلف رقم ugen). الأحرف الأربعة الأولى بعد "is" هي الشريحة: `1286` = Marvell/NXP، `0e8d` = MediaTek.
 
@@ -69,7 +69,6 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث
 
 - سماعة واحدة في كل مرة، بدون ميكروفون. التلفاز يستمر في تشغيل الصوت أيضًا.
 - شغّل حمولة بلوتوث واحدة فقط في كل مرة. ذراع DualSense يستمر في العمل.
-- تم الاختبار فقط على 10.20 (PS5 fat، CFI-10xx). الطرازات والبرامج الثابتة الأخرى غير مختبرة.
 - سماعات مختبرة: Sony WF-1000XM6، OnePlus Buds Ace 2، Xbox Wireless Headset.
 
 ## حل المشكلات / الإبلاغ عن مشكلة

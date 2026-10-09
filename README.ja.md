@@ -39,7 +39,7 @@ PS5 の Bluetooth チップは Marvell/NXP か MediaTek のどちらかです。
 | CFI-20xx, CFI-21xx (Slim) | チップを確認: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 | CFI-70xx, CFI-71xx (Pro、常に MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-mediatek test ビルドはまだテストされていません。1.1.0 は CFI-10xx でのみテスト済みです。結果を報告してください。
+テスト済み: 1.1.0 は PS5 fat CFI-10xx（Marvell/NXP）、mediatek test は PS5 Slim CFI-2008（MediaTek）。ほかのモデルは結果を報告してください。
 
 **確認方法:** 1.1.0 を起動し、**Status** パネル下部の **Chip** 行を見ます。`Marvell/NXP (1286:…)` → 1.1.0 のまま。`MediaTek (0e8d:…)` → mediatek test を使用（ページにオレンジ色の案内も出ます）。または `/data/hearbridge/hearbridge.log` を開いて `usb: /dev/ugen0.2 is 1286:2059 …` を探します（ugen の番号は違うことがあります）。"is" の後の最初の 4 文字がチップです：`1286` = Marvell/NXP、`0e8d` = MediaTek。
 
@@ -67,7 +67,6 @@ AAC、aptX、LDAC には対応していません。
 
 - 同時に 1 台のみ、マイクなし。テレビからも音が出続けます。
 - Bluetooth を使うペイロードは 1 つだけ実行してください。DualSense はそのまま使えます。
-- テストは fw 10.20（PS5 fat、CFI-10xx）のみ。他のモデルやファームウェアは未テストです。
 - テスト済みヘッドホン：Sony WF-1000XM6、OnePlus Buds Ace 2、Xbox Wireless Headset。
 
 ## トラブルシューティング / 問題の報告
