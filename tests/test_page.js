@@ -118,5 +118,22 @@ global.hbTest.draw();
 check(!/>Connected</.test(B()) && el('dev').textContent !== 'X',
   'page: an old status (tab asleep, no answer) does not keep showing connected');
 Date.now = realNow;
+// Bluetooth chip row + MediaTek hint (regular build only)
+STATUS.chip = { vid: '', pid: '', vendor: '', mediatek: 0, mtk_build: 0 };
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === '-' && !el('mtkhint').innerHTML, 'page: chip row is "-" before the controller is open');
+STATUS.chip = { vid: '1286', pid: '2059', vendor: 'Marvell/NXP', mediatek: 0, mtk_build: 0 };
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === 'Marvell/NXP (1286:2059)' && !el('mtkhint').innerHTML, 'page: Marvell chip, no hint');
+STATUS.chip = { vid: 'abcd', pid: '0012', vendor: '', mediatek: 0, mtk_build: 0 };
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === 'abcd:0012' && !el('mtkhint').innerHTML, 'page: unknown chip shows only the IDs');
+STATUS.chip = { vid: '0e8d', pid: '0608', vendor: 'MediaTek', mediatek: 1, mtk_build: 0 };
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === 'MediaTek (0e8d:0608)' && /use the mediatek test build/.test(el('mtkhint').innerHTML) &&
+  /releases\/tag\/v1\.1\.0-mtk-test/.test(el('mtkhint').innerHTML), 'page: MediaTek on the regular build links the test build');
+STATUS.chip.mtk_build = 1;
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === 'MediaTek (0e8d:0608)' && !el('mtkhint').innerHTML, 'page: no hint in the mediatek test build');
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);

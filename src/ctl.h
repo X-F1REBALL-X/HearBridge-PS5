@@ -53,6 +53,7 @@ typedef struct {
     int bitpool_lo, bitpool_hi; /* adaptive range */
     long dropped;          /* media packets dropped (radio too slow) */
     int xq_low;            /* SBC-XQ held under HB_XQ_LOW_BP: tell the page */
+    int chip_vid, chip_pid; /* Bluetooth controller USB IDs, -1 until known */
 #define HB_EVENT_N   14
 #define HB_EVENT_LEN 80
     char events[HB_EVENT_N][HB_EVENT_LEN]; /* last codec switches / disconnects */
