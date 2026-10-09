@@ -6,6 +6,9 @@
 #include "diag.h"
 #include "rate.h"
 #include "btchip.h"
+#ifndef HB_HTTP_HOST_TEST
+#include "hcidbg.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,6 +88,7 @@ static int is_write_path(const char *path)
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
         "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean",
+        "/api/hci",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -200,6 +204,23 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
             return respond(out, max, 403, "application/json", "{\"error\":\"token\"}", 17);
     }
 
+#ifndef HB_HTTP_HOST_TEST
+    if (!hcidbg_enabled() && (!strcmp(path, "/api/hcilog") || !strcmp(path, "/api/hci")))
+        return respond(out, max, 404, "application/json", "{\"error\":\"unknown\"}", 19);
+    if (!strcmp(path, "/api/hcilog")) {
+        /* HCI trace: "seq ms CMD op bytes" / "seq ms EVT bytes"; ?since=seq */
+        static char ht[120000];
+        int since = 0, n;
+        (void)query_int(q, "since", &since);
+        n = hcidbg_text(since > 0 ? (unsigned)since : 0, ht, (int)sizeof ht);
+        return respond(out, max, 200, "text/plain; charset=utf-8", ht, n);
+    }
+    if (!strcmp(path, "/api/hci")) {
+        /* Raw HCI command (debug): op=XXXX&p=HEX, sent from the stream loop. */
+        return hcidbg_queue(q) ? respond(out, max, 200, "application/json", "{\"ok\":1}", 8)
+                               : respond(out, max, 409, "application/json", "{\"error\":\"busy or bad\"}", 24);
+    }
+#endif
     if (!strcmp(path, "/api/diag")) {
         /* Plain-text diagnostics report (see diag.h), also in diag.txt. */
         static char dt[60000];

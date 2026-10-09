@@ -39,6 +39,19 @@ static void add_endpoint(struct usbhci_iface *f, const uint8_t *e)
     }
 }
 
+/* Two bulk OUT pipes (MediaTek 0e8d:3603 has 0x01 and 0x02): ACL goes on
+ * the one numbered like the bulk IN (0x82 -> 0x02). On that controller 0x01
+ * stalls every ACL frame; the other stays as the spare. */
+void usbhci_pair_out_with_in(struct usbhci_iface *f)
+{
+    if (f->spare_out_ep && (f->spare_out_ep & 0x0F) == (f->in_ep & 0x0F) &&
+        (f->out_ep & 0x0F) != (f->in_ep & 0x0F)) {
+        uint8_t t = f->out_ep;
+        f->out_ep = f->spare_out_ep;
+        f->spare_out_ep = t;
+    }
+}
+
 int usbhci_scan(const uint8_t *d, int len, struct usbhci_iface *found)
 {
     struct usbhci_iface cur;
