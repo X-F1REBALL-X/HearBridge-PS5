@@ -12,7 +12,7 @@
 
 HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带的蓝牙把主机声音传到普通蓝牙耳机或音箱（A2DP）。通过主机提供的网页进行控制。它不会改动游戏、固件或破解。
 
-<p align="center"><img src="docs/img/ui-en.png" alt="HearBridge PS5 网页" width="900"></p>
+<p align="center"><img src="docs/img/ui-zh.png" alt="HearBridge PS5 网页" width="900"></p>
 
 ## 要求
 
