@@ -57,6 +57,10 @@ int  btlink_drop_handle(btlink *l, unsigned handle, int wait_ms);
 /* When set and true for the address being connected, btlink_connect /
  * btlink_accept stop at once (Create Connection Cancel / disconnect). */
 extern int (*btlink_abort_connect)(const unsigned char addr[6]);
+/* 1 if the pending page command is a Connect/Reconnect of this headset. */
+extern int (*btlink_press_is_for)(const unsigned char addr[6]);
+/* Idle: page scan on once (on=1), restored once (on=0). */
+void btlink_page_scan_hold(hci_t hci, int on);
 /* Called when an ACL comes up (page answered or incoming accepted). */
 extern void (*btlink_on_acl_up)(const unsigned char addr[6]);
 

@@ -57,6 +57,12 @@ int hb_dev_name_hints_headphones(const char *name)
 static int dev_rank(uint32_t cod, const char *name);
 
 /* Unnamed devices are listed only with a headphone / headset class. */
+/* Class only (name not known yet): would this device be listed once named? */
+int hb_dev_rank_class(uint32_t cod)
+{
+    return dev_rank(cod, "");
+}
+
 int hb_dev_rank(uint32_t cod, const char *name)
 {
     int r = dev_rank(cod, name);
@@ -66,6 +72,7 @@ int hb_dev_rank(uint32_t cod, const char *name)
 
 static int dev_rank(uint32_t cod, const char *name)
 {
+    if (!name) name = "";
     unsigned major = (cod >> 8) & 0x1F, minor = (cod >> 2) & 0x3F;
 
     if (major == 4) {

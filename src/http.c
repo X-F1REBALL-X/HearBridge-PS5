@@ -93,7 +93,7 @@ static int is_write_path(const char *path)
 
 static int status_json(hb_ctl *c, char *o, int max)
 {
-    char dev[140], st[70], url[140], det[200], why[40], ev[700];
+    char dev[140], st[70], url[140], det[200], why[40], ev[1800];
     int ei, en;
     json_esc(dev, sizeof dev, c->device);
     json_esc(st, sizeof st, c->state);
@@ -151,7 +151,7 @@ static int respond(char *out, int max, int code, const char *ctype,
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 {
     char method[8], path[128], *q;
-    char body[4096];
+    char body[6144];
     int i = 0, j = 0, v, bl, is_api;
 
     while (i < reqlen && req[i] != ' ' && j < (int)sizeof method - 1) method[j++] = req[i++];

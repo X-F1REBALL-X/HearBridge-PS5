@@ -132,7 +132,7 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
         log_line("select: connect aborted for a page command");
         return 0;
     }
-    if (g_av_fail_ms && now_ms() - g_av_fail_ms < 2500) {
+    if (!g_user_connect && g_av_fail_ms && now_ms() - g_av_fail_ms < 2500) {
         long w = g_av_fail_ms + 2500;
         log_line("select: waiting %ld ms after the last AVDTP failure", w - now_ms());
         while (now_ms() < w) idle_pump(hci, 50);
@@ -194,9 +194,19 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 {
     int sdp;
     {
-        long w = now_ms() + 500;
-        while (now_ms() < w)
-            if (btlink_pump(link, 40) < 0) break;
+        /* Short look for channels the headset opens itself; a link that
+         * dropped meanwhile fails at once instead of SDP/AVDTP on a dead link. */
+        long w = now_ms() + 150;
+        while (now_ms() < w) {
+            if (btlink_pump(link, 30) < 0) break;
+            if (!btlink_is_up(link) || btlink_chan_find_inbound(link, BTLINK_PSM_AVDTP)) break;
+        }
+        if (!btlink_is_up(link)) {
+            log_line("select: headset dropped the link right after encryption (reason %#04x)",
+                     btlink_last_disc_reason());
+            btlink_destroy(link);
+            return -2;
+        }
     }
     if (ini->ok && (btlink_chan_find_inbound(link, BTLINK_PSM_AVDTP) ||
                     btlink_chan_find_inbound(link, BTLINK_PSM_SDP))) {
@@ -230,7 +240,7 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 /* A scan (button or page refresh) runs inquiries back to back for
  * SCAN_WINDOW_S. Each result is written to devices.json as it arrives.
  * The list stays until the next scan. */
-#define SCAN_WINDOW_S 10
+#define SCAN_WINDOW_S 20
 
 static void write_status(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void write_status(const char *fmt, ...)
@@ -317,6 +327,7 @@ static int g_nseen;
 static void seen_clear(void)
 {
     g_nseen = 0;
+    a2dp_rank_log_reset();
 }
 
 static void seen_merge(const a2dp_inq_dev *devs, int n)
@@ -519,6 +530,26 @@ static int btlink_forget_abort(const unsigned char addr[6])
     return connect_abort(addr);
 }
 
+/* The waiting page command is a Connect / Reconnect that this headset
+ * answers (its own address, or Reconnect while it is a saved one). */
+static int press_is_for(const unsigned char addr[6])
+{
+    FILE *f;
+    char line[64];
+    unsigned char a[6];
+    int yes = 0;
+    if (!cmd_waiting()) return 0;
+    f = fopen(SELECT_TXT, "r");
+    if (!f) return 0;
+    if (fgets(line, sizeof line, f)) {
+        line[strcspn(line, "\r\n")] = 0;
+        if (!strcmp(line, "reconnect")) yes = paired_find(g_paired, g_npaired, addr) >= 0;
+        else if (strncmp(line, "forget ", 7) && headset_parse_addr(line, a)) yes = !memcmp(a, addr, 6);
+    }
+    fclose(f);
+    return yes;
+}
+
 /* A saved device answered a page or connected in: show "connecting" now. */
 static void on_acl_up(const unsigned char addr[6])
 {
@@ -585,7 +616,7 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
 /* Status label for a connect_and_probe failure. */
 static const char *conn_fail_label(int r)
 {
-    if (r < 0) return "not-a2dp-sink";
+    if (r == -1) return "not-a2dp-sink";
     if (btlink_last_connect_fail() == 0x04) return "page-timeout";
     if (btlink_last_connect_fail() == 0x0B) return "link-held-elsewhere";
     return "connect-failed";
@@ -675,7 +706,8 @@ static int try_device(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
                     write_status("connected %s", ini->name[0] ? ini->name : "-");
                     return 1;
                 }
-                if (pr2 < 0) { write_status("error not-a2dp-sink"); return 0; }  /* k freed */
+                if (pr2 == -1) { write_status("error not-a2dp-sink"); return 0; }
+                if (pr2 < 0) return 0;                                /* k freed */  /* k freed */
             }
         }
         /* SDP did not work on the kept link: close it, page as before. */
@@ -717,6 +749,12 @@ static int listen_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *p
     if (!accept_one(link, ini, ms)) {
         btlink_destroy(link);
         return 0;
+    }
+    if (press_is_for(ini->addr)) {
+        /* The Connect press was for this headset, which joined by itself: done. */
+        hb_cmd c;
+        (void)poll_cmd(&c, ini);
+        log_line("select: that press is answered by the incoming link");
     }
     pr = probe_link(link, ini, linkp, psm);
     return pr == 1;
@@ -2045,6 +2083,7 @@ int main(void)
         a2dp_inquiry_abort = cmd_waiting;
         a2dp_inquiry_progress = inquiry_progress;
         btlink_abort_connect = btlink_forget_abort;
+        btlink_press_is_for = press_is_for;
         btlink_on_acl_up = on_acl_up;
         port = http_start(&g_ctl, url, (int)sizeof url);
         if (port) {
@@ -2147,6 +2186,7 @@ int main(void)
         g_ctl.device[0] = 0;
         CTL_UNLOCK(&g_ctl);
         log_line("hearbridge: idle — waiting for Connect");
+        if (!paused && ini.ok) btlink_page_scan_hold(hci, 1);   /* once for the idle period */
         {
             for (;;) {
                 int go;
@@ -2204,6 +2244,7 @@ int main(void)
                 }
             }
         }
+        btlink_page_scan_hold(hci, 0);                          /* put back once */
         if (hb_stop_requested()) { rc = 0; break; }
         (void)headset_ini_load(&ini);
         continue;
