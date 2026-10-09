@@ -60,6 +60,10 @@ typedef struct {
     int dump_left;
     int quick;              /* teardown: single short command try */
     int peer_opened;          /* signalling channel opened by the headset */
+    int remote_cfg;           /* the headset configured our SEP itself (SET_CONFIGURATION) */
+    int remote_seid;          /* its SEID from that SET_CONFIGURATION */
+    uint8_t remote_sbc[4];    /* the SBC configuration it chose */
+    int remote_open;          /* the headset sent OPEN */
     int unsupported_format;   /* the sink cannot take 48 kHz stereo SBC */
     int want_codec, no_xq;    /* request (HB_CODEC_*), see avdtp_sbc_pick() */
     int held_codec, held_bp;  /* last codec/bitpool that held (0 = none) */

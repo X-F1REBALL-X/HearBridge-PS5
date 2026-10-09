@@ -142,7 +142,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:.6rem;heig
 input[type=range]::-moz-range-track{height:1.6rem;background:var(--void)}
 input[type=range]::-moz-range-progress{height:1.6rem;background:var(--lime)}
 input[type=range]::-moz-range-thumb{width:.6rem;height:1.6rem;border:0;border-radius:0;background:#fff}
-.vol .btns{margin-top:var(--s1)}.devbtns{margin-top:var(--s2);grid-template-columns:1fr}.devbtns button{min-width:0}
+.vol .btns{margin-top:var(--s1)}
 /* equalizer: colour per band, live response curve */
 body{--b0:#ff6a2b;--b1:#ffb23d;--b2:#c8ff3d;--b3:#3dd6ff;--b4:#b06bff}
 .eqhead{display:flex;align-items:center;justify-content:space-between;margin:0 0 var(--s2)}
@@ -174,7 +174,8 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .apick{color:var(--lime);font-weight:800}
 .seg button{overflow:hidden;text-overflow:ellipsis}
 .seg button.cur:before{border-color:rgba(200,255,61,.75);box-shadow:inset 0 0 0 1px rgba(200,255,61,.35)}
-.evlog{margin:0;font-size:.78rem;line-height:1.4;color:var(--mute)}
+.evlog{margin:0;font-size:.9rem;line-height:1.4;color:#e8edf2}
+.evlog .bad{color:#ff8a8a}.evlog .good{color:var(--lime)}.evlog .press{color:var(--cyan)}.evlog .k{color:var(--ink2)}
 .evlog div{padding:.12rem 0;border-top:1px solid var(--edge)}
 .seg button[disabled]:before,.seg button.no:before{background:transparent;border-color:var(--edge);border-style:dashed}
 /* latency meter */
@@ -244,7 +245,7 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 .side .hero{min-height:0}
 #devlist .dl,#savedlist .dl{min-height:2.9rem;padding-top:.2rem;padding-bottom:.2rem}
 .side #savedlist{flex:0 0 auto;max-height:none}
-.side #scan{min-height:2.9rem}.side .devbtns button{min-height:2.5rem}
+.side #scan{min-height:2.9rem}
 .side .hint{margin-top:var(--s1);margin-bottom:var(--s1)}
 #devlist .dl button{min-height:2.2rem}
 .logp .evlog div{padding:.06rem 0}
@@ -295,7 +296,6 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 <div class="side">
 <section class="panel hero" id="devpanel"><p class="label" data-i18n="devices">Devices</p>
 <button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
-<div class="btns devbtns"><button id="reconnect" data-i18n="reconnect">Reconnect</button></div>
 <p class="k hint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p>
 <p class="sub" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div>
 <p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div>
@@ -444,6 +444,9 @@ rows.push({k:d.addr,h:row(icon(k),d.name||d.addr,'<span class="addr">'+esc(d.add
 patchList('devlist',rows,'<p class="k">'+esc(t('noDevices'))+'</p>')})}
 function pct(v){return Math.round(v)+'%'}
 function chips(a){var h='',i;for(i=0;i<a.length;i++)h+='<span class="chip'+(a[i][1]?' '+a[i][1]:'')+'">'+esc(a[i][0])+'</span>';return h}
+/* log line colour: problems soft red, success lime, presses cyan, the rest white */
+function evKind(s){return /fail|no answer|busy|hung up|lost|dropped|refused|not an audio|unstable|stuck|went away|closed/i.test(s)?'bad':
+/pressed|scan started/i.test(s)?'press':/playing|turned on|answered|secured|connected in|worked|now /i.test(s)?'good':''}
 function setHtml(id,h){var e=$(id);if(e.hbHtml!==h){e.hbHtml=h;e.innerHTML=h}}
 function draw(){
 $('msg').textContent='';
@@ -470,10 +473,10 @@ setHtml('av',!avUp?chips([[t('avrcpNone'),'off']]):chips([[av.absolute_volume?t(
 setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
 var ev=S.events||[],eh='';
 if(!ev.length)eh='<div class="k">'+esc(t('logEmpty'))+'</div>';
-else for(var ei=0;ei<ev.length;ei++)eh+='<div>'+esc(ev[ei])+'</div>';
+else for(var ei=0;ei<ev.length;ei++)eh+='<div class="'+evKind(ev[ei])+'">'+esc(ev[ei])+'</div>';
 /* newest at the bottom; follow it unless the user scrolled up to read */
-var lg=$('evlog'),atEnd=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-6;
-setHtml('evlog',eh);if(atEnd)lg.scrollTop=lg.scrollHeight;
+var lg=$('evlog');if(!lg.onscroll){lg.hbFollow=1;lg.onscroll=function(){this.hbFollow=this.scrollTop+this.clientHeight>=this.scrollHeight-6}}
+setHtml('evlog',eh);if(lg.hbFollow)lg.scrollTop=lg.scrollHeight;
 $('pkv').textContent=S.peak.toFixed(3);$('m1').style.width=Math.min(100,S.peak*100)+'%';
 $('opv').textContent=S.out_peak.toFixed(3);$('m2').style.width=Math.min(100,S.out_peak*100)+'%';
 if(!busyG)$('gain').value=S.gain_pct;$('gv').textContent=pct(S.gain_pct);
@@ -556,7 +559,6 @@ $('lat').onmouseup=markLat;$('lat').ontouchend=markLat;$('lat').onpointerup=mark
 for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!this.disabled)act('/api/codec?mode='+m)}})(cj);
 function armScan(){scanLive=Date.now()+12000;$('scanning').style.display='';devices()}
 $('scan').onclick=function(){act('/api/scan');armScan()};
-$('reconnect').onclick=function(){act('/api/reconnect')};
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();
 (function(){var c=null,m=/[?&]lang=([a-z]{2})/.exec(location.search);if(m)c=m[1];else try{c=localStorage.getItem('hb_lang')}catch(e){}

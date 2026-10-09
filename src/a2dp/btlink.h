@@ -135,6 +135,8 @@ int      btlink_tx_backlog(const btlink *l);
 
 /* scid of an OPEN channel the remote opened to us on psm, 0 if none. */
 unsigned btlink_chan_find_inbound(const btlink *l, unsigned psm);
+/* An open inbound channel on psm other than not_scid (A2DP media next to signalling). */
+unsigned btlink_chan_find_inbound_other(const btlink *l, unsigned psm, unsigned not_scid);
 
 /* Page scan for up to timeout_ms and accept the first Connection Request
  * from one of the n saved addresses, answering with its stored key.

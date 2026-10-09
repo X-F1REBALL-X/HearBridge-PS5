@@ -123,7 +123,8 @@ void hb_eq_set(hb_eq *e, int on, const int db[HB_EQ_NB], int sample_rate)
     e->on = on && any;
     /* headroom: minus the largest boost (a little less for shelves stacking
      * is not needed: peaks of different bands sit at different frequencies) */
-    e->preamp = (float)hb_pow10(-maxb / 20.0);
+    e->preamp = 1.f;   /* no pre-cut: the limiter after the gain keeps the headroom */
+    (void)maxb;
 }
 
 void hb_eq_process(hb_eq *e, float *lr, int frames)

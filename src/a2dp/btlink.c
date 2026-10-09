@@ -1949,6 +1949,17 @@ int btlink_chan_is_open(const btlink *l, unsigned scid)
     return c && c->st == CH_OPEN;
 }
 
+unsigned btlink_chan_find_inbound_other(const btlink *l, unsigned psm, unsigned not_scid)
+{
+    int i;
+    if (!l) return 0;
+    for (i = 0; i < BTLINK_CHAN_MAX; i++)
+        if (l->ch[i].st == CH_OPEN && l->ch[i].psm == psm && l->ch[i].inbound &&
+            l->ch[i].scid != not_scid)
+            return l->ch[i].scid;
+    return 0;
+}
+
 unsigned btlink_chan_find_inbound(const btlink *l, unsigned psm)
 {
     int i;

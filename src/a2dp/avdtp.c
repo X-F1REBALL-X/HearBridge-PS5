@@ -74,7 +74,7 @@ static void avdtp_answer_remote(avdtp_session *s, unsigned scid,
         r[n++] = 0x01; r[n++] = 0x00;          /* Media Transport */
         r[n++] = 0x07; r[n++] = 0x06;          /* Media Codec */
         r[n++] = 0x00; r[n++] = 0x00;          /* Audio, SBC */
-        r[n++] = 0x3F; r[n++] = 0xFF;          /* 48/44.1/32/16, all modes/blocks */
+        r[n++] = 0x13; r[n++] = 0xFF;          /* 48 kHz, stereo/joint; all blocks/subbands/alloc */
         r[n++] = 2;    r[n++] = 53;            /* bitpool range */
         break;
     case AV_ABORT:
@@ -114,12 +114,52 @@ static void avdtp_answer_remote(avdtp_session *s, unsigned scid,
             s->delay_reports++;
         }
         break;
-    case AV_SET_CONFIGURATION:
+    case AV_SET_CONFIGURATION: {
+        /* The headset drives (Xbox): it configures our SEP. Take it when it
+         * is SBC 48 kHz stereo/joint, which the encoder makes. */
+        int off = 4, ok = 0, dly = 0;
+        unsigned char cfg[4] = { 0, 0, 0, 0 };
+        if (s->configured || len < 4) goto setcfg_bad;
+        while (off + 2 <= len) {
+            int cat = cmd[off], cl = cmd[off + 1];
+            if (off + 2 + cl > len) break;
+            if (cat == 0x07 && cl >= 6 && (cmd[off + 2] >> 4) == 0 && cmd[off + 3] == 0) {
+                memcpy(cfg, cmd + off + 4, 4);
+                ok = (cfg[0] & 0x10) && (cfg[0] & 0x03) && cfg[3] >= cfg[2] && cfg[3] >= 2;
+            }
+            if (cat == 0x08) dly = 1;
+            off += 2 + cl;
+        }
+        if (!ok) {
+            r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_REJECT);
+            r[n++] = 0x07;                      /* media codec category */
+            r[n++] = 0x29;                      /* unsupported configuration */
+            log_line("avdtp: headset SET_CONFIGURATION refused (cfg %02x %02x: need SBC 48 kHz stereo)",
+                     cfg[0], cfg[1]);
+            break;
+        }
+        s->remote_cfg = 1;
+        s->remote_seid = cmd[3] >> 2;
+        memcpy(s->remote_sbc, cfg, 4);
+        s->delay_on = dly;
+        r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_ACCEPT);
+        log_line("avdtp: headset configured us: SEID %d, SBC %02x %02x bitpool %u-%u%s",
+                 s->remote_seid, cfg[0], cfg[1], cfg[2], cfg[3], dly ? ", delay reports" : "");
+        break;
+    setcfg_bad:
         r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_REJECT);
         r[n++] = 0x00;                          /* service category */
         r[n++] = AV_ERR_BAD_STATE;
         break;
+    }
     case AV_OPEN:
+        if (s->remote_cfg && !s->remote_open) {
+            s->remote_open = 1;
+            r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_ACCEPT);
+            log_line("avdtp: headset sent OPEN");
+            break;
+        }
+        goto bad_state;
     case 0x05: /* RECONFIGURE */
     bad_state:
     case 0x0B: /* SECURITY_CONTROL */
@@ -397,10 +437,26 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm, int want_cod
     btlink_set_inbound_rx(link, BTLINK_PSM_AVDTP, avdtp_sig_rx, s);
     if (s->peer_opened) {
         /* The headset opened signalling: it may drive first (Discover /
-         * Get Capabilities). Answer it for ~1 s before our own Discover. */
+         * Get Capabilities / Set Configuration). Answer it for ~1 s. */
         long w = now_ms() + 1000;
-        while (now_ms() < w)
+        while (now_ms() < w && !s->remote_cfg)
             if (btlink_pump(link, 30) < 0) break;
+    }
+    if (s->remote_cfg) {
+        /* It configured the stream itself: keep its choice, no Discover /
+         * SetConfiguration of ours (that would collide with it). */
+        memset(&s->sink, 0, sizeof s->sink);
+        s->sink.seid = s->remote_seid;
+        memcpy(s->sink.sbc_caps, s->remote_sbc, 4);
+        s->sink.bitpool_min = s->remote_sbc[2];
+        s->sink.bitpool_max = s->remote_sbc[3];
+        s->sink.have_sbc = 1;
+        s->sink.delay_report = s->delay_on;
+        if (!pick_sbc_config(s, s->want_codec)) {
+            s->unsupported_format = 1;
+            return 0;
+        }
+        return configure_and_start(s);
     }
 
     /* Discover (we are INT / Source; headset is ACP / Sink) */
@@ -527,6 +583,16 @@ static int configure_and_start(avdtp_session *s)
     int rsp_len = 0;
     int msg;
 
+    if (s->remote_cfg) {
+        /* Its configuration stands (pick_sbc_config stayed inside it). */
+        memcpy(s->sbc_cfg, s->remote_sbc, 4);
+        s->bitpool_lo = s->sbc_cfg[2];
+        s->bitpool_hi = s->sbc_cfg[3];
+        if (s->bitpool < s->bitpool_lo) s->bitpool = s->bitpool_lo;
+        if (s->bitpool > s->bitpool_hi) s->bitpool = s->bitpool_hi;
+        s->configured = 1;
+        goto open_step;
+    }
     /* SetConfiguration: ACP SEID, INT SEID, Media Transport + Media Codec */
     {
         int n = 0, co;
@@ -588,12 +654,32 @@ static int configure_and_start(avdtp_session *s)
         s->configured = 1;
     }
 
-    /* Open */
-    body[0] = (unsigned char)(s->sink.seid << 2);
-    msg = avdtp_cmd(s, AV_OPEN, body, 1, rsp, (int)sizeof rsp, &rsp_len);
-    if (msg != AV_MSG_ACCEPT) {
-        log_line("avdtp: open refused");
-        return 0;
+open_step:
+    if (s->remote_cfg && !s->remote_open) {
+        /* It configured us; OPEN is its move. Give it ~300 ms, then send
+         * OPEN ourselves (the Xbox headset waits for us). */
+        long w = now_ms() + 300;
+        while (now_ms() < w && !s->remote_open)
+            if (btlink_pump(link, 20) < 0) break;
+    }
+    if (!s->remote_open) {
+        body[0] = (unsigned char)(s->sink.seid << 2);
+        if (s->remote_cfg) log_line("avdtp: headset configured but sent no OPEN — sending OPEN");
+        msg = avdtp_cmd(s, AV_OPEN, body, 1, rsp, (int)sizeof rsp, &rsp_len);
+        if (msg != AV_MSG_ACCEPT) {
+            log_line("avdtp: open refused");
+            return 0;
+        }
+    } else {
+        /* It opened: it also opens the media channel. Take that one. */
+        long w = now_ms() + 1500;
+        while (now_ms() < w &&
+               !(s->media_scid = btlink_chan_find_inbound_other(link, s->psm, s->sig_scid)))
+            if (btlink_pump(link, 20) < 0) break;
+        if (s->media_scid) {
+            log_line("avdtp: headset opened the media channel (scid %#x)", s->media_scid);
+            goto start_step;
+        }
     }
 
     /* Media channel — same PSM 0x19, separate L2CAP CID (A2DP spec).
@@ -629,6 +715,7 @@ static int configure_and_start(avdtp_session *s)
     log_line("avdtp: media channel open scid %#x (signaling scid %#x)",
              s->media_scid, s->sig_scid);
 
+start_step:
     /* Start */
     body[0] = (unsigned char)(s->sink.seid << 2);
     msg = avdtp_cmd(s, AV_START, body, 1, rsp, (int)sizeof rsp, &rsp_len);
