@@ -598,7 +598,7 @@ static const unsigned char k_evmask[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0
 /* Inquiry with recovery: when a whole inquiry brings no event at all (not
  * even its Command Status), the event path is re-armed (by the transport
  * pump), the event mask is sent again and the inquiry retried once. */
-int a2dp_inquiry(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound)
+static int inquiry_scan_off(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound)
 {
     int ok;
     g_inq_events = 0;
@@ -766,7 +766,7 @@ static void pair_accept(hci_t hci, const unsigned char addr[6], long age)
     log_line("pair: the headset is calling us (%ld ms ago) — accepting its call instead of paging", age);
 }
 
-int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out)
+static int pair_paged(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out)
 {
     hci_t hci;
     unsigned char p[32];
@@ -1115,4 +1115,27 @@ done:
     }
 
     return rc;
+}
+
+/* Pairing and inquiry run with the system page scan paused (see
+ * hci_scan_pause): otherwise the MediaTek controller gives them almost no
+ * radio time. */
+int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out)
+{
+    int r;
+    if (!s) return 0;
+    hci_scan_pause(s->hci, "pairing");
+    r = pair_paged(s, target, out);
+    hci_scan_resume(s->hci);
+    return r;
+}
+
+int a2dp_inquiry(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound)
+{
+    int r;
+    if (!s) return 0;
+    hci_scan_pause(s->hci, "scan");
+    r = inquiry_scan_off(s, out, max, nfound);
+    hci_scan_resume(s->hci);
+    return r;
 }

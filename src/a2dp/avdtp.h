@@ -100,6 +100,9 @@ int avdtp_send_media(avdtp_session *s, const unsigned char *sbc_frames, int len,
                      int samples_in_packet, int n_sbc_frames);
 
 void avdtp_teardown(avdtp_session *s);
+/* After the headset re-configured the open media channel: SUSPEND then
+ * START on the same stream so it binds the media again. 1 = started. */
+int avdtp_rebind(avdtp_session *s);
 
 /* Codec change without dropping the headset: CLOSE the stream, release
  * the media channel, then SET_CONFIGURATION (plain SBC if the sink refuses

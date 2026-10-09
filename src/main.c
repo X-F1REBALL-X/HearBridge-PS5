@@ -24,6 +24,7 @@
 #include "sysinfo.h"
 #include "hci_cmd.h"
 #include "hci_usb.h"
+#include "hcidbg.h"
 #include "acl_track.h"
 #include "lock.h"
 #include "log.h"
@@ -63,6 +64,7 @@
 #define RM_TILE_PATH STATE_DIR "/remove_tile"  /* exists → remove the tile once */
 #define TILE_URL_PATH STATE_DIR "/tile_url"    /* optional: deep link for the tile ("start" = fallback page) */
 #define DIAG_PATH STATE_DIR "/diag.txt"        /* diagnostics report, also at /api/diag */
+#define HCI_DEBUG_PATH STATE_DIR "/hci_debug"  /* exists → /api/hcilog trace + /api/hci raw commands */
 #define DUMP_PKTS 200
 
 #define PCM_CAP_FRAMES  1024  /* matches Avcap2 READ_BYTES / (2*sizeof float) */
@@ -108,6 +110,7 @@ static long g_av_fail_ms;   /* last AVDTP failure: the headset needs a moment */
 static void idle_pump(hci_t hci, int ms)
 {
     unsigned char ev[HCI_PKT_MAX];
+    hcidbg_service(hci);
     if (!hci.ops || hci.ops->pump(hci.ctx, ms) < 0) { usleep((useconds_t)ms * 1000); return; }
     while (hci.ops->next_event(hci.ctx, ev, (int)sizeof ev) > 0) { }
     while (hci.ops->next_acl(hci.ctx, ev, (int)sizeof ev) > 0) { }
@@ -1985,6 +1988,8 @@ stream_setup:
             rc = RUN_DROPPED;
             break;
         }
+        if (btlink_media_rebind_due(link, av.media_scid))
+            (void)avdtp_rebind(&av);
         if (btlink_ms_since_credit(link) > 4000) {
             note_event("stream: no packet acknowledged for 4 s — link lost");
             set_why("quiet");
@@ -2517,6 +2522,10 @@ int main(void)
              lock_rc == LOCK_OK ? "ok" : "NOT WRITABLE", lock_errno, log_ok ? "ok" : "NOT WRITABLE");
     (void)diag_save();
     log_line("attach to running controller (no reset); stop file %s", HB_STOP_PATH);
+    if (file_exists(HCI_DEBUG_PATH)) {
+        hcidbg_enable();
+        log_line("debug: %s present: HCI trace at /api/hcilog, raw commands at /api/hci", HCI_DEBUG_PATH);
+    }
     ctl_init(&g_ctl, HEARBRIDGE_VERSION);
     snprintf(g_ctl.devices_path, sizeof g_ctl.devices_path, "%s", DEVICES_JSON);
     snprintf(g_ctl.select_path, sizeof g_ctl.select_path, "%s", SELECT_TXT);

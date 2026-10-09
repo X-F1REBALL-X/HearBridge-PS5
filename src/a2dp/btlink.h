@@ -116,6 +116,9 @@ void btlink_set_cfg_timeout(btlink *l, long ms);
 int btlink_wait_rx(btlink *l, unsigned scid, unsigned char *out, int max,
                    int timeout_ms);
 
+/* MediaTek: 1 once when the headset re-configured this open media channel
+ * and that has settled; the stream should SUSPEND/START so it re-binds. */
+int btlink_media_rebind_due(btlink *l, unsigned scid);
 /* MTU the peer announced for this channel (0 if unknown). */
 unsigned btlink_chan_peer_mtu(const btlink *l, unsigned scid);
 /* ACL packets queued waiting for controller credits. */
