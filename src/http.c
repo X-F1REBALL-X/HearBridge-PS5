@@ -93,7 +93,7 @@ static int is_write_path(const char *path)
 
 static int status_json(hb_ctl *c, char *o, int max)
 {
-    char dev[140], st[70], url[140], det[200], why[40], ev[1800];
+    char dev[140], st[70], url[140], det[200], why[40], ev[2400];
     int ei, en;
     json_esc(dev, sizeof dev, c->device);
     json_esc(st, sizeof st, c->state);
@@ -151,7 +151,7 @@ static int respond(char *out, int max, int code, const char *ctype,
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 {
     char method[8], path[128], *q;
-    char body[6144];
+    char body[8192];
     int i = 0, j = 0, v, bl, is_api;
 
     while (i < reqlen && req[i] != ' ' && j < (int)sizeof method - 1) method[j++] = req[i++];
@@ -281,9 +281,18 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
             if (rename(tp, sp) != 0)
                 return respond(out, max, 500, "application/json", "{\"error\":\"write\"}", 17);
         }
-        CTL_LOCK(c);
-        c->cmd_seq++;                  /* the stream loop sees a new command */
-        CTL_UNLOCK(c);
+        {
+            char evl[64];
+            if (!strcmp(line, "scan")) snprintf(evl, sizeof evl, "Scan started");
+            else if (!strcmp(line, "reconnect")) snprintf(evl, sizeof evl, "Reconnect pressed");
+            else if (forget) snprintf(evl, sizeof evl, "Forget pressed (%s)", line + 7);
+            else if (strchr(line, ':')) snprintf(evl, sizeof evl, "Connect pressed (%s)", line);
+            else snprintf(evl, sizeof evl, "Connect pressed");
+            CTL_LOCK(c);
+            c->cmd_seq++;                  /* the stream loop sees a new command */
+            ctl_event_locked(c, evl);
+            CTL_UNLOCK(c);
+        }
         if (!forget) {                 /* any pick/scan/reconnect leaves "paused" */
             CTL_LOCK(c);
             c->paused = 0;
@@ -358,9 +367,11 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
     } else if (!strcmp(path, "/api/tone")) {
         c->tone = query_int(q, "on", &v) ? (v != 0) : !c->tone;
     } else if (!strcmp(path, "/api/connect")) {
+        ctl_event_locked(c, "Connect pressed");
         c->req_connect = 1;
         c->paused = 0;
     } else if (!strcmp(path, "/api/disconnect")) {
+        ctl_event_locked(c, "Disconnect pressed");
         c->req_disconnect = 1;
         c->paused = 1;
     } else if (!strcmp(path, "/api/stop")) {

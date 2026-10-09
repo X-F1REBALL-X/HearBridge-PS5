@@ -98,15 +98,21 @@ void ctl_clear_link(hb_ctl *c, int drop_device)
     c->per_packet = c->bitpool_lo = c->bitpool_hi = 0;
 }
 
-void ctl_event(hb_ctl *c, const char *line)
+void ctl_event_locked(hb_ctl *c, const char *line)
 {
     if (!c || !line || !line[0]) return;
-    CTL_LOCK(c);
     if (c->event_n >= HB_EVENT_N) {
         memmove(c->events[0], c->events[1], sizeof c->events[0] * (HB_EVENT_N - 1));
         c->event_n = HB_EVENT_N - 1;
     }
     snprintf(c->events[c->event_n], sizeof c->events[0], "%s", line);
     c->event_n++;
+}
+
+void ctl_event(hb_ctl *c, const char *line)
+{
+    if (!c || !line || !line[0]) return;
+    CTL_LOCK(c);
+    ctl_event_locked(c, line);
     CTL_UNLOCK(c);
 }

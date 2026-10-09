@@ -1515,6 +1515,22 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
         memcpy(l->acc_key[k], keys[k], 16);
         l->acc_kt[k] = key_types[k];
     }
+    /* A request from one of these headsets that arrived just before we
+     * started listening (its event is already read) is still pending at
+     * the controller: accept it now instead of waiting for another one.
+     * Unanswered, it blocks our page with 0x0b until it times out. */
+    for (k = 0; k < n; k++) {
+        long age = acl_track_request_age(l->acc_addr[k], now_ms());
+        if (age >= 0 && age < 4500 && !acl_track_handle(l->acc_addr[k])) {
+            unsigned char fake[12];
+            fake[0] = 0x04; fake[1] = 10;
+            memcpy(fake + 2, l->acc_addr[k], 6);
+            fake[8] = fake[9] = fake[10] = 0; fake[11] = 0x01;
+            log_line("btlink: request from this headset %ld ms ago still pending — accepting it", age);
+            on_event(l, fake, 12);
+            break;
+        }
+    }
     if (g_ps_held) {
         old = 0x02;                       /* idle already holds page scan on: no rewrite */
     } else if (hci_cmd_sync(l->hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) &&
@@ -1714,7 +1730,16 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
             return 0;
         }
 
-        if (btlink_abort_connect && btlink_abort_connect(l->addr)) {
+        if (btlink_abort_connect && l->connected && btlink_press_is_for &&
+            btlink_press_is_for(l->addr)) {
+            /* Same headset pressed again while its link is already up:
+             * keep going (closing it here makes many headsets stop
+             * answering pages, then 0x0b for ~20 s). */
+            if (!l->join_logged) {
+                l->join_logged = 1;
+                log_line("btlink: pressed again while the link is up — keeping it");
+            }
+        } else if (btlink_abort_connect && btlink_abort_connect(l->addr)) {
             unsigned char dp[3];
             if (!l->connected) {
                 fire_cmd(l->hci, 0x0408, l->addr, 6);    /* Create Connection Cancel */

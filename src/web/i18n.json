@@ -157,7 +157,7 @@
    "why_dropped": "headset dropped the link",
    "why_closed": "headset closed the audio",
    "why_quiet": "no audio coming back",
-   "why_held": "link is in use elsewhere",
+   "why_held": "headset still busy — try again in a few seconds",
    "why_failed": "could not connect",
    "why_off": "disconnected on this page"
   },
@@ -261,7 +261,7 @@
    "why_dropped": "السماعة قطعت الاتصال",
    "why_closed": "السماعة أغلقت الصوت",
    "why_quiet": "لا يرجع صوت",
-   "why_held": "الرابط مستخدم في مكان آخر",
+   "why_held": "السماعة ما زالت مشغولة — حاول بعد ثوانٍ",
    "why_failed": "تعذر الاتصال",
    "why_off": "قُطع من هذه الصفحة"
   },
@@ -365,7 +365,7 @@
    "why_dropped": "los auriculares cortaron el enlace",
    "why_closed": "los auriculares cerraron el audio",
    "why_quiet": "no vuelve el audio",
-   "why_held": "el enlace está en uso en otro sitio",
+   "why_held": "auriculares aún ocupados — inténtalo en unos segundos",
    "why_failed": "no se pudo conectar",
    "why_off": "desconectado desde esta página"
   },
@@ -469,7 +469,7 @@
    "why_dropped": "le casque a coupé le lien",
    "why_closed": "le casque a fermé l'audio",
    "why_quiet": "plus d'audio en retour",
-   "why_held": "lien utilisé ailleurs",
+   "why_held": "casque encore occupé — réessayez dans quelques secondes",
    "why_failed": "connexion impossible",
    "why_off": "déconnecté depuis cette page"
   },
@@ -573,7 +573,7 @@
    "why_dropped": "Headset hat die Verbindung getrennt",
    "why_closed": "Headset hat den Ton geschlossen",
    "why_quiet": "kein Ton kommt zurück",
-   "why_held": "Verbindung wird woanders benutzt",
+   "why_held": "Headset noch belegt — in ein paar Sekunden erneut versuchen",
    "why_failed": "Verbindung fehlgeschlagen",
    "why_off": "hier auf der Seite getrennt"
   },
@@ -677,7 +677,7 @@
    "why_dropped": "o fone largou a ligação",
    "why_closed": "o fone fechou o áudio",
    "why_quiet": "o áudio não volta",
-   "why_held": "ligação em uso noutro sítio",
+   "why_held": "fone ainda ocupado — tente de novo em alguns segundos",
    "why_failed": "não foi possível ligar",
    "why_off": "desligado nesta página"
   },
@@ -781,7 +781,7 @@
    "why_dropped": "гарнитура сбросила связь",
    "why_closed": "гарнитура закрыла звук",
    "why_quiet": "звук не возвращается",
-   "why_held": "канал занят в другом месте",
+   "why_held": "наушники ещё заняты — попробуйте через несколько секунд",
    "why_failed": "не удалось подключиться",
    "why_off": "отключено на этой странице"
   },
@@ -885,7 +885,7 @@
    "why_dropped": "ヘッドセットが切断しました",
    "why_closed": "ヘッドセットが音声を閉じました",
    "why_quiet": "音声が戻ってきません",
-   "why_held": "リンクは別のところで使用中",
+   "why_held": "ヘッドセットがまだ使用中です — 数秒後にもう一度",
    "why_failed": "接続できませんでした",
    "why_off": "このページで切断しました"
   },
@@ -989,7 +989,7 @@
    "why_dropped": "耳机断开了连接",
    "why_closed": "耳机关掉了音频",
    "why_quiet": "没有音频回来",
-   "why_held": "链路在别处使用",
+   "why_held": "耳机仍在忙 — 请几秒后重试",
    "why_failed": "连接失败",
    "why_off": "在此页面断开"
   },
@@ -1093,7 +1093,7 @@
    "why_dropped": "le cuffie hanno chiuso il collegamento",
    "why_closed": "le cuffie hanno chiuso l'audio",
    "why_quiet": "l'audio non torna",
-   "why_held": "collegamento in uso altrove",
+   "why_held": "cuffie ancora occupate — riprova tra qualche secondo",
    "why_failed": "connessione non riuscita",
    "why_off": "disconnesso da questa pagina"
   },
@@ -1197,7 +1197,7 @@
    "why_dropped": "האוזניות ניתקו את הקישור",
    "why_closed": "האוזניות סגרו את השמע",
    "why_quiet": "אין שמע בחזרה",
-   "why_held": "הקישור בשימוש במקום אחר",
+   "why_held": "האוזניות עדיין תפוסות — נסה שוב בעוד כמה שניות",
    "why_failed": "לא ניתן להתחבר",
    "why_off": "נותק מהעמוד הזה"
   }

@@ -85,6 +85,7 @@ static int connect_abort(const unsigned char addr[6]);
  * a pick); background retries show "disconnected", not "connecting", and
  * use one short page per device. */
 static int g_user_connect;
+static void note_event(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void set_why(const char *key);
 static void ctl_set_state(const char *st, const char *dev);
 static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *psm);
@@ -208,6 +209,7 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
             return -2;
         }
     }
+    note_event("Link secured (encrypted)");
     if (ini->ok && (btlink_chan_find_inbound(link, BTLINK_PSM_AVDTP) ||
                     btlink_chan_find_inbound(link, BTLINK_PSM_SDP))) {
         /* A saved audio device that opened SDP/AVDTP to us itself: no need
@@ -555,6 +557,7 @@ static void on_acl_up(const unsigned char addr[6])
 {
     int i = paired_find(g_paired, g_npaired, addr);
     const char *nm = i >= 0 && g_paired[i].name[0] ? g_paired[i].name : "-";
+    note_event("%s answered — securing the link", i >= 0 && g_paired[i].name[0] ? nm : "Headset");
     write_status("connecting %s", nm);
     ctl_set_state("connecting", i >= 0 ? g_paired[i].name : NULL);
 }
@@ -767,6 +770,7 @@ static int try_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm,
     if (!ini->ok) return 0;
     log_choice("reconnecting saved", ini);
     if (g_user_connect) {
+        note_event("Calling %s…", ini->name[0] ? ini->name : "the headset");
         write_status("connecting %s", ini->name[0] ? ini->name : "-");
         ctl_set_state("connecting", ini->name);
     } else {
@@ -776,9 +780,22 @@ static int try_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm,
     r = connect_and_probe(hci, ini, linkp, psm, timeout_ms);
     if (r == 1) {
         remember_device(ini);
+        if (press_is_for(ini->addr)) {        /* a second press of it: already done */
+            hb_cmd c;
+            (void)poll_cmd(&c, ini);
+        }
         return 1;
     }
     log_line("select: saved device did not answer (%s)", conn_fail_label(r));
+    if (g_user_connect) {
+        const char *nm = ini->name[0] ? ini->name : "headset";
+        int f = btlink_last_connect_fail();
+        if (r == -1) note_event("%s: not an audio headset", nm);
+        else if (r == -2) note_event("%s hung up right after connecting", nm);
+        else if (f == 0x04) note_event("%s: no answer (off, in its case or too far?)", nm);
+        else if (f == 0x0B) note_event("%s is busy connecting — try again in a few seconds", nm);
+        else note_event("%s: connection failed", nm);
+    }
     if (btlink_last_connect_fail() == 0x04) set_why("timeout");
     else if (btlink_last_connect_fail() == 0x0B) set_why("held");
     else set_why("failed");
@@ -1606,6 +1623,8 @@ stream_setup:
     if (!switched) notify("hearbridge: connected %s", ini->name[0] ? ini->name : "headphones");
     else notify("HearBridge: now %s", av.codec.name ? av.codec.name : "SBC");
     log_line("stream: streaming until stop file or link drop");
+    note_event("Playing on %s — %s %d kHz", ini->name[0] ? ini->name : "headset",
+               av.codec.name ? av.codec.name : "SBC", pk.rate_hz / 1000);
 
     samples = 0;
     xq_bad_s = xq_low_s = 0;
@@ -1737,7 +1756,7 @@ stream_setup:
             break;
         }
         if (req_disc) {
-            note_event("stream: Disconnect requested from the web page");
+            note_event("Disconnected");
             set_why("off");
             rc = RUN_PAUSED;
             break;
@@ -1840,14 +1859,14 @@ stream_setup:
                  * channel sounds worse than joint stereo SBC at 51-53. */
                 xq_low_s = pk.rate.cur < HB_XQ_LOW_BP ? xq_low_s + 1 : 0;
                 if (xq_low_s >= 30) {
-                    note_event("codec: SBC-XQ stays at bitpool %d (under %d) on this link", pk.rate.cur, HB_XQ_LOW_BP);
+                    note_event("SBC-XQ stuck at bitpool %d (under %d)", pk.rate.cur, HB_XQ_LOW_BP);
                     CTL_LOCK(&g_ctl);
                     g_ctl.xq_low = 1;
                     CTL_UNLOCK(&g_ctl);
                     xq_bad_s = 10;
                 }
                 if (xq_bad_s >= 10) {
-                    note_event("codec: SBC-XQ does not hold on this link — auto uses SBC for this headset from now on");
+                    note_event("SBC-XQ unstable here — Auto uses SBC for this headset");
                     g_prefs.auto_no_xq = 1;
                     prefs_save();
                     cs_want = HB_CODEC_AUTO;      /* switched in place on the next pass */
