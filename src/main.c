@@ -89,6 +89,9 @@ static int connect_abort(const unsigned char addr[6]);
  * a pick); background retries show "disconnected", not "connecting", and
  * use one short page per device. */
 static int g_user_connect;
+/* 1 during a background page nobody pressed for (rejoin after a drop, the
+ * idle auto page): another saved headset calling in wins over it. */
+static int g_bg_page;
 static void note_event(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void set_why(const char *key);
 static void ctl_set_state(const char *st, const char *dev);
@@ -542,6 +545,30 @@ static int cmd_waiting(void)
     return seq != g_cmd_seen;
 }
 
+/* Another saved headset (not addr, not one just disconnected by hand) has
+ * a call waiting at the controller: the user took it out of its case. */
+static int other_saved_calling(const unsigned char addr[6])
+{
+    int i;
+    long now = now_ms();
+    for (i = 0; i < g_npaired; i++) {
+        const unsigned char *a = g_paired[i].addr;
+        long age;
+        if (!memcmp(a, addr, 6)) continue;
+        if (held(a) && now - g_hold_ms < 30000) continue;
+        age = acl_track_request_age(a, now);
+        if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(a)) {
+            static long logged;
+            if (now - logged > 2000) {
+                logged = now;
+                log_line("select: another saved headset is calling in — stopping the background page for it");
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Stop the page / listen in progress for addr: a background attempt yields
  * to any page command; a user attempt yields to a Forget of it, a pick of
  * another device, Scan or Reconnect. */
@@ -555,6 +582,7 @@ static int connect_abort(const unsigned char addr[6])
     reset = g_ctl.req_reset;
     CTL_UNLOCK(&g_ctl);
     if (reset) return 1;                 /* drop our page, not anyone else's */
+    if (g_bg_page && other_saved_calling(addr)) return 1;   /* taken out of its case: it wins */
     if (!cmd_waiting()) return 0;
     if (!g_user_connect) return 1;
     f = fopen(SELECT_TXT, "r");
@@ -951,6 +979,7 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
         in.busy_other = (g_have_target && !in.is_target) ||
                         (g_stream_up && !memcmp(a, g_stream_addr, 6));
         in.held = held(a) && (g_stream_up || now - g_hold_ms < 30000);
+        in.bg_page = g_bg_page && g_have_target && !in.is_target && !g_stream_up;
         d = hb_connreq_decide(&in);
         hci_addr_str(a, astr);
         log_line("conn-req: %s CoD %06x%s%s -> %s", astr, cod,
@@ -2377,7 +2406,7 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
     write_status("disconnected waiting for %s", ini->name[0] ? ini->name : "-");
     ctl_set_state("disconnected", ini->name);
     for (;;) {
-        int listen, left, sit;
+        int listen, left, sit, j;
         if (hb_stop_requested()) return 0;
         {
             int go = 0, reset = 0;
@@ -2404,7 +2433,11 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
         listen = sit ? 8000 : hb_re_listen_ms(pages);
         for (left = listen; left > 0; ) {
             int slice = left > 5000 ? 5000 : left;
-            if (listen_saved(hci, ini, &g_ready, &g_ready_psm, slice)) {
+            /* Any saved headset, not only the one that dropped: one taken
+             * out of its case meanwhile connects and plays right away,
+             * without the page (build 20 log: it was turned down busy or
+             * left unanswered until the page sent a command). */
+            if (listen_any_saved(hci, ini, &g_ready, &g_ready_psm, slice)) {
                 note_event("rejoin: headset connected in");
                 return 1;
             }
@@ -2418,7 +2451,10 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
         pages++;
         log_line("rejoin: gentle page %d of %d", pages, HB_RE_PAGES);
         g_user_connect = 0;
-        if (try_saved(hci, ini, &g_ready, &g_ready_psm, HB_PAGE_MS)) {
+        g_bg_page = 1;
+        j = try_saved(hci, ini, &g_ready, &g_ready_psm, HB_PAGE_MS);
+        g_bg_page = 0;
+        if (j) {
             note_event("rejoin: gentle page worked");
             return 1;
         }
@@ -2689,10 +2725,14 @@ int main(void)
                     now_ms() >= next_auto && now_ms() - idle_t0 < 600000) {
                     btlink *back = NULL;
                     unsigned bpsm = 0;
+                    int got;
                     log_line("auto: one background page of %s", ini.name[0] ? ini.name : "the saved headset");
                     g_user_connect = 0;
                     btlink_page_scan_hold(hci, 0);
-                    if (try_saved(hci, &ini, &back, &bpsm, HB_PAGE_MS)) {
+                    g_bg_page = 1;
+                    got = try_saved(hci, &ini, &back, &bpsm, HB_PAGE_MS);
+                    g_bg_page = 0;
+                    if (got) {
                         note_event("auto: %s turned on — connecting", ini.name[0] ? ini.name : "headset");
                         g_ready = back;
                         g_ready_psm = bpsm;
