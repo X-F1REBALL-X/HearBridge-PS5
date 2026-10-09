@@ -12,7 +12,7 @@ Entwickelt von **X-F1REBALL-X**
 
 HearBridge PS5 ist ein Payload (ELF) für eine gejailbreakte PS5. Er überträgt den Ton der Konsole über das eigene Bluetooth der PS5 an normale Bluetooth-Kopfhörer oder -Lautsprecher (A2DP). Gesteuert wird er über eine Webseite, die die Konsole bereitstellt. Spiele, Firmware und Jailbreak bleiben unberührt.
 
-<p align="center"><img src="docs/img/ui-en.png" alt="Webseite von HearBridge PS5" width="520"></p>
+<p align="center"><img src="docs/img/ui-en.png" alt="Webseite von HearBridge PS5" width="900"></p>
 
 ## Voraussetzungen
 
@@ -30,18 +30,18 @@ Erneutes Senden des ELF ersetzt die laufende Kopie. **Stop HearBridge** auf der 
 
 ## Welchen Chip habe ich?
 
-Such dein Modell in der Tabelle. Fat- und Slim-Konsolen haben einen von zwei Bluetooth-Chips, dort also im Log nachsehen.
+PS5-Konsolen nutzen einen von zwei Bluetooth-Chips: Marvell/NXP oder MediaTek. Fat- (CFI-11xx/12xx) und Slim-Konsolen (CFI-20xx/21xx) können jeden der beiden haben, auch bei gleicher Modellnummer.
 
-| Modell | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-|---|---|---|
-| CFI-10xx (Launch) | ✅ läuft (getestet, FW 10.20) | nicht nötig |
-| CFI-11xx, CFI-12xx (Fat) | ✅ bei Marvell/NXP-Chip | ⚠️ bei MediaTek-Chip (ungetestet) |
-| CFI-20xx, CFI-21xx (Slim, die meisten Slims haben MediaTek*) | ✅ bei Marvell/NXP-Chip | ⚠️ bei MediaTek-Chip (ungetestet) |
-| CFI-70xx, CFI-71xx (Pro) | ❌ läuft nicht (MediaTek) | ✅ diese nehmen (ungetestet) |
+| Modell | Download |
+|---|---|
+| CFI-10xx (Launch) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
+| CFI-11xx, CFI-12xx (Fat) | Chip prüfen: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-20xx, CFI-21xx (Slim) | Chip prüfen: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-70xx, CFI-71xx (Pro, immer MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-\* laut Berichten aus Reparaturforen, nicht von Sony bestätigt
+Der mediatek test Build ist noch ungetestet. 1.1.0 ist nur auf einer CFI-10xx getestet. Sag Bescheid, wie es läuft.
 
-**So prüfst du es:** HearBridge einmal starten, `/data/hearbridge/hearbridge.log` öffnen und die Zeile `usb: /dev/ugen0.2 is XXXX:YYYY` suchen (die ugen-Nummer kann abweichen). `1286` = Marvell/NXP, nimm **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, nimm **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**So prüfst du es:** 1.1.0 starten und unten im **Status**-Bereich die Zeile **Chip** ansehen. `Marvell/NXP (1286:…)` → bei 1.1.0 bleiben. `MediaTek (0e8d:…)` → mediatek test nehmen (die Seite zeigt dann auch einen orangen Hinweis). Oder `/data/hearbridge/hearbridge.log` öffnen und `usb: /dev/ugen0.2 is 1286:2059 …` suchen (die ugen-Nummer kann abweichen). Die ersten vier Zeichen nach "is" sind der Chip: `1286` = Marvell/NXP, `0e8d` = MediaTek.
 
 Quellen: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
@@ -54,7 +54,8 @@ Quellen: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/complian
 - **Equalizer:** 5 Bänder (±12 dB) mit Presets, pro Kopfhörer gespeichert, mit Limiter, damit der Boost nicht übersteuert.
 - **Latenz:** Pufferziel von 60 bis 200 ms (Standard 200 ms) und eine Live-Schätzung der Verzögerung.
 - **Clean sound:** Equalizer aus, Boost zurück auf 250 %, Puffer zurück auf 200 ms.
-- **Log** auf der Seite mit jedem Schritt. Die Seite gibt es in 11 Sprachen.
+- **Log** auf der Seite mit jedem Schritt, farbig: grün geklappt, rot fehlgeschlagen, blau für deine Klicks. Die Seite gibt es in 11 Sprachen.
+- **Chip:** unten in **Status** steht dein Bluetooth-Chip. Bei einem MediaTek-Chip gibt es dort einen Link zum mediatek test Build.
 
 ## Codecs
 
@@ -68,7 +69,7 @@ AAC, aptX und LDAC werden nicht unterstützt.
 - Ein Kopfhörer gleichzeitig, kein Mikrofon. Der Fernseher spielt den Ton weiter.
 - Kopfhörer müssen SBC mit 48 kHz Stereo annehmen.
 - Immer nur einen Bluetooth-Payload laufen lassen. Der DualSense funktioniert weiter.
-- Nur auf fw 10.20 (PS5 fat) getestet. Andere Modelle und Firmwares sind ungetestet; laut Berichten starten PS5 Pro und manche 13.x-Setups nicht ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)).
+- Nur auf fw 10.20 (PS5 fat, CFI-10xx) getestet. Andere Modelle und Firmwares sind ungetestet. Laut Berichten starteten PS5 Pro und manche 13.x-Setups mit älteren Versionen nicht ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)); mit MediaTek-Chip probier den mediatek test Build.
 - Getestete Kopfhörer: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Fehlerbehebung / Problem melden

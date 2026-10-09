@@ -14,7 +14,7 @@
 
 HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא משדר את השמע של הקונסולה דרך הבלוטות' של ה-PS5 עצמו לאוזניות או לרמקול בלוטות' רגילים (A2DP). השליטה נעשית מדף אינטרנט שהקונסולה מגישה. הוא לא נוגע במשחקים, בקושחה או בפריצה.
 
-<p align="center"><img src="docs/img/ui-en.png" alt="דף האינטרנט של HearBridge PS5" width="520"></p>
+<p align="center"><img src="docs/img/ui-he.png" alt="דף האינטרנט של HearBridge PS5" width="900"></p>
 
 ## דרישות
 
@@ -32,18 +32,18 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא משדר את הש�
 
 ## איזה צ'יפ יש לי?
 
-מצאו את הדגם שלכם בטבלה. בפאט וב-Slim יש אחד משני צ'יפים של בלוטות', אז בהם צריך לבדוק בלוג.
+קונסולות PS5 משתמשות באחד משני שבבי בלוטות': Marvell/NXP או MediaTek. בקונסולות פאט (CFI-11xx/12xx) ו-Slim (CFI-20xx/21xx) יכול להיות כל אחד מהם, גם באותו מספר דגם.
 
-| דגם | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-|---|---|---|
-| CFI-10xx (ההשקה) | ✅ עובד (נבדק, fw 10.20) | לא צריך |
-| CFI-11xx, CFI-12xx (פאט) | ✅ אם הצ'יפ Marvell/NXP | ⚠️ אם הצ'יפ MediaTek (לא נבדק) |
-| CFI-20xx, CFI-21xx (Slim, ברוב ה-Slim יש MediaTek*) | ✅ אם הצ'יפ Marvell/NXP | ⚠️ אם הצ'יפ MediaTek (לא נבדק) |
-| CFI-70xx, CFI-71xx (Pro) | ❌ לא יעבוד (MediaTek) | ✅ להשתמש בזה (לא נבדק) |
+| דגם | הורדה |
+|---|---|
+| CFI-10xx (השקה) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
+| CFI-11xx, CFI-12xx (פאט) | בדקו את השבב: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-20xx, CFI-21xx (Slim) | בדקו את השבב: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-70xx, CFI-71xx (Pro, תמיד MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-\* לפי דיווחים מפורומי תיקונים, לא מאושר על ידי Sony
+גרסת mediatek test עוד לא נבדקה. גרסה 1.1.0 נבדקה רק על CFI-10xx. נשמח לשמוע איך הלך.
 
-**איך בודקים:** הפעילו את HearBridge פעם אחת, פתחו את `/data/hearbridge/hearbridge.log` וחפשו את השורה `usb: /dev/ugen0.2 is XXXX:YYYY` (מספר ה-ugen יכול להיות אחר). `1286` = Marvell/NXP, השתמשו ב-**[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, השתמשו ב-**[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**איך בודקים:** הפעילו את 1.1.0 והסתכלו על השורה **Chip** בתחתית החלון **Status**. `Marvell/NXP (1286:…)` → נשארים עם 1.1.0. `MediaTek (0e8d:…)` → משתמשים ב-mediatek test (הדף מציג גם הודעה כתומה). או פתחו את `/data/hearbridge/hearbridge.log` וחפשו `usb: /dev/ugen0.2 is 1286:2059 …` (מספר ה-ugen יכול להיות אחר). ארבעת התווים הראשונים אחרי "is" הם השבב: `1286` = Marvell/NXP,‏ `0e8d` = MediaTek.
 
 מקורות: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
@@ -56,7 +56,8 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא משדר את הש�
 - **אקולייזר:** 5 תחומים (±12 dB) עם פריסטים, נשמר לכל אוזניה, עם לימיטר כך שהבוסט לא מעוות.
 - **השהייה:** יעד באפר מ-60 עד 200 ms (ברירת מחדל 200 ms) והערכה חיה של ההשהייה.
 - **Clean sound:** מכבה את האקולייזר, מחזיר את הבוסט ל-250 % ואת הבאפר ל-200 ms.
-- **לוג** בדף עם כל שלב. הדף זמין ב-11 שפות.
+- **לוג** בדף עם כל שלב, בצבעים: ירוק הצליח, אדום נכשל, תכלת ללחיצות שלכם. הדף זמין ב-11 שפות.
+- **שבב:** בתחתית **Status** מוצג שבב הבלוטות' שלכם. עם שבב MediaTek מופיע שם קישור לגרסת mediatek test.
 
 ## קודקים
 
@@ -70,7 +71,7 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא משדר את הש�
 - אוזניה אחת בכל פעם, בלי מיקרופון. גם הטלוויזיה ממשיכה להשמיע.
 - האוזניות צריכות לקבל SBC ב-48 kHz סטריאו.
 - הריצו רק מטען בלוטות' אחד בכל פעם. ה-DualSense ממשיך לעבוד.
-- נבדק רק על קושחה 10.20 (PS5 fat). דגמים וקושחות אחרים לא נבדקו; דווח ש-PS5 Pro וחלק מהגדרות 13.x לא עולים ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)).
+- נבדק רק על קושחה 10.20 (PS5 fat, ‏CFI-10xx). דגמים וקושחות אחרים לא נבדקו. דווח ש-PS5 Pro וחלק מהגדרות 13.x לא עלו בגרסאות קודמות ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)); עם שבב MediaTek נסו את גרסת mediatek test.
 - אוזניות שנבדקו: Sony WF-1000XM6, ‏OnePlus Buds Ace 2, ‏Xbox Wireless Headset.
 
 ## פתרון בעיות / דיווח על תקלה

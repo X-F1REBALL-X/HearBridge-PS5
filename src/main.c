@@ -2546,6 +2546,16 @@ int main(void)
         bt_failed_wait("error hci-open-failed");
         goto out;
     }
+    {
+        int vid, pid;
+        if (hci_usb_chip(&vid, &pid)) {
+            CTL_LOCK(&g_ctl);
+            g_ctl.chip_vid = vid;
+            g_ctl.chip_pid = pid;
+            CTL_UNLOCK(&g_ctl);
+        }
+        (void)diag_save();
+    }
 
     memset(&opts, 0, sizeof opts);
     opts.inquiry_seconds = 3;
