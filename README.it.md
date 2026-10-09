@@ -12,7 +12,7 @@ Sviluppato da **X-F1REBALL-X**
 
 HearBridge PS5 è un payload (ELF) per una PS5 con jailbreak. Trasmette l'audio della console tramite il Bluetooth della PS5 stessa a cuffie o altoparlanti Bluetooth normali (A2DP). Si controlla da una pagina web servita dalla console. Non tocca giochi, firmware o jailbreak.
 
-<p align="center"><img src="docs/img/ui-en.png" alt="Pagina web di HearBridge PS5" width="520"></p>
+<p align="center"><img src="docs/img/ui-en.png" alt="Pagina web di HearBridge PS5" width="900"></p>
 
 ## Requisiti
 
@@ -41,7 +41,7 @@ Cerca il tuo modello nella tabella. Le fat e le Slim montano uno di due chip Blu
 
 \* da forum di riparazione, non confermato da Sony
 
-**Come controllare:** avvia HearBridge una volta, apri `/data/hearbridge/hearbridge.log` e cerca la riga `usb: /dev/ugen0.2 is XXXX:YYYY` (il numero ugen può cambiare). `1286` = Marvell/NXP, usa **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, usa **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**Come controllare:** avvia HearBridge e guarda **Chip** in fondo a **Status** nella pagina. Oppure apri `/data/hearbridge/hearbridge.log` e cerca la riga `usb: /dev/ugen0.2 is XXXX:YYYY` (il numero ugen può cambiare). `1286` = Marvell/NXP, usa **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, usa **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
 
 Fonti: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
@@ -54,7 +54,8 @@ Fonti: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance
 - **Equalizzatore:** 5 bande (±12 dB) con preset, salvato per cuffia, con limiter così il boost non distorce.
 - **Latenza:** obiettivo del buffer da 60 a 200 ms (predefinito 200 ms) e una stima del ritardo in tempo reale.
 - **Clean sound:** spegne l'equalizzatore, riporta il boost a 250 % e il buffer a 200 ms.
-- **Log** nella pagina con ogni passaggio. La pagina è in 11 lingue.
+- **Log** nella pagina con ogni passaggio, a colori: verde riuscito, rosso fallito, blu per quello che premi. La pagina è in 11 lingue.
+- **Chip:** in fondo a **Status** compare il tuo chip Bluetooth. Con un chip MediaTek c'è un link alla versione mediatek test.
 
 ## Codec
 
@@ -68,7 +69,7 @@ AAC, aptX e LDAC non sono supportati.
 - Una cuffia alla volta, niente microfono. Anche la TV continua a riprodurre l'audio.
 - Le cuffie devono accettare SBC a 48 kHz stereo.
 - Esegui un solo payload Bluetooth alla volta. Il DualSense continua a funzionare.
-- Testato solo su fw 10.20 (PS5 fat). Altri modelli e firmware non sono testati; è stato segnalato che su PS5 Pro e alcune configurazioni 13.x non si avvia ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)).
+- Testato solo su fw 10.20 (PS5 fat, CFI-10xx). Altri modelli e firmware non sono testati. È stato segnalato che su PS5 Pro e alcune configurazioni 13.x le versioni precedenti non si avviavano ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)); con un chip MediaTek prova la versione mediatek test.
 - Cuffie testate: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Risoluzione dei problemi / segnalare un problema
