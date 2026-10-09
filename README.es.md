@@ -30,18 +30,18 @@ Enviar el ELF otra vez reemplaza la copia en ejecución. **Stop HearBridge** en 
 
 ## ¿Qué chip tengo?
 
-Busca tu modelo en la tabla. Las fat y las Slim traen uno de dos chips Bluetooth, así que en esas mira el log.
+Las PS5 usan uno de dos chips Bluetooth: Marvell/NXP o MediaTek. Las fat (CFI-11xx/12xx) y las Slim (CFI-20xx/21xx) pueden traer cualquiera de los dos, incluso con el mismo número de modelo.
 
-| Modelo | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-|---|---|---|
-| CFI-10xx (lanzamiento) | ✅ funciona (probado, fw 10.20) | no hace falta |
-| CFI-11xx, CFI-12xx (fat) | ✅ si el chip es Marvell/NXP | ⚠️ si el chip es MediaTek (sin probar) |
-| CFI-20xx, CFI-21xx (Slim, la mayoría de Slim tienen MediaTek*) | ✅ si el chip es Marvell/NXP | ⚠️ si el chip es MediaTek (sin probar) |
-| CFI-70xx, CFI-71xx (Pro) | ❌ no funciona (MediaTek) | ✅ usa esta (sin probar) |
+| Modelo | Descarga |
+|---|---|
+| CFI-10xx (lanzamiento) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
+| CFI-11xx, CFI-12xx (fat) | Mira tu chip: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-20xx, CFI-21xx (Slim) | Mira tu chip: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-70xx, CFI-71xx (Pro, siempre MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-\* según foros de reparación, no confirmado por Sony
+La versión mediatek test aún no está probada. 1.1.0 solo está probada en una CFI-10xx. Cuéntanos cómo te va.
 
-**Cómo comprobarlo:** ejecuta HearBridge una vez, abre `/data/hearbridge/hearbridge.log` y busca la línea `usb: /dev/ugen0.2 is XXXX:YYYY` (el número de ugen puede cambiar). `1286` = Marvell/NXP, usa **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, usa **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**Cómo comprobarlo:** ejecuta 1.1.0 y mira la fila **Chip** abajo en el panel **Status**. `Marvell/NXP (1286:…)` → sigue con 1.1.0. `MediaTek (0e8d:…)` → usa mediatek test (la página también muestra un aviso naranja). O abre `/data/hearbridge/hearbridge.log` y busca `usb: /dev/ugen0.2 is 1286:2059 …` (el número de ugen puede cambiar). Los cuatro primeros caracteres después de "is" son el chip: `1286` = Marvell/NXP, `0e8d` = MediaTek.
 
 Fuentes: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
