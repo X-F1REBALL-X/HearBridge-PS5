@@ -56,14 +56,18 @@ int main(void)
         memcpy(b, a, sizeof a);
         hb_eq_init(&e);
         hb_eq_set(&e, 1, flat, 48000);
+        gain_limiter_reset();
         gain_apply_soft(a, 2 * N, 1000);
+        gain_limiter_reset();
         gain_apply_soft_eq(b, 2 * N, 1000, &e);
         CHECK(!e.on && !memcmp(a, b, sizeof a), "EQ on but flat: bit-exact same output as without EQ");
         {
             int db[HB_EQ_NB] = { 6, 0, 0, 0, 6 };
             memcpy(b, a, sizeof a);
             hb_eq_set(&e, 0, db, 48000);
+            gain_limiter_reset();
             gain_apply_soft(a, 2 * N, 1000);
+            gain_limiter_reset();
             gain_apply_soft_eq(b, 2 * N, 1000, &e);
             CHECK(!e.on && !memcmp(a, b, sizeof a), "EQ off: bit-exact passthrough");
         }
@@ -122,7 +126,7 @@ int main(void)
         }
         hb_eq_init(&e);
         hb_eq_set(&e, 1, db, 48000);
-        CHECK(fabs(e.preamp - pow(10, -12 / 20.0)) < 1e-4, "preamp = minus the largest boost (-12 dB)");
+        CHECK(e.preamp == 1.f, "no EQ pre-cut: boosts are not taken back off the gain");
         {
             /* reference: the same chain in float without the int16 output stage */
             static float ref[2 * N];
@@ -131,6 +135,7 @@ int main(void)
             hb_eq_set(&r, 1, db, 48000);
             for (i = 0; i < 2 * N; i++) ref[i] = a[i] * 5.0f * r.preamp / 32768.f;
             hb_eq_process(&r, ref, N);
+            gain_limiter_reset();
             pk = gain_apply_soft_eq(a, 2 * N, 5000, &e);
             for (i = 0; i < 2 * N; i++)
                 if ((ref[i] > 0.01f && a[i] < 0) || (ref[i] < -0.01f && a[i] > 0)) wraps++;

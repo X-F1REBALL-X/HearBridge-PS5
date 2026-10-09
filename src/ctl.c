@@ -79,7 +79,18 @@ int ctl_effective_gain_milli(int gain_pct, int muted, int hs_volume)
     if (muted) return 0;
     if (gain_pct < 0) gain_pct = 0;
     if (gain_pct > HB_GAIN_MAX_PCT) gain_pct = HB_GAIN_MAX_PCT;
-    g = (long)gain_pct * 10;                       /* x1000 */
+    {
+        /* Up to 100 %: linear. Above, the boost follows pct^1.43 so the top
+         * of the slider uses the headroom the quiet console capture leaves
+         * (500 % = x10, +20 dB); the limiter keeps it clean. */
+        static const int pts[5] = { 1000, 2694, 4818, 7262, 10000 };   /* 100..500 % */
+        if (gain_pct <= 100) g = (long)gain_pct * 10;
+        else {
+            int k = (gain_pct - 100) / 100, f = (gain_pct - 100) % 100;
+            if (k >= 4) g = pts[4];
+            else g = pts[k] + (long)(pts[k + 1] - pts[k]) * f / 100;
+        }
+    }
     if (hs_volume >= 0) g = g * (hs_volume > 127 ? 127 : hs_volume) / 127;
     return (int)g;
 }

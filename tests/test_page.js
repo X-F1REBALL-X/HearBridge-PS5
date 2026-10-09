@@ -36,11 +36,11 @@ check(calls.length && calls[0].m === 'GET' && calls[0].p === '/api/status' && !c
 check(calls.some(function(c,i){return i>0 && c.m==='POST' && c.p==='/api/scan' && c.h['X-HB-Token']}), 'page: refresh starts a scan');
 check(/setInterval\(function\(\)\{if\(scanLive/.test(html), 'page: devices are polled during the scan, not after it');
 check(/Nothing yet/.test(el('evlog').innerHTML), 'page: empty log says nothing yet');
-check(/if\(atEnd\)lg\.scrollTop=lg\.scrollHeight/.test(html), 'page: log follows the newest line unless scrolled up');
+check(/if\(lg\.hbFollow\)lg\.scrollTop=lg\.scrollHeight/.test(html) && /this\.hbFollow=this\.scrollTop/.test(html), 'page: log follows the newest line unless scrolled up');
 check(/patchList\('devlist'/.test(html) && /patchList\('savedlist'/.test(html) && !/\$\('(devlist|savedlist)'\)\.innerHTML=/.test(html),
   'page: device lists are patched in place (no rebuild per poll, no hover/focus blink)');
 const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], 
-  ['scan', '/api/scan'], ['reconnect', '/api/reconnect'], ['stop', '/api/stop'], ['clean', '/api/clean']];
+  ['scan', '/api/scan'], ['stop', '/api/stop'], ['clean', '/api/clean']];
 for (const [id, path] of actions) {
   calls.length = 0; el(id).onclick();
   const c = calls[0];
@@ -62,8 +62,8 @@ check(html.indexOf('class="panel logp"') > html.indexOf('id="devlist"') && html.
   html.indexOf('data-i18n="log"') > 0 && html.indexOf('data-i18n="logEmpty"') > 0,
   'page: log is its own panel, not inside devices');
 check(html.indexOf('id="reset"') < 0 && html.indexOf('/api/reset') < 0 &&
-  html.indexOf('id="reconnect"') > html.indexOf('id="scan"') && html.indexOf('id="reconnect"') < html.indexOf('id="savedlist"'),
-  'page: reconnect sits with Scan, no reset button');
+  html.indexOf('id="reconnect"') < 0 && /t\('reconnect'\)/.test(html),
+  'page: no big Reconnect/Reset under Scan, per-row Reconnect kept');
 check(el('cd0').textContent === 'Auto · SBC-XQ' && el('cd3').className === 'cur' && /Auto picked SBC-XQ/.test(el('codecno').innerHTML),
   'page: auto shows the codec it is streaming');
 check(el('cd0').className === 'act' && el('cd2').disabled && el('cd2').className === 'no' && !el('cd3').disabled && el('cd3').className !== 'no',

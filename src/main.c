@@ -420,6 +420,7 @@ static int want_blocks(const unsigned char addr[6])
 static unsigned char g_hold[PAIRED_MAX][6];
 static int g_nhold;
 
+static long g_hold_ms;     /* when the last manual Disconnect hold was set */
 static int held(const unsigned char a[6])
 {
     int i;
@@ -429,6 +430,7 @@ static int held(const unsigned char a[6])
 
 static void hold_add(const unsigned char a[6])
 {
+    g_hold_ms = now_ms();
     if (held(a) || g_nhold >= PAIRED_MAX) return;
     memcpy(g_hold[g_nhold++], a, 6);
     log_line("saved: auto-reconnect paused for the disconnected device");
@@ -761,6 +763,54 @@ static int listen_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *p
     }
     pr = probe_link(link, ini, linkp, psm);
     return pr == 1;
+}
+
+/* Idle: accept any saved headset that connects in (power on, out of its
+ * case). One the user disconnected by hand only after 30 s (a fresh power
+ * on, not its instant re-page). 1 = link probed and handed out, *ini is
+ * then that headset (saved as the current one). */
+static int listen_any_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm, int ms)
+{
+    unsigned char a[8][6], k[8][16], kt[8];
+    int idx[8], n = 0, i, which = -1, pr;
+    btlink *link;
+    headset_ini cand;
+    for (i = 0; i < g_npaired && n < 8; i++) {
+        if (held(g_paired[i].addr) && now_ms() - g_hold_ms < 30000) continue;
+        memcpy(a[n], g_paired[i].addr, 6);
+        memcpy(k[n], g_paired[i].link_key, 16);
+        kt[n] = g_paired[i].key_type;
+        idx[n++] = i;
+    }
+    if (!n) { idle_pump(hci, ms); return 0; }
+    link = btlink_create(hci, 1021, 7);
+    if (!link) return 0;
+    if (!btlink_accept(link, (const unsigned char (*)[6])a, (const unsigned char (*)[16])k, kt, n,
+                       ms, &which) || which < 0 || which >= n) {
+        btlink_destroy(link);
+        return 0;
+    }
+    cand = g_paired[idx[which]];
+    cand.ok = cand.have_addr = 1;
+    if (press_is_for(cand.addr)) {          /* a press for it is answered by this link */
+        hb_cmd c;
+        (void)poll_cmd(&c, &cand);
+    }
+    if (held(cand.addr)) {                  /* turned on again later: auto-connect is back */
+        hold_clear(cand.addr);
+        CTL_LOCK(&g_ctl);
+        g_ctl.paused = 0;
+        CTL_UNLOCK(&g_ctl);
+    }
+    note_event("auto: %s turned on — connecting", cand.name[0] ? cand.name : "headset");
+    pr = probe_link(link, &cand, linkp, psm);
+    if (pr != 1) return 0;
+    *ini = cand;
+    keep_identity(ini);
+    if (!headset_ini_save(ini)) log_line("saved: cannot write headset.ini");
+    remember_device(ini);
+    publish_saved(ini);
+    return 1;
 }
 
 /* Reconnect with a saved key (no pairing). 1 = link ready. */
@@ -1622,6 +1672,7 @@ stream_setup:
     ctl_set_state("streaming", ini->name);
     if (!switched) notify("hearbridge: connected %s", ini->name[0] ? ini->name : "headphones");
     else notify("HearBridge: now %s", av.codec.name ? av.codec.name : "SBC");
+    gain_limiter_reset();
     log_line("stream: streaming until stop file or link drop");
     note_event("Playing on %s — %s %d kHz", ini->name[0] ? ini->name : "headset",
                av.codec.name ? av.codec.name : "SBC", pk.rate_hz / 1000);
@@ -2205,8 +2256,15 @@ int main(void)
         g_ctl.device[0] = 0;
         CTL_UNLOCK(&g_ctl);
         log_line("hearbridge: idle — waiting for Connect");
-        if (!paused && ini.ok) btlink_page_scan_hold(hci, 1);   /* once for the idle period */
+        if (g_npaired || ini.ok) btlink_page_scan_hold(hci, 1);   /* once for the idle period */
         {
+            /* Auto-connect: headsets that page us on power-on are accepted
+             * (listen below). For ones that only wait to be paged: one short
+             * page of the most recent saved headset every 12 s, for 10 min,
+             * never after a manual Disconnect or a case close (it pages us
+             * itself when it comes out), never while a page command waits. */
+            long idle_t0 = now_ms(), next_auto = now_ms() + 12000;
+            int auto_ok = r != RUN_AWAY;
             for (;;) {
                 int go;
                 if (hb_stop_requested()) break;
@@ -2249,17 +2307,38 @@ int main(void)
                     }
                 }
                 persist_gain_if_dirty();
-                if (!paused && ini.ok && !held(ini.addr)) {
+                if (g_npaired || ini.ok) {
                     btlink *back = NULL;
                     unsigned bpsm = 0;
-                    if (listen_saved(hci, &ini, &back, &bpsm, 400)) {
-                        note_event("rejoin: headset connected in");
+                    if (listen_any_saved(hci, &ini, &back, &bpsm, 400)) {
                         g_ready = back;
                         g_ready_psm = bpsm;
                         break;
                     }
                 } else {
                     idle_pump(hci, 100);
+                }
+                CTL_LOCK(&g_ctl);
+                paused = g_ctl.paused;
+                CTL_UNLOCK(&g_ctl);
+                if (auto_ok && !paused && ini.ok && !held(ini.addr) && !cmd_waiting() &&
+                    now_ms() >= next_auto && now_ms() - idle_t0 < 600000) {
+                    btlink *back = NULL;
+                    unsigned bpsm = 0;
+                    log_line("auto: one background page of %s", ini.name[0] ? ini.name : "the saved headset");
+                    g_user_connect = 0;
+                    btlink_page_scan_hold(hci, 0);
+                    if (try_saved(hci, &ini, &back, &bpsm, HB_PAGE_MS)) {
+                        note_event("auto: %s turned on — connecting", ini.name[0] ? ini.name : "headset");
+                        g_ready = back;
+                        g_ready_psm = bpsm;
+                        break;
+                    }
+                    btlink_page_scan_hold(hci, 1);
+                    set_why("");
+                    write_status("disconnected");
+                    ctl_set_state("disconnected", NULL);
+                    next_auto = now_ms() + 12000;   /* 12 s after this attempt ended */
                 }
             }
         }
