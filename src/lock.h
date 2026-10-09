@@ -31,4 +31,13 @@ int  lock_decide(int flock_result, int flock_errno, int fields, long pid, long w
                  int flocked, long boot, long self);
 void lock_release(void);
 
+/* A newly started payload always takes over: if another instance holds
+ * the lock, create stop_path (and send SIGTERM when the holder's pid is
+ * certain, i.e. it holds the flock), wait up to graceful_ms for it to stop
+ * cleanly, then SIGKILL it and wait up to kill_ms more. stop_path is
+ * removed again. Returns like lock_take_ex(); *old_pid = the instance
+ * that was running (0 = none). */
+int  lock_take_over(const char *path, const char *stop_path, int graceful_ms, int kill_ms,
+                    int *err, long *old_pid);
+
 #endif

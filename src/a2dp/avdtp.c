@@ -1,4 +1,5 @@
 #include "avdtp.h"
+#include "hsprefs.h"
 #include "log.h"
 #include "util.h"
 
@@ -73,7 +74,7 @@ static void avdtp_answer_remote(avdtp_session *s, unsigned scid,
         r[n++] = 0x01; r[n++] = 0x00;          /* Media Transport */
         r[n++] = 0x07; r[n++] = 0x06;          /* Media Codec */
         r[n++] = 0x00; r[n++] = 0x00;          /* Audio, SBC */
-        r[n++] = 0x3F; r[n++] = 0xFF;          /* 48/44.1/32/16, all modes/blocks */
+        r[n++] = 0x13; r[n++] = 0xFF;          /* 48 kHz, stereo/joint; all blocks/subbands/alloc */
         r[n++] = 2;    r[n++] = 53;            /* bitpool range */
         break;
     case AV_ABORT:
@@ -103,19 +104,62 @@ static void avdtp_answer_remote(avdtp_session *s, unsigned scid,
         log_line("avdtp: sink sent CLOSE");
         s->remote_closed = 1;
         break;
-    case 0x0D: /* DELAY_REPORT: just acknowledge */
+    case 0x0D: /* DELAY_REPORT: remember it for the latency estimate */
         r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_ACCEPT);
-        if (len >= 5)
-            log_line("avdtp: sink delay report %u.%u ms",
-                     (unsigned)((cmd[3] << 8) | cmd[4]) / 10,
-                     (unsigned)((cmd[3] << 8) | cmd[4]) % 10);
+        if (len >= 5) {
+            unsigned d = (unsigned)((cmd[3] << 8) | cmd[4]);
+            if (!s->delay_reports || (int)d != s->sink_delay_x10)
+                log_line("avdtp: sink delay report %u.%u ms", d / 10, d % 10);
+            s->sink_delay_x10 = (int)d;
+            s->delay_reports++;
+        }
         break;
-    case AV_SET_CONFIGURATION:
+    case AV_SET_CONFIGURATION: {
+        /* The headset drives (Xbox): it configures our SEP. Take it when it
+         * is SBC 48 kHz stereo/joint, which the encoder makes. */
+        int off = 4, ok = 0, dly = 0;
+        unsigned char cfg[4] = { 0, 0, 0, 0 };
+        if (s->configured || len < 4) goto setcfg_bad;
+        while (off + 2 <= len) {
+            int cat = cmd[off], cl = cmd[off + 1];
+            if (off + 2 + cl > len) break;
+            if (cat == 0x07 && cl >= 6 && (cmd[off + 2] >> 4) == 0 && cmd[off + 3] == 0) {
+                memcpy(cfg, cmd + off + 4, 4);
+                ok = (cfg[0] & 0x10) && (cfg[0] & 0x03) && cfg[3] >= cfg[2] && cfg[3] >= 2;
+            }
+            if (cat == 0x08) dly = 1;
+            off += 2 + cl;
+        }
+        if (!ok) {
+            r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_REJECT);
+            r[n++] = 0x07;                      /* media codec category */
+            r[n++] = 0x29;                      /* unsupported configuration */
+            log_line("avdtp: headset SET_CONFIGURATION refused (cfg %02x %02x: need SBC 48 kHz stereo)",
+                     cfg[0], cfg[1]);
+            break;
+        }
+        s->remote_cfg = 1;
+        s->remote_seid = cmd[3] >> 2;
+        memcpy(s->remote_sbc, cfg, 4);
+        s->delay_on = dly;
+        r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_ACCEPT);
+        log_line("avdtp: headset configured us: SEID %d, SBC %02x %02x bitpool %u-%u%s",
+                 s->remote_seid, cfg[0], cfg[1], cfg[2], cfg[3], dly ? ", delay reports" : "");
+        break;
+    setcfg_bad:
         r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_REJECT);
         r[n++] = 0x00;                          /* service category */
         r[n++] = AV_ERR_BAD_STATE;
         break;
+    }
     case AV_OPEN:
+        if (s->remote_cfg && !s->remote_open) {
+            s->remote_open = 1;
+            r[0] = AV_HDR(rlabel, AV_PKT_SINGLE, AV_MSG_ACCEPT);
+            log_line("avdtp: headset sent OPEN");
+            break;
+        }
+        goto bad_state;
     case 0x05: /* RECONFIGURE */
     bad_state:
     case 0x0B: /* SECURITY_CONTROL */
@@ -267,7 +311,8 @@ static void log_hex_prefix(const char *tag, const unsigned char *p, int n, int m
 /* Media Codec service category (0x07): look for Audio + SBC (0x00). */
 static int parse_sbc_caps(const unsigned char *caps, int len, avdtp_sink_info *sink)
 {
-    int i = 0;
+    int i = 0, found = 0;
+    sink->delay_report = 0;
     while (i + 1 < len) {
         unsigned char cat = caps[i];
         unsigned char clen = caps[i + 1];
@@ -283,12 +328,14 @@ static int parse_sbc_caps(const unsigned char *caps, int len, avdtp_sink_info *s
                 sink->have_sbc = 1;
                 sink->bitpool_min = caps[i + 6];
                 sink->bitpool_max = caps[i + 7];
-                return 1;
+                found = 1;
             }
+        } else if (cat == 0x08) {   /* Delay Reporting (AVDTP 1.3) */
+            sink->delay_report = 1;
         }
         i += 2 + clen;
     }
-    return 0;
+    return found;
 }
 
 /* AVDTP Discover SEP (2 octets), Spec:
@@ -320,73 +367,41 @@ static int get_caps_for_seid(avdtp_session *s, int seid,
     return msg;
 }
 
-static int pick_sbc_config(avdtp_sink_info *sink, uint8_t cfg[4], int *bitpool)
+static int pick_sbc_config(avdtp_session *s, int want)
 {
-    unsigned char c0 = sink->sbc_caps[0];
-    unsigned char c1 = sink->sbc_caps[1];
-    int rate = 48000, ch = 2, joint = 0;
-    unsigned char out0, out1 = 0;
     const char *why = NULL;
-    int bp;
-
-    /* 48 kHz, two channels (joint > stereo > dual): what the capture
-     * delivers. Anything else is refused instead of streamed wrong. */
-    out0 = (unsigned char)avdtp_sbc_pick_mode(c0, &joint, &why);
-    if (!out0) {
-        log_line("sbc: NOT SUPPORTED: %s (capabilities %02x)", why ? why : "?", c0);
+    uint8_t caps[4];
+    memcpy(caps, s->sink.sbc_caps, 4);
+    caps[2] = (uint8_t)s->sink.bitpool_min;
+    caps[3] = (uint8_t)s->sink.bitpool_max;
+    if (!avdtp_sbc_pick(caps, want, s->no_xq, &s->codec, &why, s->held_codec, s->held_bp)) {
+        log_line("sbc: NOT SUPPORTED: %s (capabilities %02x)", why ? why : "?", caps[0]);
         return 0;
     }
-
-    /* A2DP 4.3.2: block length bit7=4 bit6=8 bit5=12 bit4=16; subbands
-     * bit3=4 bit2=8; allocation bit1=SNR bit0=Loudness. Prefer 16 blocks,
-     * 8 subbands, Loudness: 16*8 = 128 samples/frame, 375 frames/s at
-     * 48 kHz. (Earlier builds took bit7 as 16 and so asked for 4 blocks:
-     * 1500 tiny frames/s, ~4x the packet rate and no audio.) */
-    if (c1 & 0x10) out1 |= 0x10;
-    else if (c1 & 0x20) out1 |= 0x20;
-    else if (c1 & 0x40) out1 |= 0x40;
-    else out1 |= 0x80;
-
-    if (c1 & 0x04) out1 |= 0x04;      /* 8 subbands */
-    else out1 |= 0x08;                /* 4 subbands */
-
-    if (c1 & 0x01) out1 |= 0x01;      /* Loudness */
-    else out1 |= 0x02;                /* SNR */
-
-    /* Start at bitpool 35 (~250 kbit/s at 48 kHz joint stereo). The
-     * configuration carries a bitpool RANGE (A2DP 4.3.2.6: octets 2-3 are
-     * min / max) so the stream can step the bitpool down when the radio
-     * cannot keep up, and back up later; every SBC frame header carries the
-     * bitpool in use. */
-    {
-        int lo = sink->bitpool_min, hi = sink->bitpool_max;
-        if (lo < 2) lo = 2;
-        if (hi > 53 || hi < lo) hi = hi < lo ? lo : 53;
-        bp = 35;
-        if (bp > hi) bp = hi;
-        if (bp < lo) bp = lo;
-        cfg[2] = (unsigned char)lo;
-        cfg[3] = (unsigned char)hi;
-    }
-
-    cfg[0] = out0;
-    cfg[1] = out1;
-
-    sink->sample_rate = rate;
-    sink->channels = ch;
-    sink->joint_stereo = joint;
-    *bitpool = bp;
+    memcpy(s->sbc_cfg, s->codec.cfg, 4);
+    s->bitpool = s->codec.start_bp;
+    s->sink.sample_rate = 48000;
+    s->sink.channels = 2;
+    s->sink.joint_stereo = (s->sbc_cfg[0] & 0x01) != 0;
+    log_line("codec: sink takes %s%s%s; asked %s -> %s (bitpool up to %d)",
+             "SBC", (s->codec.avail & (1 << HB_CODEC_SBC_HQ)) ? ", SBC HQ" : "",
+             (s->codec.avail & (1 << HB_CODEC_SBC_XQ)) ? ", SBC-XQ" : "",
+             hb_codec_key(want), s->codec.name, s->codec.ceil);
     return 1;
 }
 
-int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
+static int configure_and_start(avdtp_session *s);
+
+int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm, int want_codec, int no_xq)
 {
-    unsigned char body[64], rsp[256];
+    unsigned char rsp[256];
     int rsp_len = 0;
     int i, nseid;
     int msg;
 
     memset(s, 0, sizeof *s);
+    s->want_codec = want_codec;
+    s->no_xq = no_xq;
     s->link = link;
     s->psm = avdtp_psm ? avdtp_psm : AVDTP_PSM;
     s->int_seid = 1; /* our Source SEID */
@@ -422,10 +437,26 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
     btlink_set_inbound_rx(link, BTLINK_PSM_AVDTP, avdtp_sig_rx, s);
     if (s->peer_opened) {
         /* The headset opened signalling: it may drive first (Discover /
-         * Get Capabilities). Answer it for ~1 s before our own Discover. */
+         * Get Capabilities / Set Configuration). Answer it for ~1 s. */
         long w = now_ms() + 1000;
-        while (now_ms() < w)
+        while (now_ms() < w && !s->remote_cfg)
             if (btlink_pump(link, 30) < 0) break;
+    }
+    if (s->remote_cfg) {
+        /* It configured the stream itself: keep its choice, no Discover /
+         * SetConfiguration of ours (that would collide with it). */
+        memset(&s->sink, 0, sizeof s->sink);
+        s->sink.seid = s->remote_seid;
+        memcpy(s->sink.sbc_caps, s->remote_sbc, 4);
+        s->sink.bitpool_min = s->remote_sbc[2];
+        s->sink.bitpool_max = s->remote_sbc[3];
+        s->sink.have_sbc = 1;
+        s->sink.delay_report = s->delay_on;
+        if (!pick_sbc_config(s, s->want_codec)) {
+            s->unsupported_format = 1;
+            return 0;
+        }
+        return configure_and_start(s);
     }
 
     /* Discover (we are INT / Source; headset is ACP / Sink) */
@@ -535,23 +566,53 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
              s->sink.seid, s->sink.sbc_caps[0], s->sink.sbc_caps[1],
              (unsigned)s->sink.bitpool_min, (unsigned)s->sink.bitpool_max);
 
-    if (!pick_sbc_config(&s->sink, s->sbc_cfg, &s->bitpool)) {
+    if (!pick_sbc_config(s, s->want_codec)) {
         s->unsupported_format = 1;
         return 0;
     }
-    memcpy(s->sink.sbc_caps, s->sbc_cfg, 4); /* store chosen */
 
+    return configure_and_start(s);
+}
+
+/* SET_CONFIGURATION (with fallbacks) + OPEN + media channel + START on the
+ * open signalling channel, for the codec already picked in s->codec. */
+static int configure_and_start(avdtp_session *s)
+{
+    btlink *link = s->link;
+    unsigned char body[64], rsp[256];
+    int rsp_len = 0;
+    int msg;
+
+    if (s->remote_cfg) {
+        /* Its configuration stands (pick_sbc_config stayed inside it). */
+        memcpy(s->sbc_cfg, s->remote_sbc, 4);
+        s->bitpool_lo = s->sbc_cfg[2];
+        s->bitpool_hi = s->sbc_cfg[3];
+        if (s->bitpool < s->bitpool_lo) s->bitpool = s->bitpool_lo;
+        if (s->bitpool > s->bitpool_hi) s->bitpool = s->bitpool_hi;
+        s->configured = 1;
+        goto open_step;
+    }
     /* SetConfiguration: ACP SEID, INT SEID, Media Transport + Media Codec */
     {
-        int n = 0;
+        int n = 0, co;
         body[n++] = (unsigned char)(s->sink.seid << 2);
         body[n++] = (unsigned char)(s->int_seid << 2);
         body[n++] = 0x01; body[n++] = 0x00; /* Media Transport */
         body[n++] = 0x07; body[n++] = 0x06; /* Media Codec len 6 */
         body[n++] = 0x00; /* Audio << 4 */
         body[n++] = 0x00; /* SBC */
+        co = n;
         memcpy(body + n, s->sbc_cfg, 4);
         n += 4;
+        s->delay_on = 0;
+        s->sink_delay_x10 = 0;
+        s->delay_reports = 0;
+        if (s->sink.delay_report) {
+            /* The sink can tell us how much it buffers: ask for it. */
+            body[n++] = 0x08; body[n++] = 0x00;
+            s->delay_on = 1;
+        }
         log_hex_prefix("avdtp: SET_CONFIGURATION body", body, n, 32);
         log_line("avdtp: SBC config %02x %02x bitpool %u-%u (freq %s, mode %s, "
                  "blocks %s, subbands %s, alloc %s)",
@@ -564,12 +625,24 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
                  (s->sbc_cfg[1] & 0x04) ? "8" : "4",
                  (s->sbc_cfg[1] & 0x01) ? "loudness" : "snr");
         msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
+        if (msg != AV_MSG_ACCEPT && s->delay_on) {
+            log_line("avdtp: configuration with delay reporting refused — retrying without");
+            n -= 2;
+            s->delay_on = 0;
+            msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
+        }
+        if (msg != AV_MSG_ACCEPT && s->codec.codec != HB_CODEC_SBC && pick_sbc_config(s, HB_CODEC_SBC)) {
+            /* The sink refused the high-quality flavour: plain SBC. */
+            log_line("avdtp: %s refused — falling back to SBC", s->want_codec == HB_CODEC_AUTO ? "auto pick" : "requested codec");
+            memcpy(body + co, s->sbc_cfg, 4);
+            msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
+        }
         if (msg != AV_MSG_ACCEPT && s->sbc_cfg[2] != s->sbc_cfg[3]) {
             /* Some sinks only take a single bitpool: retry fixed (no adaptation). */
             log_line("avdtp: bitpool range %u-%u refused — retrying with fixed bitpool %d",
                      s->sbc_cfg[2], s->sbc_cfg[3], s->bitpool);
             s->sbc_cfg[2] = s->sbc_cfg[3] = (unsigned char)s->bitpool;
-            memcpy(body + n - 4, s->sbc_cfg, 4);
+            memcpy(body + co, s->sbc_cfg, 4);
             msg = avdtp_cmd(s, AV_SET_CONFIGURATION, body, n, rsp, (int)sizeof rsp, &rsp_len);
         }
         if (msg != AV_MSG_ACCEPT) {
@@ -581,12 +654,32 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
         s->configured = 1;
     }
 
-    /* Open */
-    body[0] = (unsigned char)(s->sink.seid << 2);
-    msg = avdtp_cmd(s, AV_OPEN, body, 1, rsp, (int)sizeof rsp, &rsp_len);
-    if (msg != AV_MSG_ACCEPT) {
-        log_line("avdtp: open refused");
-        return 0;
+open_step:
+    if (s->remote_cfg && !s->remote_open) {
+        /* It configured us; OPEN is its move. Give it ~300 ms, then send
+         * OPEN ourselves (the Xbox headset waits for us). */
+        long w = now_ms() + 300;
+        while (now_ms() < w && !s->remote_open)
+            if (btlink_pump(link, 20) < 0) break;
+    }
+    if (!s->remote_open) {
+        body[0] = (unsigned char)(s->sink.seid << 2);
+        if (s->remote_cfg) log_line("avdtp: headset configured but sent no OPEN — sending OPEN");
+        msg = avdtp_cmd(s, AV_OPEN, body, 1, rsp, (int)sizeof rsp, &rsp_len);
+        if (msg != AV_MSG_ACCEPT) {
+            log_line("avdtp: open refused");
+            return 0;
+        }
+    } else {
+        /* It opened: it also opens the media channel. Take that one. */
+        long w = now_ms() + 1500;
+        while (now_ms() < w &&
+               !(s->media_scid = btlink_chan_find_inbound_other(link, s->psm, s->sig_scid)))
+            if (btlink_pump(link, 20) < 0) break;
+        if (s->media_scid) {
+            log_line("avdtp: headset opened the media channel (scid %#x)", s->media_scid);
+            goto start_step;
+        }
     }
 
     /* Media channel — same PSM 0x19, separate L2CAP CID (A2DP spec).
@@ -622,6 +715,7 @@ int avdtp_setup(avdtp_session *s, btlink *link, unsigned avdtp_psm)
     log_line("avdtp: media channel open scid %#x (signaling scid %#x)",
              s->media_scid, s->sig_scid);
 
+start_step:
     /* Start */
     body[0] = (unsigned char)(s->sink.seid << 2);
     msg = avdtp_cmd(s, AV_START, body, 1, rsp, (int)sizeof rsp, &rsp_len);
@@ -666,13 +760,61 @@ void avdtp_teardown(avdtp_session *s)
     if (!s || !s->link) return;
     avdtp_dump_close(s);
     btlink_set_inbound_rx(s->link, BTLINK_PSM_AVDTP, NULL, NULL);
-    if (s->streaming && s->sig_scid && !s->remote_closed) {
+    if (s->streaming && s->sig_scid && !s->remote_closed && btlink_is_up(s->link)) {
         s->quick = 1;   /* shutting down: one short try */
         body[0] = (unsigned char)(s->sink.seid << 2);
         (void)avdtp_cmd(s, AV_CLOSE, body, 1, rsp, (int)sizeof rsp, &rsp_len);
-        s->streaming = 0;
     }
+    s->streaming = 0;                   /* closed, or the link is gone (no CLOSE on a dead link) */
     if (s->media_scid) btlink_chan_close(s->link, s->media_scid);
     if (s->sig_scid) btlink_chan_close(s->link, s->sig_scid);
     s->media_scid = s->sig_scid = 0;
+}
+
+int avdtp_switch_codec(avdtp_session *s, int want_codec, int no_xq)
+{
+    unsigned char body[1], rsp[64];
+    int rsp_len = 0, msg;
+
+    if (!s || !s->link || !s->sig_scid) return 0;
+    if (!btlink_chan_is_open(s->link, s->sig_scid)) {
+        log_line("avdtp: switch: signalling channel is gone");
+        return 0;
+    }
+    log_line("avdtp: switching codec in place (%s -> %s), the link stays up",
+             s->codec.name ? s->codec.name : "?", hb_codec_key(want_codec));
+    avdtp_dump_close(s);
+    if (s->configured && !s->remote_closed) {
+        /* CLOSE releases the stream; the SEP is idle again and takes a
+         * new SET_CONFIGURATION. Signalling and the ACL stay up. */
+        body[0] = (unsigned char)(s->sink.seid << 2);
+        msg = avdtp_cmd(s, AV_CLOSE, body, 1, rsp, (int)sizeof rsp, &rsp_len);
+        if (msg != AV_MSG_ACCEPT) {
+            log_line("avdtp: switch: CLOSE answered %d — aborting the stream", msg);
+            (void)avdtp_cmd(s, AV_ABORT, body, 1, rsp, (int)sizeof rsp, &rsp_len);
+        }
+    }
+    s->streaming = 0;
+    s->configured = 0;
+    s->remote_closed = 0;
+    if (s->media_scid) {
+        btlink_chan_close(s->link, s->media_scid);
+        s->media_scid = 0;
+    }
+    {
+        long w = now_ms() + 200;      /* let DISC_RSP and the sink settle */
+        while (now_ms() < w)
+            if (btlink_pump(s->link, 20) < 0) return 0;
+    }
+    if (!btlink_chan_is_open(s->link, s->sig_scid)) {
+        log_line("avdtp: switch: the headset closed signalling after CLOSE");
+        return 0;
+    }
+    s->want_codec = want_codec;
+    s->no_xq = no_xq;
+    s->rtp_seq = 1;
+    s->rtp_ts = 0;
+    if (!pick_sbc_config(s, want_codec) && !pick_sbc_config(s, HB_CODEC_SBC))
+        return 0;
+    return configure_and_start(s);
 }

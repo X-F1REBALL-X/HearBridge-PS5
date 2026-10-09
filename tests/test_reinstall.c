@@ -293,11 +293,95 @@ static void test_lock(void)
     rmdir(dir);
 }
 
+/* A child that holds the lock like a running HearBridge. mode 0: stops
+ * cleanly when the stop file appears (SIGTERM ignored); 1: hangs (ignores
+ * SIGTERM and the stop file); 2: default SIGTERM. */
+static pid_t holder(const char *path, const char *stop, int mode)
+{
+    int pfd[2];
+    char c = 0;
+    pid_t child;
+    if (pipe(pfd) != 0) return -1;
+    if ((child = fork()) == 0) {
+        close(pfd[0]);
+        if (mode != 2) signal(SIGTERM, SIG_IGN);
+        c = lock_take_ex(path, NULL) == LOCK_OK ? 'y' : 'n';
+        if (write(pfd[1], &c, 1) != 1) _exit(2);
+        for (;;) {
+            usleep(50 * 1000);
+            if (mode == 0 && access(stop, F_OK) == 0) {
+                usleep(200 * 1000);       /* teardown */
+                lock_release();
+                _exit(0);
+            }
+        }
+    }
+    close(pfd[1]);
+    if (read(pfd[0], &c, 1) != 1 || c != 'y') child = -1;
+    close(pfd[0]);
+    return child;
+}
+
+static void test_takeover(void)
+{
+    char dir[] = "/tmp/hb_take_XXXXXX", path[300], stop[300];
+    long old = -1;
+    int err = 0, st = 0;
+    pid_t ch;
+    FILE *f;
+
+    if (!mkdtemp(dir)) { CHECK(0, "takeover temp dir"); return; }
+    snprintf(path, sizeof path, "%s/hearbridge.lock", dir);
+    snprintf(stop, sizeof stop, "%s/stop", dir);
+
+    CHECK(lock_take_over(path, stop, 500, 500, &err, &old) == LOCK_OK && old == 0,
+          "takeover: nothing running -> starts, no old pid");
+    lock_release();
+
+    ch = holder(path, stop, 0);
+    CHECK(ch > 0 && lock_take_over(path, stop, 3000, 1000, &err, &old) == LOCK_OK && old == (long)ch,
+          "takeover: running copy (same version) stops on the stop file, new one starts");
+    CHECK(ch > 0 && waitpid(ch, &st, 0) == ch && WIFEXITED(st) && WEXITSTATUS(st) == 0,
+          "takeover: old copy exited cleanly (its own teardown ran)");
+    CHECK(access(stop, F_OK) != 0, "takeover: stop file removed, the new copy keeps running");
+    {
+        long p = 0;
+        f = fopen(path, "r");
+        if (f) { if (fscanf(f, "%ld", &p) != 1) p = 0; fclose(f); }
+        CHECK(p == (long)getpid(), "takeover: the lock file on disk is ours (not a deleted one)");
+    }
+    lock_release();
+
+    ch = holder(path, stop, 2);
+    CHECK(ch > 0 && lock_take_over(path, stop, 3000, 1000, &err, &old) == LOCK_OK && old == (long)ch,
+          "takeover: SIGTERM stops a copy that does not see the stop file");
+    if (ch > 0) waitpid(ch, &st, 0);
+    lock_release();
+
+    ch = holder(path, stop, 1);
+    CHECK(ch > 0 && lock_take_over(path, stop, 300, 2000, &err, &old) == LOCK_OK && old == (long)ch,
+          "takeover: a hung copy is killed after the grace period");
+    CHECK(ch > 0 && waitpid(ch, &st, 0) == ch && WIFSIGNALED(st) && WTERMSIG(st) == SIGKILL,
+          "takeover: hung copy ended by SIGKILL");
+    lock_release();
+
+    /* Old-format record with a live pid that is not ours to kill (here: the
+     * test's parent). Without the flock the pid is not certain: only the
+     * stop file is used, nothing is signalled. */
+    f = fopen(path, "w");
+    if (f) { fprintf(f, "%ld 0\n", (long)getppid()); fclose(f); }
+    CHECK(lock_take_over(path, stop, 300, 300, &err, &old) == LOCK_BUSY && access(stop, F_OK) != 0,
+          "takeover: uncertain pid -> never signalled, stop file cleaned up, reports busy");
+    unlink(path);
+    rmdir(dir);
+}
+
 int main(void)
 {
     test_tile_register();
     test_tile_fallback();
     test_lock();
+    test_takeover();
     if (fails) printf("%d test(s) FAILED\n", fails);
     else printf("ALL OK (0 failures)\n");
     return fails != 0;

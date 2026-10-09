@@ -8,6 +8,7 @@
 #include "avrcp.h"
 #include "sdp_server.h"
 
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,7 +19,7 @@ static int fails;
 #define CHECK(c, what) do { if (c) printf("ok   %s\n", what); \
     else { printf("FAIL %s\n", what); fails++; } } while (0)
 
-static char out[65536];
+static char out[196608];
 
 static int get(hb_ctl *c, const char *path)
 {
@@ -56,8 +57,9 @@ int main(int argc, char **argv)
     CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/html") &&
           strstr(out, "HearBridge PS5"), "GET / serves the page");
     n = get(&c, "/api/status");
-    CHECK(n > 0 && strstr(out, "application/json") && strstr(out, "\"gain_pct\":500"),
-          "status JSON, default gain 500%");
+    CHECK(n > 0 && strstr(out, "application/json") && strstr(out, "\"gain_pct\":250"),
+          "status JSON, default gain 250%");
+    CHECK(strstr(out, "\"why\":\"\""), "status: no disconnect reason until there is one");
     CHECK(strstr(out, "WF-\\\"1000\\\"XM6") != NULL, "device name JSON-escaped");
     if (argc > 1) {
         FILE *f = fopen(argv[1], "w");
@@ -86,15 +88,62 @@ int main(int argc, char **argv)
     CHECK(c.req_connect && !c.paused, "connect");
     post(&c, "/api/stop");
     CHECK(c.req_stop, "stop");
+    post(&c, "/api/reset");
+    CHECK(c.req_reset, "reset");
     n = get(&c, "/api/status");
-    CHECK(strstr(out, "\"stable\":0") && strstr(out, "\"queue_ms\":200"), "latency: low latency by default (200 ms)");
-    post(&c, "/api/latency?stable=1");
-    CHECK(c.stable == 1 && c.stable_dirty && strstr(out, "\"queue_ms\":1000"), "latency: stable mode set + saved");
-    c.stable_dirty = 0;
+    CHECK(strstr(out, "\"stable\":0") && strstr(out, "\"queue_ms\":200") &&
+          strstr(out, "\"latency\":{\"target_ms\":200,"), "latency: 200 ms target by default");
+    c.prefs_dirty = 0;
+    post(&c, "/api/latency?ms=120");
+    CHECK(c.latency_ms == 120 && c.prefs_dirty, "latency: slider value set + saved per headset");
+    post(&c, "/api/latency?ms=5");
+    CHECK(c.latency_ms == 60, "latency: clamped to 60 ms");
+    post(&c, "/api/latency?ms=99999");
+    CHECK(c.latency_ms == 200, "latency: clamped to 200 ms");
     post(&c, "/api/latency?stable=0");
-    CHECK(c.stable == 0 && c.stable_dirty, "latency: back to low latency");
+    CHECK(c.latency_ms == 200, "latency: old stable=0 -> 200 ms");
+    post(&c, "/api/latency?stable=1");
+    CHECK(c.latency_ms == 200 && strstr(out, "\"stable\":0"), "latency: old stable=1 clamps to 200 ms");
+    c.lat_total = 187; c.lat_sink = 130; c.lat_sink_reported = 1;
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"estimate_ms\":187") && strstr(out, "\"sink_ms\":130,\"sink_reported\":1"), "latency: estimate in status");
     post(&c, "/api/latency");
-    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "latency without stable= -> 400");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "latency without ms= -> 400");
+    c.codec_avail = (1 << 1);                 /* plain SBC sink */
+    c.codec_pref = 0;
+    post(&c, "/api/codec?mode=3");
+    CHECK(!strncmp(out, "HTTP/1.1 409", 12) && strstr(out, "not supported by this headset") && c.codec_pref == 0,
+          "codec: SBC-XQ on a plain SBC headset -> refused (409), setting unchanged");
+    post(&c, "/api/codec?mode=2");
+    CHECK(!strncmp(out, "HTTP/1.1 409", 12) && c.codec_pref == 0, "codec: SBC HQ on a plain SBC headset -> refused");
+    c.codec_avail = 0;                         /* nothing connected yet */
+    post(&c, "/api/codec?mode=3");
+    CHECK(!strncmp(out, "HTTP/1.1 409", 12), "codec: SBC-XQ refused while the headset's caps are unknown");
+    post(&c, "/api/codec?mode=1");
+    CHECK(c.codec_pref == 1, "codec: plain SBC always allowed");
+    c.codec_avail = (1 << 1) | (1 << 2) | (1 << 3);   /* Xbox headset: 3f ff, bitpool 2-60 */
+    post(&c, "/api/codec?mode=3");
+    CHECK(c.codec_pref == 3 && c.prefs_dirty && strstr(out, "\"codec_pref\":3"), "codec: SBC-XQ picked + saved per headset");
+    post(&c, "/api/codec?mode=7");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12) && c.codec_pref == 3, "codec: unknown mode -> 400");
+    c.prefs_dirty = 0;
+    post(&c, "/api/eq?on=1&b0=6&b4=-40");
+    CHECK(c.eq_on && c.eq_db[0] == 6 && c.eq_db[4] == -12 && c.prefs_dirty && c.eq_seq &&
+          strstr(out, "\"eq\":{\"on\":1,\"db\":[6,0,0,0,-12]}"), "eq: bands set (clamped), saved per headset");
+    post(&c, "/api/eq");
+    CHECK(!strncmp(out, "HTTP/1.1 400", 12), "eq: no parameter -> 400");
+    c.eq_on = 1; c.eq_db[0] = 6; c.gain_pct = 250; c.latency_ms = 1000; c.prefs_dirty = c.gain_dirty = 0;
+    post(&c, "/api/clean");
+    CHECK(!c.eq_on && !c.eq_db[0] && c.gain_pct == 250 && c.latency_ms == 200 && c.prefs_dirty && c.gain_dirty,
+          "clean sound: EQ flat, gain 250, buffer 200, saved");
+    ctl_event(&c, "switch: now SBC");
+    ctl_event(&c, "stream: link dropped");
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"xq_low\":0") && strstr(out, "switch: now SBC") && strstr(out, "stream: link dropped"),
+          "status: recent codec switch and disconnect");
+    c.xq_low = 1;
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"xq_low\":1"), "status: low SBC-XQ note flag");
     diag_init(NULL);
     get(&c, "/api/diag");
     CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/plain") &&
@@ -218,21 +267,81 @@ int main(int argc, char **argv)
     }
     {
         int16_t p[7] = { 32767, -32768, 16000, -16000, 1000, 0, 8000 };
-        int i, ok = 1, peak = gain_apply_soft(p, 7, 4000);
-        /* sign kept, never wraps, < full scale, monotonic */
+        int i, ok = 1, peak;
+        gain_limiter_reset();
+        peak = gain_apply_soft(p, 7, 4000);
+        /* sign kept, never wraps, < full scale */
         if (p[0] <= 0 || p[1] >= 0 || p[2] <= 0 || p[3] >= 0) ok = 0;
         for (i = 0; i < 7; i++) if (p[i] > 32766 || p[i] < -32766) ok = 0;
-        if (!(p[0] >= p[2] && p[2] >= p[6] && p[6] >= p[4])) ok = 0;
-        if (p[4] < 3990 || p[4] > 4010) ok = 0;     /* linear below the knee */
-        CHECK(ok && peak < 1000, "soft limiter: no wrap, no hard clip, linear region");
+        CHECK(ok && peak < 1000, "limiter: no wrap, never full scale");
     }
-    CHECK(ctl_effective_gain_milli(400, 0, -1) == 4000 &&
-          ctl_effective_gain_milli(400, 0, 127) == 4000 &&
+    {
+        /* quiet input: exactly linear (the limiter stays at unity) */
+        int16_t q[2000];
+        int i, ok = 1;
+        for (i = 0; i < 2000; i++) q[i] = (int16_t)((i % 50) * 40 - 1000);   /* |x| <= 1000 */
+        gain_limiter_reset();
+        (void)gain_apply_soft(q, 2000, 10000);
+        for (i = 0; i < 2000; i++) {
+            int want = ((i % 50) * 40 - 1000) * 10;
+            if (q[i] < want - 12 || q[i] > want + 12) ok = 0;
+        }
+        CHECK(ok, "limiter: x10 is exactly linear below the knee");
+    }
+    {
+        /* loud sine at x10: scaled, not bent (low distortion), peak < 1;
+         * after it stops, the gain is back within ~300 ms (100 ms release) */
+        enum { N = 48000 };
+        static int16_t s[2 * N];
+        int i, peak;
+        double num = 0, den = 0, e2 = 0, k;
+        for (i = 0; i < N; i++) s[2 * i] = s[2 * i + 1] = (int16_t)(16000 * sin(2 * M_PI * 440 * i / 48000.0));
+        gain_limiter_reset();
+        peak = gain_apply_soft(s, 2 * N, 10000);
+        for (i = N / 2; i < N; i++) {       /* settled half: fit out = k * in */
+            double x = sin(2 * M_PI * 440 * i / 48000.0), y = s[2 * i] / 32767.0;
+            num += x * y; den += x * x;
+        }
+        k = num / den;
+        for (i = N / 2; i < N; i++) {
+            double x = sin(2 * M_PI * 440 * i / 48000.0), y = s[2 * i] / 32767.0;
+            e2 += (y - k * x) * (y - k * x);
+        }
+        {
+            char m[160];
+            double thd = sqrt(e2 / (N / 2)) / (k / sqrt(2.0));
+            snprintf(m, sizeof m, "limiter: loud sine x10 -> peak %.3f, residual %.2f%% (scaled, not clipped)",
+                     peak / 1000.0, thd * 100);
+            CHECK(peak < 1000 && peak > 800 && thd < 0.01, m);
+        }
+        {
+            int16_t q[2 * 14400];                  /* 300 ms of quiet after the loud part */
+            for (i = 0; i < 2 * 14400; i++) q[i] = 500;
+            (void)gain_apply_soft(q, 2 * 14400, 10000);
+            CHECK(q[2 * 14400 - 1] > 4500, "limiter: releases back to full gain within 300 ms");
+        }
+    }
+    CHECK(ctl_effective_gain_milli(100, 0, -1) == 1000 &&
+          ctl_effective_gain_milli(50, 0, -1) == 500 &&
+          ctl_effective_gain_milli(400, 0, -1) == 7262 &&
+          ctl_effective_gain_milli(500, 0, -1) == 10000 &&
+          ctl_effective_gain_milli(500, 0, 127) == 10000 &&
           ctl_effective_gain_milli(400, 0, 0) == 0 &&
           ctl_effective_gain_milli(400, 1, 127) == 0 &&
-          ctl_effective_gain_milli(200, 0, 64) == 1007, "headset volume maps to gain");
+          ctl_effective_gain_milli(200, 0, 64) == 1357, "boost curve (500% = x10) and headset volume");
 
     /* ---- SDP ---- */
+    {
+        /* the Xbox's own request: Device ID 0x1200, all attributes */
+        static const unsigned char di[] = { 0x06, 0, 0, 0, 15, 0x35, 3, 0x19, 0x12, 0x00, 0x03, 0xe1,
+            0x35, 5, 0x0A, 0, 0, 0xFF, 0xFF, 0 };
+        unsigned char r[700];
+        int n = sdp_server_handle(di, (int)sizeof di, r, (int)sizeof r), found = 0, i;
+        for (i = 7; i + 4 < n; i++)       /* attr 0x0204 PrimaryRecord = true, 0x0205 source = 2 */
+            if (r[i] == 0x09 && r[i + 1] == 0x02 && r[i + 2] == 0x04 && r[i + 3] == 0x28 && r[i + 4] == 1) found |= 1;
+            else if (r[i] == 0x09 && r[i + 1] == 0x02 && r[i + 2] == 0x05 && i + 5 < n && r[i + 5] == 2) found |= 2;
+        CHECK(n > 11 && r[0] == 0x07 && found == 3, "SDP: Device ID record answers the Xbox query");
+    }
     {
         unsigned char rsp[700];
         /* ServiceSearch for AV Remote Control Target 0x110C, max 10 */
@@ -345,6 +454,27 @@ int main(int argc, char **argv)
         CHECK(a.volume == 0x50 && a.remote_abs && a.ct_registered, "AVRCP: INTERIM volume read");
         avrcp_input(&a, chg, sizeof chg, r, sizeof r);
         CHECK(a.volume == 0x20 && a.changed && a.need_register, "AVRCP: CHANGED -> re-register");
+        CHECK(avrcp_reported(&a), "AVRCP: a volume report counts as connected for the page");
+        {
+            avrcp_state quiet;
+            avrcp_init(&quiet, 64);
+            CHECK(!avrcp_reported(&quiet), "AVRCP: default volume alone is not a report");
+        }
+        CHECK(a.sink_renders, "AVRCP: headset answered our registration -> it applies the volume");
+        {
+            /* a headset that refuses SetAbsoluteVolume (NOT IMPLEMENTED) and never
+             * took our registration: software gain */
+            static const unsigned char ni[] = { 0x22, 0x11, 0x0E, 0x08, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x50, 0x00, 0x00, 0x01, 0x40 };
+            static const unsigned char acc[] = { 0x22, 0x11, 0x0E, 0x09, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x50, 0x00, 0x00, 0x01, 0x40 };
+            avrcp_init(&a, 64);
+            avrcp_input(&a, acc, sizeof acc, r, sizeof r);
+            CHECK(a.sink_renders && a.volume == 0x40, "AVRCP: SetAbsoluteVolume accepted -> headset applies it");
+            avrcp_init(&a, 64);
+            avrcp_input(&a, ni, sizeof ni, r, sizeof r);
+            CHECK(!a.sink_renders, "AVRCP: SetAbsoluteVolume not implemented -> software gain");
+        }
     }
 
     printf("%s (%d failures)\n", fails ? "FAILED" : "ALL OK", fails);

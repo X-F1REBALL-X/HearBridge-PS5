@@ -1,5 +1,6 @@
 /* Developed by X-F1REBALL-X. */
 #include "ctl.h"
+#include "rate.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -63,6 +64,7 @@ void ctl_init(hb_ctl *c, const char *version)
     c->gain_pct = HB_GAIN_DEFAULT_PCT;
     c->req_hs_volume = -1;
     c->hs_volume = -1;
+    c->latency_ms = HB_QUEUE_LOW_MS;
     strncpy(c->version, version, sizeof c->version - 1);
     strcpy(c->state, "starting");
     c->t0_s = mono_s();
@@ -77,7 +79,18 @@ int ctl_effective_gain_milli(int gain_pct, int muted, int hs_volume)
     if (muted) return 0;
     if (gain_pct < 0) gain_pct = 0;
     if (gain_pct > HB_GAIN_MAX_PCT) gain_pct = HB_GAIN_MAX_PCT;
-    g = (long)gain_pct * 10;                       /* x1000 */
+    {
+        /* Up to 100 %: linear. Above, the boost follows pct^1.43 so the top
+         * of the slider uses the headroom the quiet console capture leaves
+         * (500 % = x10, +20 dB); the limiter keeps it clean. */
+        static const int pts[5] = { 1000, 2694, 4818, 7262, 10000 };   /* 100..500 % */
+        if (gain_pct <= 100) g = (long)gain_pct * 10;
+        else {
+            int k = (gain_pct - 100) / 100, f = (gain_pct - 100) % 100;
+            if (k >= 4) g = pts[4];
+            else g = pts[k] + (long)(pts[k + 1] - pts[k]) * f / 100;
+        }
+    }
     if (hs_volume >= 0) g = g * (hs_volume > 127 ? 127 : hs_volume) / 127;
     return (int)g;
 }
@@ -89,6 +102,28 @@ void ctl_clear_link(hb_ctl *c, int drop_device)
     c->avrcp = 0;
     c->pkts = c->frames = c->empty_reads = c->dropped = 0;
     c->peak_milli = c->out_peak_milli = 0;
+    c->codec[0] = 0;
+    c->codec_avail = 0;
+    c->xq_low = 0;
     c->sample_rate = c->bitpool = c->backlog = 0;
     c->per_packet = c->bitpool_lo = c->bitpool_hi = 0;
+}
+
+void ctl_event_locked(hb_ctl *c, const char *line)
+{
+    if (!c || !line || !line[0]) return;
+    if (c->event_n >= HB_EVENT_N) {
+        memmove(c->events[0], c->events[1], sizeof c->events[0] * (HB_EVENT_N - 1));
+        c->event_n = HB_EVENT_N - 1;
+    }
+    snprintf(c->events[c->event_n], sizeof c->events[0], "%s", line);
+    c->event_n++;
+}
+
+void ctl_event(hb_ctl *c, const char *line)
+{
+    if (!c || !line || !line[0]) return;
+    CTL_LOCK(c);
+    ctl_event_locked(c, line);
+    CTL_UNLOCK(c);
 }

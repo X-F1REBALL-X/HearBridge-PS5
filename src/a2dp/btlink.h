@@ -45,6 +45,9 @@ int  btlink_own_acl_pending(void);
 /* HCI status of the last failed btlink_connect page (0x04 = page timeout),
  * 0 when it failed for another reason (auth, transport, 0x0b). */
 int  btlink_last_connect_fail(void);
+/* HCI reason of the last drop of a link this app owned (0x13 case / remote
+ * user, 0x08 supervision timeout). 0 if none yet. */
+int  btlink_last_disc_reason(void);
 /* HCI Disconnect (0x13) one known handle and wait for Disconnection
  * Complete. Only for handles seen in Connection Complete events. */
 /* Take over an encrypted ACL left up by a2dp_pair (fresh L2CAP state). */
@@ -54,6 +57,16 @@ int  btlink_drop_handle(btlink *l, unsigned handle, int wait_ms);
 /* When set and true for the address being connected, btlink_connect /
  * btlink_accept stop at once (Create Connection Cancel / disconnect). */
 extern int (*btlink_abort_connect)(const unsigned char addr[6]);
+/* 1 if the pending page command is a Connect/Reconnect of this headset. */
+extern int (*btlink_press_is_for)(const unsigned char addr[6]);
+/* 1 if addr is one of our saved headsets (set by main). */
+extern int (*btlink_saved_peer)(const unsigned char addr[6]);
+/* Reject_Connection_Request for addr (reason 0x0D-0x0F); clears tracking. */
+void btlink_reject_request(hci_t hci, const unsigned char addr[6], unsigned char reason);
+/* 1 if this link was accepted from the headset (it called us). */
+int  btlink_is_incoming(const btlink *l);
+/* Idle: page scan on once (on=1), restored once (on=0). */
+void btlink_page_scan_hold(hci_t hci, int on);
 /* Called when an ACL comes up (page answered or incoming accepted). */
 extern void (*btlink_on_acl_up)(const unsigned char addr[6]);
 
@@ -87,7 +100,8 @@ void btlink_set_inbound_rx(btlink *l, unsigned psm, btlink_rx_fn fn, void *ud);
 /* AVRCP absolute volume (0..127). set_volume sends SetAbsoluteVolume and a
  * VOLUME_CHANGED notification when the control channel is open. volume()
  * returns the current value; *changed = 1 once after a headset change.
- * state(): bit0 channel open, bit1 headset uses absolute volume,
+ * state(): bit3 the headset applies the volume itself (no software scaling),
+ * bit0 channel open, bit1 headset uses absolute volume,
  * bit2 volume notifications registered. connect(): open AVRCP ourselves. */
 void btlink_avrcp_set_volume(btlink *l, int vol);
 int  btlink_avrcp_volume(btlink *l, int *changed);
@@ -111,6 +125,7 @@ unsigned btlink_chan_peer_mtu(const btlink *l, unsigned scid);
 int      btlink_l2_send_media(btlink *l, unsigned scid, const unsigned char *d, int len);
 /* Media packets dropped so far on this link. */
 long     btlink_tx_dropped(const btlink *l);
+long     btlink_acl_gap_avg(const btlink *l);   /* ms between ACL completions while busy */
 /* ms since the controller last returned a credit for our packets while some
  * are outstanding (0 if none outstanding): a link that died quietly. */
 long     btlink_ms_since_credit(const btlink *l);
@@ -126,6 +141,8 @@ int      btlink_tx_backlog(const btlink *l);
 
 /* scid of an OPEN channel the remote opened to us on psm, 0 if none. */
 unsigned btlink_chan_find_inbound(const btlink *l, unsigned psm);
+/* An open inbound channel on psm other than not_scid (A2DP media next to signalling). */
+unsigned btlink_chan_find_inbound_other(const btlink *l, unsigned psm, unsigned not_scid);
 
 /* Page scan for up to timeout_ms and accept the first Connection Request
  * from one of the n saved addresses, answering with its stored key.

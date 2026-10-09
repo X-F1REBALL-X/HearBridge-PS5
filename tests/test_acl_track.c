@@ -31,6 +31,37 @@ int main(void)
           acl_track_event(dc, 6, 3300);
           if (!acl_track_page_params(a, &ps, &ck) || ck != 0x8111) { printf("FAIL clock kept %04x\n", ck); fails++; } }
     }
-    puts(fails ? "FAIL acl tracking" : "ok   inbound ACL tracked by handle, cleared on disconnect");
+    {
+        /* Our own page failing 0x0b must not hide the headset's pending call;
+         * an accept timeout (0x10) or an explicit clear ends it. */
+        static const unsigned char x[6] = { 0x44, 0xD7, 0xF7, 0xDF, 0xE2, 0xD8 };
+        unsigned char r2[12] = { 0x04, 10 }, c2[13] = { 0x03, 11 };
+        memcpy(r2 + 2, x, 6); r2[11] = 1;
+        acl_track_event(r2, 12, 10000);
+        c2[2] = 0x0B; memcpy(c2 + 5, x, 6); c2[11] = 1;
+        acl_track_event(c2, 13, 18000);
+        if (acl_track_request_age(x, 18000) != 8000) { puts("FAIL 0x0b cleared the pending call"); fails++; }
+        acl_track_request_clear(x);
+        if (acl_track_request_age(x, 18100) != -1) { puts("FAIL clear"); fails++; }
+        acl_track_event(r2, 12, 20000);
+        c2[2] = 0x10;
+        acl_track_event(c2, 13, 45000);
+        if (acl_track_request_age(x, 45000) != -1) { puts("FAIL accept timeout kept the call"); fails++; }
+    }
+    {
+        /* A handle that disconnected (seen by any reader) is not ours any more. */
+        unsigned char c3[13] = { 0x03, 11, 0, 0x02, 0x00 }, d3[6] = { 0x05, 4, 0, 0x02, 0x00, 0x08 };
+        unsigned e0;
+        memcpy(c3 + 5, a, 6); c3[11] = 1; c3[12] = 0;
+        acl_track_event(c3, 13, 50000);
+        e0 = acl_track_handle_epoch(0x002);
+        if (acl_track_handle_epoch(0x002) != e0) { puts("FAIL epoch stable"); fails++; }
+        acl_track_event(d3, 6, 51000);
+        if (acl_track_handle_epoch(0x002) == e0) { puts("FAIL epoch after drop (0x08)"); fails++; }
+        e0 = acl_track_handle_epoch(0x002);
+        acl_track_event(c3, 13, 52000);
+        if (acl_track_handle_epoch(0x002) == e0) { puts("FAIL epoch after reuse"); fails++; }
+    }
+    puts(fails ? "FAIL acl tracking" : "ok   inbound ACL tracked by handle, cleared on disconnect, kept over our 0x0b, stale handle seen");
     return fails != 0;
 }

@@ -94,12 +94,32 @@ int main(int argc, char **argv)
     hb_rate_init(&r, 30, 40, 35, 0);
     CHECK(r.lo == 30 && r.hi == 40, "configured range above the floor is kept");
     hb_rate_init(&r, 2, 53, 35, 0);
-    CHECK(hb_rate_update(&r, 1000, 6, 10, 0) == 32, "queue half full: -3");
-    CHECK(hb_rate_update(&r, 1100, 9, 10, 1) == 32, "at most one step down per 300 ms");
-    CHECK(hb_rate_update(&r, 1400, 9, 10, 2) == 28, "drops: -4");
-    CHECK(hb_rate_update(&r, 5000, 0, 10, 2) == 28, "no step up before the calm period");
-    CHECK(hb_rate_update(&r, 7500, 0, 10, 2) == 29, "step up +1 after 6 s calm");
-    CHECK(hb_rate_update(&r, 8000, 0, 10, 2) == 29, "steps up are spaced");
+    /* qmax 20: room above the slack (4 paced packets) is 16. */
+    CHECK(hb_rate_update(&r, 500, HB_RATE_SLACK, 20, 0) == 35, "paced packets only (queue = slack): no change");
+    CHECK(hb_rate_update(&r, 1000, HB_RATE_SLACK + 8, 20, 0) == 35, "a short burst of late packets: no change");
+    CHECK(hb_rate_update(&r, 1350, HB_RATE_SLACK + 8, 20, 0) == 32, "half the room late for 300 ms: -3");
+    CHECK(hb_rate_update(&r, 1400, 19, 20, 1) == 32, "at most one step down per 300 ms");
+    CHECK(hb_rate_update(&r, 1700, 19, 20, 2) == 28, "drops: -4");
+    CHECK(r.cap == 31, "congested at 32: temporary ceiling 31");
+    CHECK(hb_rate_update(&r, 1800, HB_RATE_SLACK + 2, 20, 2) == 28, "a few late packets for 100 ms: no change");
+    CHECK(hb_rate_update(&r, 2400, HB_RATE_SLACK + 2, 20, 2) == 27, "late packets staying 600 ms: -1");
+    CHECK(hb_rate_update(&r, 5000, 0, 20, 2) == 27, "no step up before the calm period");
+    CHECK(!hb_rate_settled(&r, 5000), "still dropping or not calm yet: do not treat the bitpool as held");
+    CHECK(hb_rate_update(&r, 6500, HB_RATE_SLACK, 20, 2) == 28,
+          "step up after 4 s calm (paced packets count as calm); +1 near the ceiling");
+    CHECK(hb_rate_settled(&r, 6500), "clean for the calm window: this bitpool can be remembered");
+    CHECK(hb_rate_update(&r, 7000, 0, 20, 2) == 28, "steps up are spaced");
+    hb_rate_update(&r, 8500, 0, 20, 2); hb_rate_update(&r, 10500, 0, 20, 2);
+    hb_rate_update(&r, 12500, 0, 20, 2);
+    CHECK(hb_rate_update(&r, 14500, 0, 20, 2) == 31, "does not retry the congested bitpool within 30 s");
+    CHECK(hb_rate_update(&r, 31800, 0, 20, 2) == 33, "retries above it after 30 s (+2)");
+    hb_rate_init(&r, 2, 53, 22, 0);
+    CHECK(hb_rate_update(&r, 4000, 0, 8, 0) == 24, "far below the top: +2 per step");
+    hb_rate_init(&r, 2, 60, 35, 0);
+    hb_rate_set_ceiling(&r, 60, 60);
+    CHECK(r.hi == 60, "high-quality mode: ceiling lifted to the sink's 60");
+    hb_rate_set_ceiling(&r, 60, HB_RATE_CEIL);
+    CHECK(r.hi == HB_RATE_CEIL, "standard mode: ceiling 53");
 
     /* The console case: 8 frames/packet at bitpool 35 (47 pkt/s) vs ~44 credits/s. */
     o = simulate(44.0, 672, 120, 10);
@@ -124,7 +144,7 @@ int main(int argc, char **argv)
     CHECK(o.late_drops <= 2 && o.bp_end < 53, m);
 
     /* Big MTU: up to 15 frames/packet (4-bit NUM field). */
-    o = simulate(200.0, 1021, 10, 10);
+    o = simulate(200.0, 1021, 3, 10);
     CHECK(o.per_pkt_end <= 15 && o.per_pkt_end >= 11, "large MTU: frames/packet capped at 15");
 
     /* Media queue depth = worst-case added latency. */
@@ -191,6 +211,29 @@ int main(int argc, char **argv)
         }
         fclose(fo); fclose(fr); free(pcm); sbc_encoder_close(e);
         CHECK(!bad, "mid-stream bitpool change: every frame header and length match");
+    }
+    {   /* latency slider + estimate */
+        hb_latency L;
+        int t, fit = 1;
+        CHECK(hb_latency_clamp(10) == 60 && hb_latency_clamp(5000) == 200 && hb_latency_clamp(180) == 180,
+              "latency target clamps to 60..200 ms");
+        CHECK(hb_latency_frames_cap(200, 48000, 128) == 0 && hb_latency_frames_cap(1000, 48000, 128) == 0,
+              "200 ms and up: packets stay MTU-sized");
+        for (t = 60; t < 200; t += 10) {
+            int n = hb_latency_frames_cap(t, 48000, 128);
+            if (n < 2 || (n > 2 && HB_QUEUE_FLOOR_PKTS * n * 128 * 1000 / 48000 > t)) fit = 0;
+        }
+        CHECK(fit && hb_latency_frames_cap(60, 48000, 128) == 2 && hb_latency_frames_cap(100, 48000, 128) == 4,
+              "below 200 ms: the 8-packet queue floor fits in the target (2 frames minimum)");
+        hb_latency_estimate(&L, 11, 20, 24, 0);
+        CHECK(L.queue_ms == 22 && L.sink_ms == HB_SINK_TYPICAL_MS && !L.sink_reported &&
+              L.total_ms == HB_CAPTURE_MS + 11 + 22 + 24 + HB_SINK_TYPICAL_MS,
+              "estimate: capture + packet + queue + radio + typical headset buffer");
+        hb_latency_estimate(&L, 29, 0, 0, 1305);
+        CHECK(L.sink_ms == 131 && L.sink_reported && L.queue_ms == 0 && L.total_ms == HB_CAPTURE_MS + 29 + 131,
+              "estimate: headset delay report (1/10 ms) replaces the typical value");
+        hb_latency_estimate(&L, 29, 10, 4000, 0);
+        CHECK(L.radio_ms == 500, "estimate: a stalled radio counts at most 500 ms");
     }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;

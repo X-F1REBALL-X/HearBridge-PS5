@@ -15,10 +15,18 @@ typedef struct {
     int remote_abs;        /* headset showed absolute volume support */
     int changed;           /* volume changed by the headset (consumer clears) */
     int need_register;     /* re-register for VOLUME_CHANGED after a CHANGED */
+    int sink_renders;      /* the headset applies the volume itself (it took our
+                              SetAbsoluteVolume or answered our registration) */
     unsigned long rx_cmds, rx_rsps;
 } avrcp_state;
 
 void avrcp_init(avrcp_state *a, int volume);
+
+/* 1 once the headset has registered for volume or reported an absolute
+ * level. Independent of the L2CAP channel still being open this instant:
+ * the page's volume number comes from this. */
+int avrcp_reported(const avrcp_state *a);
+
 
 /* Handle one AVCTP packet from the headset. Writes a reply into out
  * (returns its length, 0 = none). */
