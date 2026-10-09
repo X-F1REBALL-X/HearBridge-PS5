@@ -39,6 +39,19 @@ static void add_endpoint(struct usbhci_iface *f, const uint8_t *e)
     }
 }
 
+/* Two bulk OUT pipes (MediaTek 0e8d:3603 has 0x01 and 0x02): ACL goes on
+ * the one numbered like the bulk IN (0x82 -> 0x02). On that controller 0x01
+ * stalls every ACL frame; the other stays as the spare. */
+static void pair_out_with_in(struct usbhci_iface *f)
+{
+    if (f->spare_out_ep && (f->spare_out_ep & 0x0F) == (f->in_ep & 0x0F) &&
+        (f->out_ep & 0x0F) != (f->in_ep & 0x0F)) {
+        uint8_t t = f->out_ep;
+        f->out_ep = f->spare_out_ep;
+        f->spare_out_ep = t;
+    }
+}
+
 int usbhci_scan(const uint8_t *d, int len, struct usbhci_iface *found)
 {
     struct usbhci_iface cur;
@@ -52,8 +65,10 @@ int usbhci_scan(const uint8_t *d, int len, struct usbhci_iface *found)
         if (blen < 2 || pos + blen > len)
             break;
         if (type == DT_INTERFACE && blen >= 9) {
-            if (inside && complete(&cur) && count < USBHCI_MAX_IFACES)
+            if (inside && complete(&cur) && count < USBHCI_MAX_IFACES) {
+                pair_out_with_in(&cur);
                 found[count++] = cur;
+            }
             memset(&cur, 0, sizeof cur);
             /* bAlternateSetting == 0, class/subclass/protocol E0/01/01 */
             inside = d[pos + 3] == 0 && d[pos + 5] == 0xE0 &&
@@ -64,8 +79,10 @@ int usbhci_scan(const uint8_t *d, int len, struct usbhci_iface *found)
         }
         pos += blen;
     }
-    if (inside && complete(&cur) && count < USBHCI_MAX_IFACES)
+    if (inside && complete(&cur) && count < USBHCI_MAX_IFACES) {
+        pair_out_with_in(&cur);
         found[count++] = cur;
+    }
     return count;
 }
 
