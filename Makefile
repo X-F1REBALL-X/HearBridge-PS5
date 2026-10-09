@@ -58,12 +58,15 @@ test-control:
 	@mkdir -p $(BUILD)/host
 	python3 scripts/gen_webpage.py src/web/index.html $(BUILD)/host/webpage.h src/web/i18n.json
 	cmp -s $(BUILD)/host/webpage.h src/webpage.h || (echo "src/webpage.h is stale: make webpage"; false)
+	python3 scripts/gen_font.py assets/fonts $(BUILD)/host/font_he.h
+	cmp -s $(BUILD)/host/font_he.h src/font_he.h || (echo "src/font_he.h is stale: make webpage"; false)
 	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp -Isrc/bt tests/test_control.c src/http.c src/bt/btchip.c src/diag.c src/ctl.c src/gain.c src/a2dp/eq.c src/a2dp/rate.c src/a2dp/avrcp.c src/a2dp/sdp_server.c -lpthread -lm -o $(BUILD)/host/test_control
 	$(BUILD)/host/test_control $(BUILD)/host/status.json
 	python3 -c "import json;d=json.load(open('$(BUILD)/host/status.json'));print('ok   status JSON parses,', len(d), 'keys')"
 
 webpage:
 	python3 scripts/gen_webpage.py
+	python3 scripts/gen_font.py
 
 test-tile:
 	@mkdir -p $(BUILD)/host
