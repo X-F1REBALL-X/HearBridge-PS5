@@ -243,8 +243,12 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 .wrap{height:100vh}
 .grid{flex:1;min-height:0;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr);
-grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) auto}
-/* left column: devices as tall as their content (found list ~3 rows, scrolls), the log takes the rest */
+grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(min-content,1fr) auto}
+/* left column: takes the height the grid gives it and never stretches the rows (height:0 keeps it out of row sizing, min-height:100% fills its area) */
+.side{height:0;min-height:100%}
+/* bottom row panels never shrink below their content (page scrolls on a very short screen instead of overlapping) */
+.vol,.conn{min-height:min-content;padding-bottom:var(--s3)}
+/* devices as tall as their content (found list ~3 rows, scrolls), the log takes the rest */
 .side .hero{flex:0 1 auto}
 .side .logp{flex:1 1 0;min-height:13rem}
 .side .hero{min-height:0}
@@ -264,7 +268,9 @@ grid-template-areas:"dev st eq" "dev vol conn";grid-template-rows:minmax(0,1fr) 
 .eqp .curve{flex:1 1 0;height:auto;min-height:1.4rem;max-height:6rem}.eqp .bands,.eqp .presets,.eqp .eqhead{flex:0 0 auto}
 #devlist{flex:0 1 auto;min-height:3.2rem;max-height:10rem}
 /* spare height goes to the status card (meters sit at its bottom, idle art fills it) */
-.status #stats{flex:1}.status .meters{margin-top:auto;padding-top:var(--s3)}
+.status #stats{flex:1 0 auto}.status .meters{margin-top:auto;padding-top:var(--s3)}
+/* status rows a bit tighter so long labels (de) still fit one screen */
+.kv>*{min-height:1.9rem}
 .vol .ctl{margin-bottom:var(--s3)}
 .big{font-size:2.6rem}
 .vol input[type=range],.vol input[type=range]::-webkit-slider-runnable-track,.vol input[type=range]::-webkit-slider-thumb,.vol input[type=range]::-moz-range-track,.vol input[type=range]::-moz-range-progress,.vol input[type=range]::-moz-range-thumb{height:2rem}
