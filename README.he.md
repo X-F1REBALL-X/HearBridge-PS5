@@ -32,18 +32,18 @@ HearBridge PS5 הוא מטען (ELF) ל-PS5 פרוץ. הוא משדר את הש�
 
 ## איזה צ'יפ יש לי?
 
-מצאו את הדגם שלכם בטבלה. בפאט וב-Slim יש אחד משני צ'יפים של בלוטות', אז בהם צריך לבדוק בלוג.
+קונסולות PS5 משתמשות באחד משני שבבי בלוטות': Marvell/NXP או MediaTek. בקונסולות פאט (CFI-11xx/12xx) ו-Slim (CFI-20xx/21xx) יכול להיות כל אחד מהם, גם באותו מספר דגם.
 
-| דגם | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-|---|---|---|
-| CFI-10xx (ההשקה) | ✅ עובד (נבדק, fw 10.20) | לא צריך |
-| CFI-11xx, CFI-12xx (פאט) | ✅ אם הצ'יפ Marvell/NXP | ⚠️ אם הצ'יפ MediaTek (לא נבדק) |
-| CFI-20xx, CFI-21xx (Slim, ברוב ה-Slim יש MediaTek*) | ✅ אם הצ'יפ Marvell/NXP | ⚠️ אם הצ'יפ MediaTek (לא נבדק) |
-| CFI-70xx, CFI-71xx (Pro) | ❌ לא יעבוד (MediaTek) | ✅ להשתמש בזה (לא נבדק) |
+| דגם | הורדה |
+|---|---|
+| CFI-10xx (השקה) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
+| CFI-11xx, CFI-12xx (פאט) | בדקו את השבב: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-20xx, CFI-21xx (Slim) | בדקו את השבב: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-70xx, CFI-71xx (Pro, תמיד MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-\* לפי דיווחים מפורומי תיקונים, לא מאושר על ידי Sony
+גרסת mediatek test עוד לא נבדקה. גרסה 1.1.0 נבדקה רק על CFI-10xx. נשמח לשמוע איך הלך.
 
-**איך בודקים:** הפעילו את HearBridge פעם אחת, פתחו את `/data/hearbridge/hearbridge.log` וחפשו את השורה `usb: /dev/ugen0.2 is XXXX:YYYY` (מספר ה-ugen יכול להיות אחר). `1286` = Marvell/NXP, השתמשו ב-**[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek, השתמשו ב-**[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**איך בודקים:** הפעילו את 1.1.0 והסתכלו על השורה **Chip** בתחתית החלון **Status**. `Marvell/NXP (1286:…)` → נשארים עם 1.1.0. `MediaTek (0e8d:…)` → משתמשים ב-mediatek test (הדף מציג גם הודעה כתומה). או פתחו את `/data/hearbridge/hearbridge.log` וחפשו `usb: /dev/ugen0.2 is 1286:2059 …` (מספר ה-ugen יכול להיות אחר). ארבעת התווים הראשונים אחרי "is" הם השבב: `1286` = Marvell/NXP,‏ `0e8d` = MediaTek.
 
 מקורות: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 

@@ -30,18 +30,18 @@ HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带�
 
 ## 我的是哪种芯片？
 
-在表中找到你的型号。fat 和 Slim 装的是两种蓝牙芯片之一，这些型号请查看日志。
+PS5 使用两种蓝牙芯片之一：Marvell/NXP 或 MediaTek。初代机型（CFI-11xx/12xx）和 Slim（CFI-20xx/21xx）两种都有可能，即使型号相同。
 
-| 型号 | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-|---|---|---|
-| CFI-10xx (首发) | ✅ 可用（已测试，fw 10.20） | 不需要 |
-| CFI-11xx, CFI-12xx (fat) | ✅ Marvell/NXP 芯片时 | ⚠️ MediaTek 芯片时（未测试） |
-| CFI-20xx, CFI-21xx (Slim, 大多数 Slim 是 MediaTek*) | ✅ Marvell/NXP 芯片时 | ⚠️ MediaTek 芯片时（未测试） |
-| CFI-70xx, CFI-71xx (Pro) | ❌ 不可用（MediaTek） | ✅ 用这个（未测试） |
+| 型号 | 下载 |
+|---|---|
+| CFI-10xx (首发) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
+| CFI-11xx, CFI-12xx (初代) | 查看芯片: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-20xx, CFI-21xx (Slim) | 查看芯片: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-70xx, CFI-71xx (Pro，始终是 MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-\* 来自维修论坛的报告，未经 Sony 确认
+mediatek test 版本尚未测试。1.1.0 仅在 CFI-10xx 上测试过。欢迎反馈结果。
 
-**如何检查：** 运行一次 HearBridge，打开 `/data/hearbridge/hearbridge.log`，找到 `usb: /dev/ugen0.2 is XXXX:YYYY` 这一行（ugen 编号可能不同）。`1286` = Marvell/NXP，用 **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**。`0e8d` = MediaTek，用 **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**。
+**如何检查：** 运行 1.1.0，查看 **Status** 面板底部的 **Chip** 行。`Marvell/NXP (1286:…)` → 继续用 1.1.0。`MediaTek (0e8d:…)` → 用 mediatek test（页面还会显示橙色提示）。或者打开 `/data/hearbridge/hearbridge.log`，找到 `usb: /dev/ugen0.2 is 1286:2059 …`（ugen 编号可能不同）。"is" 后面的前四个字符就是芯片：`1286` = Marvell/NXP，`0e8d` = MediaTek。
 
 来源: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
