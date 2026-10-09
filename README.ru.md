@@ -12,7 +12,7 @@
 
 HearBridge PS5 — это payload (ELF) для взломанной PS5. Он передаёт звук консоли через собственный Bluetooth PS5 на обычные Bluetooth-наушники или колонки (A2DP). Управление — через веб-страницу, которую отдаёт консоль. Игры, прошивку и взлом он не трогает.
 
-<p align="center"><img src="docs/img/ui-en.png" alt="Веб-страница HearBridge PS5" width="900"></p>
+<p align="center"><img src="docs/img/ui-ru.png" alt="Веб-страница HearBridge PS5" width="900"></p>
 
 ## Требования
 

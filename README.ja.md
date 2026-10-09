@@ -12,7 +12,7 @@
 
 HearBridge PS5 は脱獄した PS5 用のペイロード（ELF）です。本体の音声を PS5 自身の Bluetooth で普通の Bluetooth ヘッドホンやスピーカー（A2DP）に送ります。操作は本体が提供する Web ページから行います。ゲーム、ファームウェア、脱獄には手を加えません。
 
-<p align="center"><img src="docs/img/ui-en.png" alt="HearBridge PS5 の Web ページ" width="900"></p>
+<p align="center"><img src="docs/img/ui-ja.png" alt="HearBridge PS5 の Web ページ" width="900"></p>
 
 ## 必要なもの
 
