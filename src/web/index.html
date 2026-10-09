@@ -141,7 +141,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:.6rem;heig
 input[type=range]::-moz-range-track{height:1.6rem;background:var(--void)}
 input[type=range]::-moz-range-progress{height:1.6rem;background:var(--lime)}
 input[type=range]::-moz-range-thumb{width:.6rem;height:1.6rem;border:0;border-radius:0;background:#fff}
-.vol .btns{margin-top:var(--s1)}.devbtns{margin-top:var(--s2)}.devbtns button{min-width:0}
+.vol .btns{margin-top:var(--s1)}.devbtns{margin-top:var(--s2);grid-template-columns:1fr}.devbtns button{min-width:0}
 /* equalizer: colour per band, live response curve */
 body{--b0:#ff6a2b;--b1:#ffb23d;--b2:#c8ff3d;--b3:#3dd6ff;--b4:#b06bff}
 .eqp{border-inline-start-color:var(--b3)}
@@ -282,7 +282,7 @@ grid-template-areas:"dev st eq" "dev vol conn" "log vol conn";grid-template-rows
 <main class="grid">
 <section class="panel hero" id="devpanel"><p class="label" data-i18n="devices">Devices</p>
 <button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
-<div class="btns devbtns"><button id="reconnect" data-i18n="reconnect">Reconnect</button><button id="reset" data-i18n="reset">Reset link</button></div>
+<div class="btns devbtns"><button id="reconnect" data-i18n="reconnect">Reconnect</button></div>
 <p class="k hint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p>
 <p class="sub" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div>
 <p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div>
@@ -511,7 +511,6 @@ for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!thi
 function armScan(){scanLive=Date.now()+12000;$('scanning').style.display='';devices()}
 $('scan').onclick=function(){act('/api/scan');armScan()};
 $('reconnect').onclick=function(){act('/api/reconnect')};
-$('reset').onclick=function(){act('/api/reset')};
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();
 (function(){var c=null,m=/[?&]lang=([a-z]{2})/.exec(location.search);if(m)c=m[1];else try{c=localStorage.getItem('hb_lang')}catch(e){}
