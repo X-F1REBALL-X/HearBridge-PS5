@@ -83,7 +83,7 @@ static int is_write_path(const char *path)
     static const char *const w[] = {
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
-        "/api/stop", "/api/latency",
+        "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -93,25 +93,43 @@ static int is_write_path(const char *path)
 
 static int status_json(hb_ctl *c, char *o, int max)
 {
-    char dev[140], st[70], url[140], det[200];
+    char dev[140], st[70], url[140], det[200], why[40], ev[2400];
+    int ei, en;
     json_esc(dev, sizeof dev, c->device);
     json_esc(st, sizeof st, c->state);
     json_esc(url, sizeof url, c->url);
     json_esc(det, sizeof det, c->detail);
+    json_esc(why, sizeof why, c->why);
+    ev[0] = '[';
+    en = 1;
+    for (ei = 0; ei < c->event_n && ei < HB_EVENT_N; ei++) {
+        char one[HB_EVENT_LEN * 2];
+        json_esc(one, sizeof one, c->events[ei]);
+        en += snprintf(ev + en, sizeof ev - (size_t)en, "%s\"%s\"", ei ? "," : "", one);
+        if (en < 1 || en >= (int)sizeof ev - 2) break;
+    }
+    if (en > 0 && en < (int)sizeof ev) ev[en++] = ']';
+    ev[en < (int)sizeof ev ? en : (int)sizeof ev - 1] = 0;
     return snprintf(o, (size_t)max,
-        "{\"version\":\"%s\",\"connected\":%d,\"detail\":\"%s\",\"state\":\"%s\",\"device\":\"%s\",\"url\":\"%s\","
+        "{\"version\":\"%s\",\"connected\":%d,\"detail\":\"%s\",\"why\":\"%s\",\"state\":\"%s\",\"device\":\"%s\",\"url\":\"%s\","
         "\"gain_pct\":%d,\"muted\":%d,\"tone\":%d,\"paused\":%d,"
         "\"headset_volume\":%d,\"avrcp\":{\"connected\":%d,\"absolute_volume\":%d,"
-        "\"notifications\":%d},\"pkts\":%ld,\"frames\":%ld,\"empty_reads\":%ld,"
+        "\"notifications\":%d,\"sink_volume\":%d},\"pkts\":%ld,\"frames\":%ld,\"empty_reads\":%ld,"
         "\"peak\":%.3f,\"out_peak\":%.3f,\"sample_rate\":%d,\"bitpool\":%d,"
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
-        "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d}",
-        c->version, !strcmp(c->state, "streaming"), det, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
-        c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1,
+        "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
+        "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,\"events\":%s}",
+        c->version, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
+        c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
         c->out_peak_milli / 1000.0, c->sample_rate, c->bitpool, c->backlog,
         c->bitpool_lo, c->bitpool_hi, c->per_packet, c->dropped, ctl_uptime_s(c), c->uptime_s,
-        c->stable, c->stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS);
+        c->latency_ms >= 500, c->latency_ms,
+        c->latency_ms, c->lat_total, c->lat_capture, c->lat_packet, c->lat_queue, c->lat_radio,
+        c->lat_sink, c->lat_sink_reported, c->codec,
+        c->codec_pref, c->codec_avail,
+        c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4],
+        c->xq_low, ev);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,
@@ -119,6 +137,7 @@ static int respond(char *out, int max, int code, const char *ctype,
 {
     const char *reason = code == 200 ? "OK" : code == 404 ? "Not Found" :
                          code == 405 ? "Method Not Allowed" : code == 403 ? "Forbidden" :
+                         code == 409 ? "Conflict" :
                          code == 500 ? "Internal Server Error" : "Bad Request";
     int n = snprintf(out, (size_t)max,
         "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
@@ -132,7 +151,7 @@ static int respond(char *out, int max, int code, const char *ctype,
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 {
     char method[8], path[128], *q;
-    char body[1024];
+    char body[8192];
     int i = 0, j = 0, v, bl, is_api;
 
     while (i < reqlen && req[i] != ' ' && j < (int)sizeof method - 1) method[j++] = req[i++];
@@ -237,6 +256,21 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         CTL_LOCK(c);
         snprintf(sp, sizeof sp, "%s", c->select_path);
         CTL_UNLOCK(c);
+        if (!strcmp(line, "scan") && sp[0]) {
+            /* A refresh starts a scan, but it must not erase a reconnect
+             * or a device pick that has not been read yet. */
+            FILE *oldf = fopen(sp, "r");
+            char prev[40];
+            prev[0] = 0;
+            if (oldf) {
+                if (!fgets(prev, sizeof prev, oldf)) prev[0] = 0;
+                fclose(oldf);
+                prev[strcspn(prev, "\r\n")] = 0;
+                if (!strcmp(prev, "reconnect") ||
+                    (strchr(prev, ':') && strncmp(prev, "forget ", 7)))
+                    return respond(out, max, 200, "application/json", "{\"ok\":1}", 8);
+            }
+        }
         {
             char tp[104];
             snprintf(tp, sizeof tp, "%s.tmp", sp);
@@ -247,9 +281,18 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
             if (rename(tp, sp) != 0)
                 return respond(out, max, 500, "application/json", "{\"error\":\"write\"}", 17);
         }
-        CTL_LOCK(c);
-        c->cmd_seq++;                  /* the stream loop sees a new command */
-        CTL_UNLOCK(c);
+        {
+            char evl[64];
+            if (!strcmp(line, "scan")) snprintf(evl, sizeof evl, "Scan started");
+            else if (!strcmp(line, "reconnect")) snprintf(evl, sizeof evl, "Reconnect pressed");
+            else if (forget) snprintf(evl, sizeof evl, "Forget pressed (%s)", line + 7);
+            else if (strchr(line, ':')) snprintf(evl, sizeof evl, "Connect pressed (%s)", line);
+            else snprintf(evl, sizeof evl, "Connect pressed");
+            CTL_LOCK(c);
+            c->cmd_seq++;                  /* the stream loop sees a new command */
+            ctl_event_locked(c, evl);
+            CTL_UNLOCK(c);
+        }
         if (!forget) {                 /* any pick/scan/reconnect leaves "paused" */
             CTL_LOCK(c);
             c->paused = 0;
@@ -276,22 +319,66 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->req_hs_volume = v;
         c->hs_volume = v;
     } else if (!strcmp(path, "/api/latency")) {
-        /* stable=1: ~1 s media queue; stable=0: low latency (~200 ms). */
-        if (!query_int(q, "stable", &v)) goto bad;
-        c->stable = v != 0;
-        c->stable_dirty = 1;
+        /* ms=60..200: media queue target, saved per headset.
+         * stable=0|1 (older pages): both land on 200 ms now. */
+        if (query_int(q, "ms", &v)) { }
+        else if (query_int(q, "stable", &v)) v = v ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+        else goto bad;
+        c->latency_ms = hb_latency_clamp(v);
+        c->prefs_dirty = 1;
+    } else if (!strcmp(path, "/api/codec")) {
+        /* mode=0 auto, 1 SBC, 2 SBC HQ, 3 SBC-XQ (hsprefs.h); the stream
+         * loop switches the headset to it. HQ / XQ only when the connected
+         * headset's capabilities allow them (codec_avail). */
+        if (!query_int(q, "mode", &v) || v < 0 || v > 3) goto bad;
+        if (v >= 2 && !(c->codec_avail & (1 << v))) {
+            CTL_UNLOCK(c);
+            return respond(out, max, 409, "application/json",
+                           "{\"error\":\"not supported by this headset\"}", 41);
+        }
+        c->codec_pref = v;
+        c->prefs_dirty = 1;
+    } else if (!strcmp(path, "/api/clean")) {
+        /* EQ off and flat, software gain back to the default, buffer 200 ms.
+         * Saved for this headset (prefs) and the gain file. */
+        int k;
+        c->eq_on = 0;
+        for (k = 0; k < 5; k++) c->eq_db[k] = 0;
+        c->eq_seq++;
+        c->gain_pct = HB_GAIN_DEFAULT_PCT;
+        c->gain_dirty = 1;
+        c->latency_ms = HB_QUEUE_LOW_MS;
+        c->prefs_dirty = 1;
+    } else if (!strcmp(path, "/api/eq")) {
+        /* on=0|1 and/or b0..b4=-12..12 (dB); saved per headset. */
+        static const char *const bk[5] = { "b0", "b1", "b2", "b3", "b4" };
+        int k, any = 0;
+        if (query_int(q, "on", &v)) { c->eq_on = v != 0; any = 1; }
+        for (k = 0; k < 5; k++)
+            if (query_int(q, bk[k], &v)) {
+                c->eq_db[k] = v < -12 ? -12 : v > 12 ? 12 : v;
+                any = 1;
+            }
+        if (!any) goto bad;
+        c->eq_seq++;
+        c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/mute")) {
         c->muted = query_int(q, "on", &v) ? (v != 0) : !c->muted;
     } else if (!strcmp(path, "/api/tone")) {
         c->tone = query_int(q, "on", &v) ? (v != 0) : !c->tone;
     } else if (!strcmp(path, "/api/connect")) {
+        ctl_event_locked(c, "Connect pressed");
         c->req_connect = 1;
         c->paused = 0;
     } else if (!strcmp(path, "/api/disconnect")) {
+        ctl_event_locked(c, "Disconnect pressed");
         c->req_disconnect = 1;
         c->paused = 1;
     } else if (!strcmp(path, "/api/stop")) {
         c->req_stop = 1;
+    } else if (!strcmp(path, "/api/reset")) {
+        /* Our page and our headset ACL only. Not an HCI reset. */
+        c->req_reset = 1;
     } else {
         CTL_UNLOCK(c);
         return respond(out, max, 404, "application/json", "{\"error\":\"unknown\"}", 19);
@@ -343,7 +430,7 @@ static void console_ip(char *ip, size_t n)
 
 static void serve_one(int fd)
 {
-    static char req[4096], out[65536];
+    static char req[4096], out[196608];   /* the page (~75 KB with all languages) */
     int got = 0, n;
     struct timeval tv = { 2, 0 };
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);

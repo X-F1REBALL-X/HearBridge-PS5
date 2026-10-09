@@ -28,6 +28,15 @@
 #define PDU_SET_ABSVOL 0x50
 #define EV_VOLUME      0x0D
 
+int avrcp_reported(const avrcp_state *a)
+{
+    if (!a) return 0;
+    /* notify_label stays set while the headset's VOLUME_CHANGED
+     * registration is outstanding; the other flags stick after it has
+     * shown absolute volume (SetAbsoluteVolume or our registration). */
+    return a->remote_abs || a->ct_registered || a->notify_label >= 0 || a->sink_renders;
+}
+
 void avrcp_init(avrcp_state *a, int volume)
 {
     memset(a, 0, sizeof *a);
@@ -110,6 +119,7 @@ static void on_response(avrcp_state *a, const unsigned char *av, int n)
         if (pdu == PDU_REG_NOTIFY && np >= 2 && par[0] == EV_VOLUME) {
             if (rc == RSP_INTERIM || rc == RSP_CHANGED) {
                 a->remote_abs = 1;
+                a->sink_renders = 1;
                 a->ct_registered = (rc == RSP_INTERIM);
                 if (rc == RSP_CHANGED) a->need_register = 1;
                 if ((par[1] & 0x7F) != a->volume || rc == RSP_CHANGED) {
@@ -119,14 +129,17 @@ static void on_response(avrcp_state *a, const unsigned char *av, int n)
                 log_line("avrcp: headset volume %s %d/127",
                          rc == RSP_INTERIM ? "is" : "changed to", a->volume);
             } else {
+                a->ct_registered = 0;
                 log_line("avrcp: headset refused VOLUME_CHANGED registration (%#x)", rc);
             }
         } else if (pdu == PDU_SET_ABSVOL && np >= 1) {
             if (rc == RSP_ACCEPTED) {
                 a->remote_abs = 1;
+                a->sink_renders = 1;
                 a->volume = par[0] & 0x7F;
                 log_line("avrcp: headset set absolute volume %d/127", a->volume);
             } else {
+                if (!a->ct_registered) a->sink_renders = 0;   /* software gain then */
                 log_line("avrcp: headset refused SetAbsoluteVolume (%#x)", rc);
             }
         }
@@ -155,6 +168,11 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
     n = len - 3;
     if (n < 3) return 0;
     if (in[0] & 0x02) {                        /* a response to us */
+        if ((av[0] & 0x0F) == RSP_NOT_IMPL && n >= 7 && av[2] == OP_VENDOR) {
+            if (av[6] == PDU_SET_ABSVOL && !a->ct_registered) a->sink_renders = 0;
+            log_line("avrcp: headset does not implement PDU %#x", av[6]);
+            return 0;
+        }
         on_response(a, av, n);
         return 0;
     }

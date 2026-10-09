@@ -34,6 +34,12 @@
 #include "version.h"
 #include "ctl.h"
 #include "gain.h"
+#include "hsprefs.h"
+#include "eq.h"
+#include "cswitch.h"
+#include "rejoin.h"
+#include "forgot.h"
+#include "connreq.h"
 #include "http.h"
 
 #include <sys/stat.h>
@@ -51,7 +57,6 @@
 #define LOCK_PATH STATE_DIR "/hearbridge.lock"
 #define TONE_PATH STATE_DIR "/tone"          /* exists → 1 kHz test tone */
 #define GAIN_PATH STATE_DIR "/gain"          /* text: linear gain, e.g. 5 */
-#define LATENCY_PATH STATE_DIR "/latency"    /* text: "low" (default) or "stable" */
 #define DUMP_PATH STATE_DIR "/media_dump.bin"
 #define DUMP_FLAG_PATH STATE_DIR "/media_dump"   /* exists → dump the first media packets (debug) */
 #define NO_TILE_PATH STATE_DIR "/no_tile"      /* exists → never add the home tile */
@@ -82,10 +87,17 @@ static int connect_abort(const unsigned char addr[6]);
  * a pick); background retries show "disconnected", not "connecting", and
  * use one short page per device. */
 static int g_user_connect;
+static void note_event(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+static void set_why(const char *key);
 static void ctl_set_state(const char *st, const char *dev);
 static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *psm);
 static void idle_pump(hci_t hci, int ms);
 static int g_kept_link;
+static unsigned char g_target[6];        /* device being paged / paired / used */
+static int g_have_target;
+static int set_target(const unsigned char *a);
+static btlink *g_ready;          /* headset already connected in (gentle rejoin) */
+static unsigned g_ready_psm;
 static long g_av_fail_ms;   /* last AVDTP failure: the headset needs a moment */     /* the current link is the kept pairing ACL */
 
 /* Idle: keep reading HCI events (link tracking sees a headset that
@@ -111,6 +123,15 @@ static int accept_one(btlink *link, const headset_ini *ini, int ms)
                          (const unsigned char (*)[16])k, kt, 1, ms, &which) && which == 0;
 }
 
+/* How long a page may take. A headset that is there answers in a
+ * second or two; this only bounds a miss. Long enough that a slow page
+ * still finishes, short enough that we do not sit for half a minute. */
+#define HB_PAGE_MS 5000
+/* After a hang-up right after encryption: wait this long for its own call. */
+#define HB_CALLBACK_MS 2500
+static int probe_after(hci_t hci, btlink *link, headset_ini *ini, btlink **linkp, unsigned *psm);
+static void turn_down_other_calls(hci_t hci, const unsigned char target[6]);
+
 static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
                              unsigned *psm, int timeout_ms)
 {
@@ -121,13 +142,14 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
         log_line("select: connect aborted for a page command");
         return 0;
     }
-    if (g_av_fail_ms && now_ms() - g_av_fail_ms < 2500) {
+    if (!g_user_connect && g_av_fail_ms && now_ms() - g_av_fail_ms < 2500) {
         long w = g_av_fail_ms + 2500;
         log_line("select: waiting %ld ms after the last AVDTP failure", w - now_ms());
         while (now_ms() < w) idle_pump(hci, 50);
     }
     link = btlink_create(hci, 1021, 7);
     if (!link) return 0;
+    turn_down_other_calls(hci, ini->addr);   /* nothing else holds the radio */
     (void)btlink_drop_stale(link, ini->addr);
     (void)btlink_pump(link, 50);              /* take in queued events (tracking) */
     {
@@ -139,8 +161,9 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
         if (h) {
             log_line("select: an ACL to this device already exists (handle %#05x) — closing it", h);
             (void)btlink_drop_handle(link, h, 2500);
-        } else if (age >= 0 && age < 8000) {
-            if (accept_one(link, ini, 6000)) return probe_link(link, ini, linkp, psm);
+        } else if (age >= 0 && age < ACL_REQ_PENDING_MS) {
+            /* Its own call is still waiting: take it (a page now fails 0x0b). */
+            if (accept_one(link, ini, 2000)) return probe_after(hci, link, ini, linkp, psm);
         }
     }
     if (!btlink_connect(link, ini->addr, 0x01, 0, ini->link_key, ini->key_type,
@@ -149,9 +172,10 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
         if (btlink_last_connect_fail() == 0x04 && !connect_abort(ini->addr)) {
             /* Page timeout: the device may connect in on power-up. Listen
              * for its own request during this Connect only. */
-            log_line("select: page timeout — waiting 8 s for the device to connect in");
-            ok = accept_one(link, ini, 8000);
-        } else if (btlink_last_connect_fail() == 0x0B || btlink_last_connect_fail() == 0) {
+            log_line("select: page timeout — listening briefly for the device to connect in");
+            ok = accept_one(link, ini, 2000);
+        } else if (!connect_abort(ini->addr) &&
+                   (btlink_last_connect_fail() == 0x0B || btlink_last_connect_fail() == 0)) {
             unsigned h = acl_track_handle(ini->addr);
             if (h) {
                 /* 0x0b: a link exists after all — close that handle, page once more. */
@@ -160,11 +184,14 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
                 ok = btlink_connect(link, ini->addr, 0x01, 0, ini->link_key, ini->key_type,
                                     ini->name, (int)sizeof ini->name, timeout_ms);
             } else {
-                /* Handle unknown: the headset is calling us. Accept it. */
-                log_line("select: 0x0b with no known handle — the link was opened outside this app "
-                         "(no Connection Complete reached us; HCI has no safe handle->address lookup, "
-                         "so no other handle is touched). Waiting for the headset to connect in");
-                ok = accept_one(link, ini, 8000);
+                /* No handle of ours. The page was cancelled in btlink.
+                 * Do not guess a handle (that drops a pad) and do not sit. */
+                long age = acl_track_request_age(ini->addr, now_ms());
+                log_line("select: 0x0b, no headset ACL of ours — page cancelled");
+                if (age >= 0 && age < ACL_REQ_PENDING_MS) {
+                    log_line("select: it is calling us (%ld ms ago) — accepting that instead", age);
+                    ok = accept_one(link, ini, 2000);
+                }
             }
         }
         if (!ok) {
@@ -173,7 +200,33 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
         }
     }
     if (!link) return 0;
-    return probe_link(link, ini, linkp, psm);
+    return probe_after(hci, link, ini, linkp, psm);
+}
+
+/* probe_link, and when a saved headset hangs up right after encryption,
+ * give it a moment to call back before anyone pages it again. The Xbox
+ * headset drops a link we opened (0x13, ~15 ms after its Device ID lookup)
+ * and calls the console itself 0.2-1.1 s later (16 log); accepted, that
+ * call streams (12 log). */
+static int probe_after(hci_t hci, btlink *link, headset_ini *ini, btlink **linkp, unsigned *psm)
+{
+    int pr = probe_link(link, ini, linkp, psm);
+    if (pr == -2 && ini->ok && !connect_abort(ini->addr)) {
+        btlink *in;
+        log_line("select: waiting %d ms for %s to call back", HB_CALLBACK_MS,
+                 ini->name[0] ? ini->name : "the headset");
+        if (g_user_connect)
+            note_event("%s hung up — waiting for it to call back", ini->name[0] ? ini->name : "headset");
+        in = btlink_create(hci, 1021, 7);
+        if (!in) return pr;
+        if (!accept_one(in, ini, HB_CALLBACK_MS)) {
+            log_line("select: no call back");
+            btlink_destroy(in);
+            return pr;
+        }
+        pr = probe_link(in, ini, linkp, psm);   /* once: no loop */
+    }
+    return pr;
 }
 
 /* SDP check on an encrypted link; on success the link is handed out. */
@@ -181,10 +234,23 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 {
     int sdp;
     {
-        long w = now_ms() + 500;
-        while (now_ms() < w)
-            if (btlink_pump(link, 40) < 0) break;
+        /* Short look for channels the headset opens itself; a link that
+         * dropped meanwhile fails at once instead of SDP/AVDTP on a dead link. */
+        /* A headset that called us usually opens SDP, then AVDTP itself:
+         * give it 1.5 s before we open AVDTP on its link ourselves. */
+        long w = now_ms() + (btlink_is_incoming(link) ? 1500 : 150);
+        while (now_ms() < w) {
+            if (btlink_pump(link, 30) < 0) break;
+            if (!btlink_is_up(link) || btlink_chan_find_inbound(link, BTLINK_PSM_AVDTP)) break;
+        }
+        if (!btlink_is_up(link)) {
+            log_line("select: headset dropped the link right after encryption (reason %#04x)",
+                     btlink_last_disc_reason());
+            btlink_destroy(link);
+            return -2;
+        }
     }
+    note_event("Link secured (encrypted)");
     if (ini->ok && (btlink_chan_find_inbound(link, BTLINK_PSM_AVDTP) ||
                     btlink_chan_find_inbound(link, BTLINK_PSM_SDP))) {
         /* A saved audio device that opened SDP/AVDTP to us itself: no need
@@ -194,7 +260,7 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
         *linkp = link;
         return 1;
     }
-    sdp = sdp_probe_a2dp_sink(link, 12000, psm);
+    sdp = sdp_probe_a2dp_sink(link, 6000, psm);
     if (sdp == 0) {
         log_choice("no A2DP Sink in SDP — rejecting", ini);
         btlink_disconnect(link);
@@ -214,8 +280,9 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 #define PAIRED_INI    STATE_DIR "/paired.ini"
 #define SAVED_JSON    STATE_DIR "/saved.json"
 #define SELECT_WAIT_S 86400 /* manual mode: wait for a choice indefinitely */
-/* Scans run only when the user presses Scan: inquiries back to back for
- * SCAN_WINDOW_S, then the list stays until the next press. */
+/* A scan (button or page refresh) runs inquiries back to back for
+ * SCAN_WINDOW_S. Each result is written to devices.json as it arrives.
+ * The list stays until the next scan. */
 #define SCAN_WINDOW_S 20
 
 static void write_status(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
@@ -303,6 +370,7 @@ static int g_nseen;
 static void seen_clear(void)
 {
     g_nseen = 0;
+    a2dp_rank_log_reset();
 }
 
 static void seen_merge(const a2dp_inq_dev *devs, int n)
@@ -351,12 +419,13 @@ static void inquiry_progress(const a2dp_inq_dev *devs, int n)
 }
 
 /* ---- web commands (select.txt) and the saved-device list ------------- */
-enum { CMD_NONE, CMD_ADDR, CMD_INDEX, CMD_SCAN, CMD_RECONNECT };
+enum { CMD_NONE, CMD_ADDR, CMD_INDEX, CMD_SCAN, CMD_RECONNECT, CMD_FORGET_CUR };
 typedef struct { int kind, index; unsigned char addr[6]; } hb_cmd;
 
 static headset_ini g_paired[PAIRED_MAX];
 static int g_npaired;
 static hb_cmd g_pending;              /* command that ended the last session */
+static hb_cswitch g_cs;               /* codec switch that needs a reconnect */
 
 static void publish_saved(const headset_ini *cur)
 {
@@ -392,6 +461,7 @@ static int want_blocks(const unsigned char addr[6])
 static unsigned char g_hold[PAIRED_MAX][6];
 static int g_nhold;
 
+static long g_hold_ms;     /* when the last manual Disconnect hold was set */
 static int held(const unsigned char a[6])
 {
     int i;
@@ -401,6 +471,7 @@ static int held(const unsigned char a[6])
 
 static void hold_add(const unsigned char a[6])
 {
+    g_hold_ms = now_ms();
     if (held(a) || g_nhold >= PAIRED_MAX) return;
     memcpy(g_hold[g_nhold++], a, 6);
     log_line("saved: auto-reconnect paused for the disconnected device");
@@ -436,6 +507,7 @@ static void remember_device(const headset_ini *din)
 {
     headset_ini dd = *din, *d = &dd;
     if (!d->ok) return;
+    hb_forgot_clear(d->addr);
     keep_identity(d);
     paired_put(g_paired, &g_npaired, PAIRED_MAX, d);
     if (!paired_save(PAIRED_INI, g_paired, g_npaired))
@@ -475,7 +547,11 @@ static int connect_abort(const unsigned char addr[6])
     FILE *f;
     char line[64];
     unsigned char a[6];
-    int stop = 1;
+    int stop = 1, reset = 0;
+    CTL_LOCK(&g_ctl);
+    reset = g_ctl.req_reset;
+    CTL_UNLOCK(&g_ctl);
+    if (reset) return 1;                 /* drop our page, not anyone else's */
     if (!cmd_waiting()) return 0;
     if (!g_user_connect) return 1;
     f = fopen(SELECT_TXT, "r");
@@ -484,8 +560,12 @@ static int connect_abort(const unsigned char addr[6])
         line[strcspn(line, "\r\n")] = 0;
         if (!strncmp(line, "forget ", 7))
             stop = headset_parse_addr(line + 7, a) && !memcmp(a, addr, 6);
+        else if (!strcmp(line, "reconnect"))
+            stop = 1;
+        else if (!strcmp(line, "scan"))
+            stop = 0;                    /* a refresh scan must not cancel this page */
         else if (headset_parse_addr(line, a))
-            stop = memcmp(a, addr, 6) != 0;      /* same device again: keep going */
+            stop = 1;                    /* a new press starts again, same headset too */
     }
     fclose(f);
     return stop;
@@ -496,17 +576,60 @@ static int btlink_forget_abort(const unsigned char addr[6])
     return connect_abort(addr);
 }
 
+/* The waiting page command is a Connect / Reconnect that this headset
+ * answers (its own address, or Reconnect while it is a saved one). */
+static int press_is_for(const unsigned char addr[6])
+{
+    FILE *f;
+    char line[64];
+    unsigned char a[6];
+    int yes = 0;
+    if (!cmd_waiting()) return 0;
+    f = fopen(SELECT_TXT, "r");
+    if (!f) return 0;
+    if (fgets(line, sizeof line, f)) {
+        line[strcspn(line, "\r\n")] = 0;
+        if (!strcmp(line, "reconnect")) yes = paired_find(g_paired, g_npaired, addr) >= 0;
+        else if (strncmp(line, "forget ", 7) && headset_parse_addr(line, a)) yes = !memcmp(a, addr, 6);
+    }
+    fclose(f);
+    return yes;
+}
+
 /* A saved device answered a page or connected in: show "connecting" now. */
 static void on_acl_up(const unsigned char addr[6])
 {
     int i = paired_find(g_paired, g_npaired, addr);
     const char *nm = i >= 0 && g_paired[i].name[0] ? g_paired[i].name : "-";
+    note_event("%s answered — securing the link", i >= 0 && g_paired[i].name[0] ? nm : "Headset");
     write_status("connecting %s", nm);
     ctl_set_state("connecting", i >= 0 ? g_paired[i].name : NULL);
 }
 
+static int g_stream_up;            /* run_session is streaming to ini */
+static void prefs_forget(const unsigned char addr[6]);
+
+/* Deletes everything saved for addr: key (paired.ini, headset.ini when it
+ * is the current one), its settings file, its saved.json row. It is then
+ * not accepted or paged again until it is paired again. */
+static void forget_device(const unsigned char addr[6], headset_ini *ini, int cur)
+{
+    if (paired_drop(g_paired, &g_npaired, addr)) paired_save(PAIRED_INI, g_paired, g_npaired);
+    hold_clear(addr);
+    if (!memcmp(g_want, addr, 6)) g_want_until = 0;
+    prefs_forget(addr);
+    hb_forgot_add(addr);
+    acl_track_request_clear(addr);
+    if (cur || (ini->ok && !memcmp(ini->addr, addr, 6))) {
+        unlink(HEADSET_INI_PATH);
+        memset(ini, 0, sizeof *ini);
+    }
+    publish_saved(ini);
+}
+
 /* Reads and deletes select.txt. "forget" is handled here; forgetting the
- * current headset turns into a scan. */
+ * current headset turns into a scan (while streaming: CMD_FORGET_CUR, the
+ * stream disconnects cleanly first and deletes after). */
 static int poll_cmd(hb_cmd *c, headset_ini *ini)
 {
     FILE *f;
@@ -532,15 +655,15 @@ static int poll_cmd(hb_cmd *c, headset_ini *ini)
             CTL_UNLOCK(&g_ctl);
         }
         /* shown: it is the one being connected right now (maybe not headset.ini) */
-        if (paired_drop(g_paired, &g_npaired, c->addr)) paired_save(PAIRED_INI, g_paired, g_npaired);
+        if (hb_forget_action(cur, g_stream_up) == HB_FORGET_AFTER_DISCONNECT) {
+            log_line("saved: Forget of the connected headset — disconnecting it first");
+            c->kind = CMD_FORGET_CUR;
+            log_line("select: page command received: \"%s\"", line);
+            return 1;
+        }
         log_line("saved: forgot a device%s", cur || shown ? " (the current one)" : "");
-        hold_clear(c->addr);
-        if (!memcmp(g_want, c->addr, 6)) g_want_until = 0;
+        forget_device(c->addr, ini, cur);
         if (cur || shown) {
-            if (cur) {
-                unlink(HEADSET_INI_PATH);
-                memset(ini, 0, sizeof *ini);
-            }
             c->kind = CMD_SCAN;            /* disconnect it and show the chooser */
             ctl_set_state("scanning", NULL);
             CTL_LOCK(&g_ctl);
@@ -562,16 +685,31 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
 /* Status label for a connect_and_probe failure. */
 static const char *conn_fail_label(int r)
 {
-    if (r < 0) return "not-a2dp-sink";
+    if (r == -1) return "not-a2dp-sink";
     if (btlink_last_connect_fail() == 0x04) return "page-timeout";
     if (btlink_last_connect_fail() == 0x0B) return "link-held-elsewhere";
     return "connect-failed";
 }
+static void set_why(const char *key);
 static void ctl_set_state(const char *st, const char *dev);
 
 /* Pair the chosen device (saves headset.ini), reconnect, SDP-check. */
+static int try_device_(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
+                       headset_ini *ini, btlink **linkp, unsigned *psm);
 static int try_device(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
                       headset_ini *ini, btlink **linkp, unsigned *psm)
+{
+    unsigned char prev[6];
+    int had, r;
+    memcpy(prev, g_target, 6);
+    had = set_target(d->addr);
+    r = try_device_(asess, hci, d, ini, linkp, psm);
+    set_target(had ? prev : NULL);
+    return r;
+}
+
+static int try_device_(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
+                       headset_ini *ini, btlink **linkp, unsigned *psm)
 {
     a2dp_pair_result pr;
 
@@ -590,6 +728,9 @@ static int try_device(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
                 btlink *t = btlink_create(hci, 1021, 7);
                 if (t) { (void)btlink_drop_handle(t, (unsigned)pr.handle, 1500); btlink_destroy(t); }
             }
+            if (pr.need_pair_mode)
+                note_event("%s didn't pair. Put it in pairing mode (hold the pair button until it flashes fast) and try again.",
+                           d->name[0] ? d->name : "The headset");
             write_status("error pair-failed");
             return 0;
         }
@@ -641,17 +782,18 @@ static int try_device(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
         if (k && !btlink_is_up(k) && !connect_abort(ini->addr)) {
             /* The headset itself dropped the new link: it usually comes
              * back on its own. Listen for it (stored key) before paging. */
-            log_line("select: headset closed the pairing link — waiting 12 s for it to connect in");
+            log_line("select: headset closed the pairing link — listening briefly, then paging");
             btlink_destroy(k);
             k = btlink_create(hci, 1021, 7);          /* fresh state for the new link */
-            if (k && accept_one(k, ini, 12000)) {
+            if (k && accept_one(k, ini, 2000)) {
                 int pr2 = probe_link(k, ini, linkp, psm);
                 if (pr2 == 1) {
                     log_choice("chosen", ini);
                     write_status("connected %s", ini->name[0] ? ini->name : "-");
                     return 1;
                 }
-                if (pr2 < 0) { write_status("error not-a2dp-sink"); return 0; }  /* k freed */
+                if (pr2 == -1) { write_status("error not-a2dp-sink"); return 0; }
+                if (pr2 < 0) return 0;                                /* k freed */  /* k freed */
             }
         }
         /* SDP did not work on the kept link: close it, page as before. */
@@ -681,6 +823,195 @@ static int try_device(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
 }
 
 
+/* Page scan: the headset connects in on its own (power on, out of the case).
+ * 1 = encrypted link probed and handed out. */
+static int listen_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm, int ms)
+{
+    btlink *link;
+    int pr;
+    if (!ini || !ini->ok || ms <= 0) return 0;
+    link = btlink_create(hci, 1021, 7);
+    if (!link) return 0;
+    if (!accept_one(link, ini, ms)) {
+        btlink_destroy(link);
+        return 0;
+    }
+    if (press_is_for(ini->addr)) {
+        /* The Connect press was for this headset, which joined by itself: done. */
+        hb_cmd c;
+        (void)poll_cmd(&c, ini);
+        log_line("select: that press is answered by the incoming link");
+    }
+    pr = probe_link(link, ini, linkp, psm);
+    return pr == 1;
+}
+
+/* Idle: accept any saved headset that connects in (power on, out of its
+ * case). One the user disconnected by hand only after 30 s (a fresh power
+ * on, not its instant re-page). 1 = link probed and handed out, *ini is
+ * then that headset (saved as the current one). */
+static int listen_any_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm, int ms)
+{
+    unsigned char a[8][6], k[8][16], kt[8];
+    int idx[8], n = 0, i, which = -1, pr;
+    btlink *link;
+    headset_ini cand;
+    for (i = 0; i < g_npaired && n < 8; i++) {
+        if (held(g_paired[i].addr) && now_ms() - g_hold_ms < 30000) continue;
+        memcpy(a[n], g_paired[i].addr, 6);
+        memcpy(k[n], g_paired[i].link_key, 16);
+        kt[n] = g_paired[i].key_type;
+        idx[n++] = i;
+    }
+    if (!n) { idle_pump(hci, ms); return 0; }
+    link = btlink_create(hci, 1021, 7);
+    if (!link) return 0;
+    if (!btlink_accept(link, (const unsigned char (*)[6])a, (const unsigned char (*)[16])k, kt, n,
+                       ms, &which) || which < 0 || which >= n) {
+        btlink_destroy(link);
+        return 0;
+    }
+    cand = g_paired[idx[which]];
+    cand.ok = cand.have_addr = 1;
+    if (press_is_for(cand.addr)) {          /* a press for it is answered by this link */
+        hb_cmd c;
+        (void)poll_cmd(&c, &cand);
+    }
+    if (held(cand.addr)) {                  /* turned on again later: auto-connect is back */
+        hold_clear(cand.addr);
+        CTL_LOCK(&g_ctl);
+        g_ctl.paused = 0;
+        CTL_UNLOCK(&g_ctl);
+    }
+    note_event("auto: %s turned on — connecting", cand.name[0] ? cand.name : "headset");
+    pr = probe_link(link, &cand, linkp, psm);
+    if (pr != 1) return 0;
+    *ini = cand;
+    keep_identity(ini);
+    if (!headset_ini_save(ini)) log_line("saved: cannot write headset.ini");
+    remember_device(ini);
+    publish_saved(ini);
+    return 1;
+}
+
+static int saved_peer(const unsigned char addr[6])
+{
+    return paired_find(g_paired, g_npaired, addr) >= 0 || hb_forgot_has(addr);
+}
+
+/* Connecting to target: a call still waiting from another of our saved (or
+ * forgotten) headsets, e.g. the one just disconnected calling back, is
+ * turned down first so the controller is not busy with it. */
+static void turn_down_other_calls(hci_t hci, const unsigned char target[6])
+{
+    int i;
+    long now = now_ms();
+    for (i = 0; i < g_npaired + hb_forgot_count(); i++) {
+        const unsigned char *a = i < g_npaired ? g_paired[i].addr : hb_forgot_at(i - g_npaired);
+        long age;
+        if (!a || !memcmp(a, target, 6)) continue;
+        age = acl_track_request_age(a, now);
+        if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(a))
+            btlink_reject_request(hci, a, 0x0D);
+    }
+}
+
+/* --- every incoming connection request gets an answer ----------------- */
+static unsigned char g_stream_addr[6];   /* valid while g_stream_up */
+static volatile int g_switch_req;        /* a saved headset called while we stream */
+static unsigned char g_switch_addr[6];
+
+static int set_target(const unsigned char *a)
+{
+    int had = g_have_target;
+    if (a) { memcpy(g_target, a, 6); g_have_target = 1; }
+    else g_have_target = 0;
+    return had;
+}
+
+static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
+{
+    long now = now_ms();
+    if (ev && n >= 12) {
+        const unsigned char *a = ev + 2;
+        unsigned cod = (unsigned)ev[8] | ((unsigned)ev[9] << 8) | ((unsigned)ev[10] << 16);
+        int si = paired_find(g_paired, g_npaired, a), d;
+        hb_cr_in in;
+        char astr[18];
+        if (ev[11] != 0x01) return;                  /* SCO/eSCO: not ours */
+        memset(&in, 0, sizeof in);
+        in.is_av = hb_cod_is_av(cod);
+        in.saved = si >= 0;
+        in.forgotten = hb_forgot_has(a);
+        in.is_target = g_have_target && !memcmp(a, g_target, 6);
+        in.streaming_other = g_stream_up && memcmp(a, g_stream_addr, 6) != 0;
+        in.busy_other = (g_have_target && !in.is_target) ||
+                        (g_stream_up && !memcmp(a, g_stream_addr, 6));
+        in.held = held(a) && (g_stream_up || now - g_hold_ms < 30000);
+        d = hb_connreq_decide(&in);
+        hci_addr_str(a, astr);
+        log_line("conn-req: %s CoD %06x%s%s -> %s", astr, cod,
+                 in.saved ? " saved" : in.forgotten ? " forgotten" : "",
+                 in.is_target ? " (target)" : "", hb_connreq_name(d));
+        switch (d) {
+        case HB_CR_REJECT_UNKNOWN: btlink_reject_request(hci, a, 0x0F); break;
+        case HB_CR_REJECT_BUSY:    btlink_reject_request(hci, a, 0x0D); break;
+        case HB_CR_SWITCH:
+            memcpy(g_switch_addr, a, 6);
+            g_switch_req = 1;
+            break;
+        default: break;                               /* TAKE: accepted by the state machine; LEAVE: system */
+        }
+        return;
+    }
+    {
+        /* Safety net: a call from one of ours that nobody took within 5 s
+         * is turned down (busy) before it blocks pages for ~25 s. */
+        static long last;
+        int i;
+        if (now - last < 500) return;
+        last = now;
+        for (i = 0; i < g_npaired + hb_forgot_count(); i++) {
+            const unsigned char *a = i < g_npaired ? g_paired[i].addr : hb_forgot_at(i - g_npaired);
+            long age;
+            if (!a) continue;
+            if (g_have_target && !memcmp(a, g_target, 6)) continue;
+            if (g_switch_req && !memcmp(a, g_switch_addr, 6)) continue;
+            age = acl_track_request_age(a, now);
+            if (age < 5000 || age >= ACL_REQ_PENDING_MS || acl_track_handle(a)) continue;
+            log_line("conn-req: nobody took a call for %ld ms -> turning it down", age);
+            btlink_reject_request(hci, a, i < g_npaired ? 0x0D : 0x0F);
+        }
+    }
+}
+
+/* Never leave a saved headset's call unanswered (it blocks our pages to it
+ * with 0x0b until the controller times it out, ~25 s). One the user just
+ * disconnected by hand is turned down; any other is accepted and connected.
+ * Other devices (pads) are left to the system. 1 = link handed out. */
+static int answer_saved_calls(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm)
+{
+    int i, take = 0;
+    long now = now_ms();
+    for (i = 0; i < hb_forgot_count(); i++) {        /* forgotten: not until paired again */
+        const unsigned char *fa = hb_forgot_at(i);
+        long age = acl_track_request_age(fa, now);
+        if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(fa))
+            btlink_reject_request(hci, fa, 0x0F);
+    }
+    for (i = 0; i < g_npaired; i++) {
+        long age = acl_track_request_age(g_paired[i].addr, now);
+        if (age < 0 || age >= ACL_REQ_PENDING_MS || acl_track_handle(g_paired[i].addr)) continue;
+        if (held(g_paired[i].addr) && now - g_hold_ms < 30000) {
+            btlink_reject_request(hci, g_paired[i].addr, 0x0D);
+            continue;
+        }
+        take = 1;
+    }
+    if (!take) return 0;
+    return listen_any_saved(hci, ini, linkp, psm, 2500);
+}
+
 /* Reconnect with a saved key (no pairing). 1 = link ready. */
 static int try_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm, int timeout_ms)
 {
@@ -688,18 +1019,42 @@ static int try_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm,
     if (!ini->ok) return 0;
     log_choice("reconnecting saved", ini);
     if (g_user_connect) {
+        note_event("Calling %s…", ini->name[0] ? ini->name : "the headset");
         write_status("connecting %s", ini->name[0] ? ini->name : "-");
         ctl_set_state("connecting", ini->name);
     } else {
         write_status("disconnected waiting for %s", ini->name[0] ? ini->name : "-");
         ctl_set_state("disconnected", ini->name);
     }
-    r = connect_and_probe(hci, ini, linkp, psm, timeout_ms);
+    {
+        unsigned char prev[6];
+        int had;
+        memcpy(prev, g_target, 6);
+        had = set_target(ini->addr);
+        r = connect_and_probe(hci, ini, linkp, psm, timeout_ms);
+        set_target(had ? prev : NULL);
+    }
     if (r == 1) {
         remember_device(ini);
+        if (press_is_for(ini->addr)) {        /* a second press of it: already done */
+            hb_cmd c;
+            (void)poll_cmd(&c, ini);
+        }
         return 1;
     }
     log_line("select: saved device did not answer (%s)", conn_fail_label(r));
+    if (g_user_connect) {
+        const char *nm = ini->name[0] ? ini->name : "headset";
+        int f = btlink_last_connect_fail();
+        if (r == -1) note_event("%s: not an audio headset", nm);
+        else if (r == -2) note_event("%s hung up right after connecting", nm);
+        else if (f == 0x04) note_event("%s: no answer (off, in its case or too far?)", nm);
+        else if (f == 0x0B) note_event("%s is busy connecting — try again in a few seconds", nm);
+        else note_event("%s: connection failed", nm);
+    }
+    if (btlink_last_connect_fail() == 0x04) set_why("timeout");
+    else if (btlink_last_connect_fail() == 0x0B) set_why("held");
+    else set_why("failed");
     return 0;
 }
 
@@ -716,8 +1071,11 @@ static int try_all_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *
         hb_cmd c;
         cand.ok = cand.have_addr = 1;
         if (held(cand.addr)) {
-            log_line("rotation: skip \"%s\" (disconnected by hand)", cand.name);
-            continue;
+            if (!g_user_connect) {
+                log_line("rotation: skip \"%s\" (disconnected by hand)", cand.name);
+                continue;
+            }
+            hold_clear(cand.addr);       /* Reconnect was pressed: page it anyway */
         }
         if (want_blocks(cand.addr)) {
             log_line("rotation: skip \"%s\" (another device was just picked)", cand.name);
@@ -754,10 +1112,11 @@ static int try_pick(a2dp_session *asess, hci_t hci, const hb_cmd *c,
     } else {
         want_device(c->addr);
         hold_clear(c->addr);
+        hb_forgot_clear(c->addr);
         int s = paired_find(g_paired, g_npaired, c->addr);
         if (s >= 0) {                              /* already paired: use the key */
             use_saved(s, ini);
-            if (try_saved(hci, ini, linkp, psm, 30000)) return 1;   /* one attempt */
+            if (try_saved(hci, ini, linkp, psm, HB_PAGE_MS)) return 1;   /* one attempt */
             write_status("error %s %s", conn_fail_label(0), ini->name[0] ? ini->name : "-");
             log_line("select: saved device did not connect — is it on?");
             return 0;
@@ -839,7 +1198,7 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
                 if (cand.ok) {
                     g_user_connect = 1;
                     hold_clear(cand.addr);
-                    if (try_saved(hci, &cand, linkp, psm, 30000)) {
+                    if (try_saved(hci, &cand, linkp, psm, HB_PAGE_MS)) {
                         *ini = cand;
                         keep_identity(ini);
             if (!headset_ini_save(ini)) log_line("saved: cannot write headset.ini");
@@ -864,13 +1223,18 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
                 continue;
             }
             g_user_connect = 1;
-            if (c.kind == CMD_RECONNECT) ok = try_all_saved(hci, ini, linkp, psm, 20000, 12000);
+            if (c.kind == CMD_RECONNECT) ok = try_all_saved(hci, ini, linkp, psm, HB_PAGE_MS, HB_PAGE_MS);
             else ok = try_pick(asess, hci, &c, found, order, ncand, ini, linkp, psm);
             if (ok) return 1;
             if (c.kind != CMD_ADDR) write_status("waiting-selection %d", ncand);
             else t_keep_err = now_ms();
         }
-        if (!cmd_waiting()) idle_pump(hci, 100);
+        if (!cmd_waiting()) {
+            idle_pump(hci, 100);
+            /* A saved headset calling in while the list is up (power on,
+             * or the Xbox calling back after it hung up on our page). */
+            if (answer_saved_calls(hci, ini, linkp, psm)) return 1;
+        }
     }
     log_line("select: no choice within %d s", SELECT_WAIT_S);
     write_status("error selection-timeout");
@@ -944,16 +1308,24 @@ static int file_exists(const char *path)
     return stat(path, &st) == 0;
 }
 
+static void set_why(const char *key)
+{
+    CTL_LOCK(&g_ctl);
+    snprintf(g_ctl.why, sizeof g_ctl.why, "%s", key ? key : "");
+    CTL_UNLOCK(&g_ctl);
+}
+
 static void ctl_set_state(const char *st, const char *dev)
 {
     CTL_LOCK(&g_ctl);
     snprintf(g_ctl.state, sizeof g_ctl.state, "%s", st);
+    if (!strcmp(st, "streaming")) g_ctl.why[0] = 0;
     if (dev) snprintf(g_ctl.device, sizeof g_ctl.device, "%s", dev);
     if (strcmp(st, "streaming")) ctl_clear_link(&g_ctl, !strcmp(st, "paused"));
     CTL_UNLOCK(&g_ctl);
 }
 
-/* Base gain percent from GAIN_PATH; default 500 (x5) when absent. */
+/* Base gain percent from GAIN_PATH; default 250 (middle) when absent. */
 static int read_gain_pct(void)
 {
     FILE *f = fopen(GAIN_PATH, "r");
@@ -977,45 +1349,145 @@ static void write_gain_pct(int pct)
     rename(GAIN_PATH ".tmp", GAIN_PATH);
 }
 
-/* Latency mode from LATENCY_PATH: 1 = stable, 0 = low latency (default). */
-static int read_stable(void)
+
+/* Per-headset settings (hsprefs.h) of the headset in use. */
+static hb_prefs g_prefs;
+static unsigned char g_prefs_addr[6];
+static int g_prefs_have;
+
+/* Page values -> g_prefs. Caller holds the lock. */
+static void prefs_from_ctl(void)
 {
-    char buf[16] = "";
-    FILE *f = fopen(LATENCY_PATH, "r");
-    if (f) {
-        if (!fgets(buf, sizeof buf, f)) buf[0] = 0;
-        fclose(f);
+    g_prefs.codec = g_ctl.codec_pref;
+    g_prefs.latency_ms = g_ctl.latency_ms;
+    g_prefs.eq_on = g_ctl.eq_on;
+    memcpy(g_prefs.eq_db, g_ctl.eq_db, sizeof g_prefs.eq_db);
+    /* gain is not copied: only a slider move / Clean sound sets it
+     * (persist_gain_if_dirty), so no other headset's gain lands here. */
+}
+
+/* Page values <- g_prefs. Caller holds the lock. */
+static void prefs_to_ctl(void)
+{
+    g_ctl.codec_pref = g_prefs.codec;
+    g_ctl.latency_ms = hb_latency_clamp(g_prefs.latency_ms);
+    g_ctl.eq_on = g_prefs.eq_on;
+    memcpy(g_ctl.eq_db, g_prefs.eq_db, sizeof g_ctl.eq_db);
+    g_ctl.eq_seq++;
+    g_ctl.gain_pct = hb_prefs_gain(&g_prefs);   /* the user's, else 250 */
+}
+
+static void persist_gain_if_dirty(void);
+
+static void prefs_forget(const unsigned char addr[6])
+{
+    char path[160];
+    hb_prefs_path(HB_PREFS_DIR, addr, path, (int)sizeof path);
+    if (unlink(path) == 0) log_line("prefs: settings of the forgotten headset deleted");
+    if (g_prefs_have && !memcmp(addr, g_prefs_addr, 6)) g_prefs_have = 0;   /* nothing saved back */
+}
+
+static void prefs_save(void)
+{
+    if (!g_prefs_have) return;
+    if (hb_prefs_save(HB_PREFS_DIR, g_prefs_addr, &g_prefs))
+        log_line("prefs: saved for this headset (codec %s, latency %d ms, EQ %s %d/%d/%d/%d/%d dB)",
+                 hb_codec_key(g_prefs.codec), g_prefs.latency_ms, g_prefs.eq_on ? "on" : "off", g_prefs.eq_db[0], g_prefs.eq_db[1], g_prefs.eq_db[2],
+                 g_prefs.eq_db[3], g_prefs.eq_db[4]);
+    else
+        log_line("prefs: cannot write %s", HB_PREFS_DIR);
+}
+
+/* A headset is connecting: its own settings, or (first time) what the page
+ * shows now, which then becomes its settings. */
+static void prefs_attach(const unsigned char addr[6])
+{
+    hb_prefs p;
+    hb_prefs_default(&p);
+    if (g_prefs_have && !memcmp(addr, g_prefs_addr, 6)) return;
+    persist_gain_if_dirty();          /* a pending slider move belongs to the previous one */
+    memcpy(g_prefs_addr, addr, 6);
+    g_prefs_have = 1;
+    if (hb_prefs_load(HB_PREFS_DIR, addr, &p)) {
+        g_prefs = p;
+        CTL_LOCK(&g_ctl);
+        prefs_to_ctl();
+        g_ctl.prefs_dirty = 0;
+        CTL_UNLOCK(&g_ctl);
+        log_line("prefs: loaded for this headset (codec %s, latency %d ms, gain %d%%%s)",
+                 hb_codec_key(g_prefs.codec), g_prefs.latency_ms, hb_prefs_gain(&g_prefs),
+                 g_prefs.gain_user ? " set by you" : " default");
+    } else {
+        g_prefs = p;
+        CTL_LOCK(&g_ctl);
+        prefs_from_ctl();
+        /* No file yet: 200 ms, even if the page was still on the old 1 s mode.
+         * A value already saved above is left alone. */
+        hb_prefs_new_headset(&g_prefs);
+        g_ctl.latency_ms = g_prefs.latency_ms;
+        g_ctl.gain_pct = hb_prefs_gain(&g_prefs);   /* not set for it yet: 250 */
+        CTL_UNLOCK(&g_ctl);
+        prefs_save();
     }
-    return !strncmp(buf, "stable", 6);
 }
 
-static void write_stable(int stable)
-{
-    FILE *f = fopen(LATENCY_PATH ".tmp", "w");
-    if (!f) return;
-    fputs(stable ? "stable\n" : "low\n", f);
-    fclose(f);
-    rename(LATENCY_PATH ".tmp", LATENCY_PATH);
-}
-
-/* Gain and latency mode changed from the page: write them down. */
+/* Gain and per-headset settings (codec, latency, EQ) changed from the page:
+ * write them down. */
 static void persist_gain_if_dirty(void)
 {
-    int pct = -1, stable = -1;
+    int pct = -1, prefs = 0;
     CTL_LOCK(&g_ctl);
-    if (g_ctl.gain_dirty) { pct = g_ctl.gain_pct; g_ctl.gain_dirty = 0; }
-    if (g_ctl.stable_dirty) { stable = g_ctl.stable; g_ctl.stable_dirty = 0; }
+    if (g_ctl.gain_dirty) {
+        pct = g_ctl.gain_pct;
+        g_ctl.gain_dirty = 0;
+        if (g_prefs_have) {               /* the user moved it for this headset */
+            g_prefs.gain_pct = pct;
+            g_prefs.gain_user = 1;
+            prefs = 1;
+        }
+    }
+    if (g_ctl.prefs_dirty) { prefs_from_ctl(); prefs = 1; g_ctl.prefs_dirty = 0; }
     CTL_UNLOCK(&g_ctl);
+    if (prefs) prefs_save();
     if (pct >= 0) {
         write_gain_pct(pct);
         log_line("volume: base gain %d%% saved", pct);
     }
-    if (stable >= 0) {
-        write_stable(stable);
-        log_line("latency: %s mode saved (media queue ~%d ms)", stable ? "stable" : "low-latency",
-                 stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS);
-    }
 }
+
+/* One line in the log and on the page (last few codec switches / drops). */
+static void note_event(const char *fmt, ...)
+{
+    char buf[HB_EVENT_LEN];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    log_line("%s", buf);
+    ctl_event(&g_ctl, buf);
+}
+
+/* Codec change on the open link: the hb_cswitch in-place steps (asked
+ * codec, then plain SBC). 1 = streaming again; 0 = the link is gone or the
+ * headset refused both, g_cs then holds the reconnect steps. */
+static int codec_switch_in_place(avdtp_session *av, btlink *link, int want, int no_xq)
+{
+    hb_cs_begin(&g_cs, want, no_xq);
+    while (g_cs.step == HB_CS_INPLACE || g_cs.step == HB_CS_INPLACE_SBC) {
+        int w = g_cs.step == HB_CS_INPLACE ? g_cs.want : HB_CODEC_SBC;
+        int ok = avdtp_switch_codec(av, w, g_cs.no_xq);
+        int up = btlink_is_up(link) && btlink_chan_is_open(link, av->sig_scid);
+        if (!ok) log_line("switch: in-place %s failed (link %s)", hb_codec_key(w), up ? "up" : "gone");
+        hb_cs_next(&g_cs, ok, up);
+    }
+    if (g_cs.step == HB_CS_DONE) {
+        note_event("switch: now %s, headset stayed connected", av->codec.name ? av->codec.name : "SBC");
+        g_cs.step = HB_CS_IDLE;
+        return 1;
+    }
+    return 0;
+}
+
 
 /* Encode + send up to max_sbc frames from pcm[frames]. Returns packets sent. */
 /* Packs SBC frames into media packets of up to per_pkt frames. */
@@ -1026,7 +1498,8 @@ typedef struct {
     hb_rate rate;
     int fsz, samples_per, per_pkt, mtu;
     int max_pp;          /* tuned frames/packet ceiling (0 = MTU fit) */
-    int queue_ms;        /* media queue target: HB_QUEUE_LOW_MS or HB_QUEUE_STABLE_MS */
+    int queue_ms;        /* media queue target (latency slider), ms */
+    long bl_sum, bl_n;   /* backlog samples since the last status (latency estimate) */
     int rate_hz;
     unsigned char buf[HCI_PKT_MAX];
     int nbytes, nframes;
@@ -1044,6 +1517,10 @@ static void packer_size(packer *p)
     if (p->per_pkt * p->fsz > (int)sizeof p->buf) p->per_pkt = (int)sizeof p->buf / p->fsz;
     if (p->per_pkt < 1) p->per_pkt = 1;
     if (p->max_pp > 0 && p->per_pkt > p->max_pp) p->per_pkt = p->max_pp;
+    {
+        int lat_pp = hb_latency_frames_cap(p->queue_ms, p->rate_hz, p->samples_per);
+        if (lat_pp > 0 && p->per_pkt > lat_pp) p->per_pkt = lat_pp;
+    }
     if (p->link && p->rate_hz > 0)
         btlink_set_media_pace(p->link, (long)p->per_pkt * p->samples_per * 1000L / p->rate_hz);
 }
@@ -1058,6 +1535,8 @@ static void packer_flush(packer *p)
         p->frames += p->nframes;
     }
     p->nbytes = p->nframes = 0;
+    p->bl_sum += btlink_tx_backlog(p->link);
+    p->bl_n++;
     /* Between packets: adapt the bitpool to what the radio delivers. */
     bp = hb_rate_update(&p->rate, now_ms(), btlink_tx_backlog(p->link),
                         btlink_media_cap(p->link), btlink_tx_dropped(p->link));
@@ -1123,8 +1602,9 @@ static void tune_link(packer *p, long now)
         jitter_s = 0;
     }
     /* Bitpool: only step up while the link returns credits with headroom. */
-    if (cred_pps < need_pps * 1.15 && btlink_tx_backlog(p->link) > 1)
-        p->rate.t_calm = now;
+    /* (Paced packets waiting for their due time are not a backlog.) */
+    if (cred_pps < need_pps * 1.15 && btlink_tx_backlog(p->link) > HB_RATE_SLACK)
+        hb_rate_not_calm(&p->rate, now);
     l_sent = sent; l_cred = cred; l_drop = drops; l_t = now;
 }
 
@@ -1160,7 +1640,8 @@ static int packer_feed(packer *p, const int16_t *pcm, int frames)
     return 1;
 }
 
-enum { RUN_DROPPED = 0, RUN_STOP = 1, RUN_FAIL = 2, RUN_PAUSED = 3, RUN_SWITCH = 4 };
+enum { RUN_DROPPED = 0, RUN_STOP = 1, RUN_FAIL = 2, RUN_PAUSED = 3, RUN_SWITCH = 4, RUN_AWAY = 5,
+       RUN_FORGOT = 6, RUN_SWITCH_IN = 7 };
 
 /* One connection: select/connect → AVDTP → SBC → capture → stream until
  * the stop file or a link drop. */
@@ -1179,7 +1660,16 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     double tone_phase = 0.0, sine_phase = 0.0;
     float peak_seen = 0.f;
     int tone = 0, tone_file = 0, gain_milli = 1000, out_peak = 0, gain_pct, muted;
-    int hs_vol = -1, avst = 0;
+    int hs_vol = -1, avst = 0, want_codec = HB_CODEC_AUTO, xq_bad_s = 0, xq_low_s = 0, settle_s = 0;
+    static hb_eq eq;
+    unsigned eq_seq = 0;
+    long xq_drops = 0;
+    int lat_changed = 0;
+    hb_latency lat;
+    int cs_want = -1, cs_no_xq = 0, switched = 0;
+    int vol_applied = 0, vol_auto = 0;   /* headset volume sent once on connect */
+    unsigned char forget_addr[6];        /* RUN_FORGOT: delete after the clean disconnect */
+    unsigned char switch_from[6];        /* RUN_SWITCH_IN: the headset we leave */
 
     memset(&av, 0, sizeof av);
     {
@@ -1189,19 +1679,52 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         hb_cmd pend = g_pending;
         int user = g_user_connect;
         memset(&g_pending, 0, sizeof g_pending);
-        if (pend.kind == CMD_ADDR || pend.kind == CMD_INDEX) {
+        if (g_ready) {
+            link = g_ready;
+            av_psm = g_ready_psm;
+            g_ready = NULL;
+            r = 1;
+        } else if (pend.kind == CMD_ADDR || pend.kind == CMD_INDEX) {
             r = try_pick(asess, hci, &pend, NULL, NULL, 0, ini, &link, &av_psm);
         } else if (pend.kind == CMD_RECONNECT || (user && pend.kind == CMD_NONE)) {
+            int cs = pend.kind == CMD_RECONNECT && g_cs.step == HB_CS_RECONNECT;
             if (ini->ok) {
                 hold_clear(ini->addr);
-                r = try_saved(hci, ini, &link, &av_psm, 30000);
+                /* Listen first. A page right after we dropped the link is
+                 * ignored for minutes (Xbox); the headset connects in when
+                 * it is ready. */
+                if (cs) {
+                    int left = g_cs.delay_ms > 0 ? (int)g_cs.delay_ms : 8000;
+                    while (left > 0 && r != 1 && !hb_stop_requested() && !cmd_waiting()) {
+                        int slice = left > 5000 ? 5000 : left;
+                        r = listen_saved(hci, ini, &link, &av_psm, slice);
+                        left -= slice;
+                    }
+                }
+                if (r != 1)
+                    r = try_saved(hci, ini, &link, &av_psm, HB_PAGE_MS);
+                while (cs && r != 1 && !hb_stop_requested() && !cmd_waiting() &&
+                       hb_cs_next(&g_cs, 0, 0) == HB_CS_RECONNECT) {
+                    int left = g_cs.delay_ms > 0 ? (int)g_cs.delay_ms : 8000;
+                    log_line("switch: listen, then gentle page %d of %d", g_cs.attempt, HB_CS_TRIES);
+                    write_status("disconnected waiting for %s", ini->name[0] ? ini->name : "-");
+                    while (left > 0 && !hb_stop_requested() && !cmd_waiting()) {
+                        int slice = left > 5000 ? 5000 : left;
+                        if (listen_saved(hci, ini, &link, &av_psm, slice)) { r = 1; break; }
+                        left -= slice;
+                    }
+                    if (r == 1) break;
+                    hold_clear(ini->addr);
+                    r = try_saved(hci, ini, &link, &av_psm, HB_PAGE_MS);
+                }
+                if (cs) note_event("switch: reconnect %s", r == 1 ? "worked" : "gave up — press Connect");
                 if (r != 1)
                     write_status("error %s %s", conn_fail_label(0), ini->name[0] ? ini->name : "-");
             } else if (g_npaired) {
                 headset_ini first = g_paired[0];        /* most recent saved device */
                 first.ok = first.have_addr = 1;
                 hold_clear(first.addr);
-                r = try_saved(hci, &first, &link, &av_psm, 30000);
+                r = try_saved(hci, &first, &link, &av_psm, HB_PAGE_MS);
                 if (r == 1) {
                     *ini = first;
                     keep_identity(ini);
@@ -1213,6 +1736,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             }
         }
         g_user_connect = 0;
+        g_cs.step = HB_CS_IDLE;
         if (hb_stop_requested()) { rc = RUN_STOP; goto done; }
         if (r != 1) {
             /* Not connected: keep the device list fresh (inquiry only, no
@@ -1225,9 +1749,17 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         }
     }
     log_line("stream: encrypted ACL ready, AVDTP PSM %#x", av_psm);
+    set_target(ini->addr);                 /* others calling now: busy */
 
+    prefs_attach(ini->addr);
+    CTL_LOCK(&g_ctl);
+    want_codec = g_ctl.codec_pref;
+    CTL_UNLOCK(&g_ctl);
     {
-        int av_ok = avdtp_setup(&av, link, av_psm);
+        int av_ok;
+        av.held_codec = g_prefs.held_codec;
+        av.held_bp = g_prefs.held_bp;
+        av_ok = avdtp_setup(&av, link, av_psm, want_codec, g_prefs.auto_no_xq);
         if (!av_ok && av.unsupported_format) {
             /* Retrying cannot help: the sink cannot take 48 kHz stereo. */
             g_kept_link = 0;
@@ -1245,14 +1777,16 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             btlink_destroy(link);
             link = NULL;
             memset(&av, 0, sizeof av);
+            av.held_codec = g_prefs.held_codec;
+            av.held_bp = g_prefs.held_bp;
             {
                 long w = now_ms() + 1000;
                 while (now_ms() < w) idle_pump(hci, 50);
             }
             g_user_connect = 1;
             g_av_fail_ms = now_ms();
-            av_ok = connect_and_probe(hci, ini, &link, &av_psm, 30000) == 1 &&
-                    avdtp_setup(&av, link, av_psm);
+            av_ok = connect_and_probe(hci, ini, &link, &av_psm, HB_PAGE_MS) == 1 &&
+                    avdtp_setup(&av, link, av_psm, want_codec, g_prefs.auto_no_xq);
             g_user_connect = 0;
         }
         g_kept_link = 0;
@@ -1264,6 +1798,18 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         }
     }
 
+stream_setup:
+    if (want_codec != HB_CODEC_AUTO && av.codec.codec != want_codec) {
+        /* The headset cannot take what was picked: plain SBC, and the page
+         * and this headset's settings say so. */
+        log_line("codec: %s does not fit this headset — using %s", hb_codec_key(want_codec),
+                 hb_codec_key(av.codec.codec));
+        want_codec = av.codec.codec;
+        CTL_LOCK(&g_ctl);
+        g_ctl.codec_pref = want_codec;
+        g_ctl.prefs_dirty = 1;
+        CTL_UNLOCK(&g_ctl);
+    }
     memset(&scfg, 0, sizeof scfg);
     scfg.sample_rate = av.sink.sample_rate ? av.sink.sample_rate : 48000;
     scfg.channels = av.sink.channels ? av.sink.channels : 2;
@@ -1287,7 +1833,7 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         goto done;
     }
 
-    cap = avcap2_session_open();
+    if (!cap) cap = avcap2_session_open();
     if (!cap) {
         log_line("stream: Avcap2 open failed");
         goto done;
@@ -1304,19 +1850,21 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     pk.mtu = (int)mtu;
     pk.rate_hz = scfg.sample_rate;
     CTL_LOCK(&g_ctl);
-    pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+    pk.queue_ms = hb_latency_clamp(g_ctl.latency_ms);
     CTL_UNLOCK(&g_ctl);
     packer_size(&pk);
     {
         /* Media queue from the first packet (tune_link() keeps it in step). */
         int pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
         btlink_set_media_cap(link, hb_media_queue_cap(pkt_ms, pk.queue_ms));
-        log_line("stream: %s mode, media queue %d packets (~%d ms)",
-                 pk.queue_ms == HB_QUEUE_STABLE_MS ? "stable" : "low-latency",
-                 btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
+        log_line("stream: latency target %d ms, media queue %d packets (~%d ms)",
+                 pk.queue_ms, btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
     }
     hb_rate_init(&pk.rate, av.bitpool_lo ? av.bitpool_lo : av.bitpool,
                  av.bitpool_hi ? av.bitpool_hi : av.bitpool, sbc_encoder_bitpool(enc), now_ms());
+    /* SBC HQ may climb above 53 (to the sink's maximum); SBC-XQ (dual
+     * channel) stops at its own ceiling. */
+    hb_rate_set_ceiling(&pk.rate, av.bitpool_hi ? av.bitpool_hi : av.bitpool, av.codec.ceil);
     log_line("stream: media MTU %u, SBC frame %d bytes, %d frames/packet, bitpool %d "
              "(adapts %d-%d)", mtu, pk.fsz, pk.per_pkt, sbc_encoder_bitpool(enc),
              pk.rate.lo, pk.rate.hi);
@@ -1344,45 +1892,73 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
         }
     }
 
+    hb_eq_init(&eq);
     CTL_LOCK(&g_ctl);
+    eq_seq = g_ctl.eq_seq;
+    hb_eq_set(&eq, g_ctl.eq_on, g_ctl.eq_db, scfg.sample_rate);
     gain_pct = g_ctl.gain_pct;
     muted = g_ctl.muted;
     tone = g_ctl.tone || tone_file;
     g_ctl.sample_rate = scfg.sample_rate;
     g_ctl.bitpool = av.bitpool;
+    snprintf(g_ctl.codec, sizeof g_ctl.codec, "%s", av.codec.name ? av.codec.name : "SBC");
+    g_ctl.codec_avail = av.codec.avail;
     CTL_UNLOCK(&g_ctl);
     log_line("stream: base gain %d%%%s%s", gain_pct, muted ? ", muted" : "",
              tone ? ", TEST TONE 1 kHz -6 dB" : "");
 
     write_status("connected %s", ini->name[0] ? ini->name : "-");
     ctl_set_state("streaming", ini->name);
-    notify("hearbridge: connected %s", ini->name[0] ? ini->name : "headphones");
+    if (!switched) notify("hearbridge: connected %s", ini->name[0] ? ini->name : "headphones");
+    else notify("HearBridge: now %s", av.codec.name ? av.codec.name : "SBC");
+    gain_limiter_reset();
     log_line("stream: streaming until stop file or link drop");
+    note_event("Playing on %s — %s %d kHz", ini->name[0] ? ini->name : "headset",
+               av.codec.name ? av.codec.name : "SBC", pk.rate_hz / 1000);
 
+    samples = 0;
+    xq_bad_s = xq_low_s = 0;
+    xq_drops = btlink_tx_dropped(link);
     t_start = t_stat = now_ms();
+    memcpy(g_stream_addr, ini->addr, 6);
+    g_switch_req = 0;
+    g_stream_up = 1;
     for (;;) {
-        int nframes, req_vol = -1, req_disc = 0, changed = 0;
+        int nframes, req_vol = -1, req_disc = 0, changed = 0, req_codec = -1;
         float peak = 0.f;
         long now, ahead_ms;
 
         if (hb_stop_requested()) { rc = RUN_STOP; break; }
         if (btlink_pump(link, 1) < 0 || !btlink_is_up(link)) {
-            log_line("stream: link dropped");
-            rc = RUN_DROPPED;
+            /* 0x13 remote user / 0x08 supervision: buds went in the case
+             * (or just died). That is a disconnect, not a reason to page. */
+            int dr = btlink_last_disc_reason();
+            if (dr == 0x13 || dr == 0x08) {
+                note_event("stream: headset went away");
+                set_why("away");
+                rc = RUN_AWAY;
+            } else {
+                note_event("stream: link dropped");
+                set_why("dropped");
+                rc = RUN_DROPPED;
+            }
             break;
         }
         if (av.remote_closed) {
-            log_line("stream: headset closed the stream");
+            note_event("stream: headset closed the stream");
+            set_why("closed");
             rc = RUN_DROPPED;
             break;
         }
         if (!btlink_chan_is_open(link, av.media_scid)) {
-            log_line("stream: headset closed the media channel");
+            note_event("stream: headset closed the media channel");
+            set_why("closed");
             rc = RUN_DROPPED;
             break;
         }
         if (btlink_ms_since_credit(link) > 4000) {
-            log_line("stream: no packet acknowledged for 4 s — link lost");
+            note_event("stream: no packet acknowledged for 4 s — link lost");
+            set_why("quiet");
             rc = RUN_DROPPED;
             break;
         }
@@ -1392,25 +1968,121 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             int v = btlink_avrcp_volume(link, &changed);
             avst = btlink_avrcp_state(link);
             CTL_LOCK(&g_ctl);
+            if (g_ctl.req_reset) {
+                g_ctl.req_reset = 0;
+                CTL_UNLOCK(&g_ctl);
+                note_event("link: reset");
+                btlink_disconnect(link);   /* our handle only */
+                set_why("off");
+                rc = RUN_AWAY;
+                break;
+            }
+            if (!vol_applied && (avst & 1) && (avst & 6)) {
+                /* Volume control is up: the volume this headset was left at
+                 * by the user, else 50 %. A page move meanwhile wins. */
+                vol_applied = 1;
+                if (g_ctl.req_hs_volume < 0) {
+                    g_ctl.req_hs_volume = hb_prefs_hs_volume(&g_prefs);
+                    vol_auto = 1;
+                }
+            }
             req_vol = g_ctl.req_hs_volume;
             g_ctl.req_hs_volume = -1;
             req_disc = g_ctl.req_disconnect;
             g_ctl.req_disconnect = 0;
-            if (changed || (avst & 1)) g_ctl.hs_volume = (avst & 3) ? v : -1;
+            /* Bit 0: channel open, or the headset has registered / reported
+             * volume (avrcp_reported). Same test as the status chip, so a
+             * live percentage cannot sit next to "not connected". */
+            if (avst & 1) g_ctl.hs_volume = v;
+            else g_ctl.hs_volume = -1;
             if (req_vol >= 0) g_ctl.hs_volume = req_vol;
-            hs_vol = (avst & 2) || req_vol >= 0 ? g_ctl.hs_volume : -1;
+            /* The headset applies its own volume (it took SetAbsoluteVolume or
+             * answered our registration): software gain stays at the base,
+             * else the level would be lowered twice. Otherwise the headset
+             * volume scales the software gain. */
+            hs_vol = (avst & 8) ? -1 : (avst & 2) || req_vol >= 0 ? g_ctl.hs_volume : -1;
             gain_pct = g_ctl.gain_pct;
             muted = g_ctl.muted;
             tone = g_ctl.tone || tone_file;
-            pk.queue_ms = g_ctl.stable ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+            if (hb_latency_clamp(g_ctl.latency_ms) != pk.queue_ms) {
+                pk.queue_ms = hb_latency_clamp(g_ctl.latency_ms);
+                lat_changed = 1;
+            }
+            if (g_ctl.codec_pref != want_codec) req_codec = g_ctl.codec_pref;
+            if (g_ctl.eq_seq != eq_seq) {
+                int on = g_ctl.eq_on, db[HB_EQ_NB];
+                memcpy(db, g_ctl.eq_db, sizeof db);
+                eq_seq = g_ctl.eq_seq;
+                hb_eq_set(&eq, on, db, scfg.sample_rate);
+            }
             g_ctl.avrcp = avst;
             CTL_UNLOCK(&g_ctl);
             if (changed) log_line("stream: headset volume %d/127 -> gain", v);
-            if (req_vol >= 0) btlink_avrcp_set_volume(link, req_vol);
+            if (req_vol >= 0) {
+                btlink_avrcp_set_volume(link, req_vol);
+                if (vol_auto) {
+                    log_line("stream: headset volume %d/127 (%s)", req_vol,
+                             g_prefs.hs_vol >= 0 ? "set by you before" : "default 50%");
+                    vol_auto = 0;
+                } else if (g_prefs_have && g_prefs.hs_vol != req_vol) {
+                    g_prefs.hs_vol = req_vol;      /* moved on the page: kept for it */
+                    prefs_save();
+                }
+            }
             gain_milli = ctl_effective_gain_milli(gain_pct, muted, hs_vol);
+            if (lat_changed) {
+                /* New latency target: packet size and queue follow now. */
+                int pkt_ms;
+                lat_changed = 0;
+                packer_size(&pk);
+                pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
+                btlink_set_media_cap(link, hb_media_queue_cap(pkt_ms, pk.queue_ms));
+                log_line("stream: latency target %d ms — %d frames/packet, media queue %d packets (~%d ms)",
+                         pk.queue_ms, pk.per_pkt, btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
+            }
+        }
+        if (req_codec >= 0) {
+            log_line("stream: codec %s picked on the page", hb_codec_key(req_codec));
+            cs_want = req_codec;
+            cs_no_xq = g_prefs.auto_no_xq;
+        }
+        if (cs_want >= 0) {
+            /* New codec = new AVDTP configuration. Done on the open link
+             * (no disconnect: some headsets, the Xbox one included, do not
+             * answer pages for minutes after we drop them). */
+            int ok;
+            persist_gain_if_dirty();
+            ok = codec_switch_in_place(&av, link, cs_want, cs_no_xq);
+            want_codec = cs_want;
+            cs_want = -1;
+            if (ok) {
+                sbc_encoder_close(enc);
+                enc = NULL;
+                switched = 1;
+                goto stream_setup;
+            }
+            note_event("stream: codec switch lost the link — paging the headset again");
+            memset(&g_pending, 0, sizeof g_pending);
+            g_pending.kind = CMD_RECONNECT;
+            rc = RUN_SWITCH;
+            break;
+        }
+        if (g_switch_req) {
+            int bi = paired_find(g_paired, g_npaired, g_switch_addr);
+            long age = acl_track_request_age(g_switch_addr, now_ms());
+            if (bi >= 0 && age >= 0 && age < ACL_REQ_PENDING_MS) {
+                memcpy(switch_from, ini->addr, 6);
+                note_event("switching to %s — %s disconnected",
+                           g_paired[bi].name[0] ? g_paired[bi].name : "the other headset",
+                           ini->name[0] ? ini->name : "the headset");
+                rc = RUN_SWITCH_IN;
+                break;
+            }
+            g_switch_req = 0;                  /* gone meanwhile */
         }
         if (req_disc) {
-            log_line("stream: Disconnect requested from the web page");
+            note_event("Disconnected");
+            set_why("off");
             rc = RUN_PAUSED;
             break;
         }
@@ -1445,13 +2117,20 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             if (muted) memset(pcm, 0, (size_t)nframes * 4);
             out_peak = muted ? 0 : 500;
         } else {
-            int op = gain_apply_soft(pcm, nframes * 2, gain_milli);
+            int op = gain_apply_soft_eq(pcm, nframes * 2, gain_milli, &eq);
             if (op > out_peak) out_peak = op;
         }
         if (!packer_feed(&pk, pcm, nframes)) break;
         samples += nframes;
 
         if (now - t_stat >= 1000) {
+            {
+                int pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
+                int q10 = pk.bl_n > 0 ? (int)(pk.bl_sum * 10 / pk.bl_n) : 0;
+                hb_latency_estimate(&lat, pkt_ms, q10, (int)btlink_acl_gap_avg(link),
+                                    av.delay_on ? av.sink_delay_x10 : 0);
+                pk.bl_sum = pk.bl_n = 0;
+            }
             log_line("stream: pkts=%ld sbc=%ld reads ok=%ld empty=%ld peak=%.4f "
                      "out=%.3f gain=%.2f hs=%d backlog=%d bitpool=%d frames/pkt=%d (mtu %d, frame %d B) dropped=%ld",
                      pk.pkts, pk.frames,
@@ -1471,8 +2150,55 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
             g_ctl.bitpool_lo = pk.rate.lo;
             g_ctl.bitpool_hi = pk.rate.hi;
             g_ctl.uptime_s = (now - t_start) / 1000;
+            g_ctl.lat_total = lat.total_ms;
+            g_ctl.lat_capture = lat.capture_ms;
+            g_ctl.lat_packet = lat.packet_ms;
+            g_ctl.lat_queue = lat.queue_ms;
+            g_ctl.lat_radio = lat.radio_ms;
+            g_ctl.lat_sink = lat.sink_ms;
+            g_ctl.lat_sink_reported = lat.sink_reported;
             CTL_UNLOCK(&g_ctl);
             tune_link(&pk, now);
+            if (hb_rate_settled(&pk.rate, now)) {
+                int bp = sbc_encoder_bitpool(enc);
+                if (bp > 0 && (bp != g_prefs.held_bp || av.codec.codec != g_prefs.held_codec)) {
+                    if (++settle_s >= 15) {
+                        g_prefs.held_codec = av.codec.codec;
+                        g_prefs.held_bp = bp;
+                        prefs_save();
+                        log_line("prefs: this link holds %s at bitpool %d",
+                                 hb_codec_key(av.codec.codec), bp);
+                    }
+                }
+            } else {
+                settle_s = 0;
+            }
+            if (want_codec == HB_CODEC_AUTO && av.codec.codec == HB_CODEC_SBC_XQ) {
+                /* Auto picked SBC-XQ but the link cannot carry it: still
+                 * dropping at the bottom of the range for 10 s. Remember that
+                 * for this headset and reconnect with plain SBC. */
+                long d = btlink_tx_dropped(link);
+                xq_bad_s = (d > xq_drops && pk.rate.cur <= pk.rate.lo + 2) ? xq_bad_s + 1 : 0;
+                xq_drops = d;
+                /* Holding but far below its 38: dual channel at under 30 per
+                 * channel sounds worse than joint stereo SBC at 51-53. */
+                xq_low_s = pk.rate.cur < HB_XQ_LOW_BP ? xq_low_s + 1 : 0;
+                if (xq_low_s >= 30) {
+                    note_event("SBC-XQ stuck at bitpool %d (under %d)", pk.rate.cur, HB_XQ_LOW_BP);
+                    CTL_LOCK(&g_ctl);
+                    g_ctl.xq_low = 1;
+                    CTL_UNLOCK(&g_ctl);
+                    xq_bad_s = 10;
+                }
+                if (xq_bad_s >= 10) {
+                    note_event("SBC-XQ unstable here — Auto uses SBC for this headset");
+                    g_prefs.auto_no_xq = 1;
+                    prefs_save();
+                    cs_want = HB_CODEC_AUTO;      /* switched in place on the next pass */
+                    cs_no_xq = 1;
+                    xq_bad_s = 0;
+                }
+            }
             peak_seen = 0.f;
             out_peak = 0;
             t_stat = now;
@@ -1485,7 +2211,15 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
                 hb_cmd c;
                 if (poll_cmd(&c, ini)) {
                     int same = c.kind == CMD_ADDR && !memcmp(c.addr, ini->addr, 6);
-                    if (!same && c.kind != CMD_NONE) {
+                    if (c.kind == CMD_FORGET_CUR) {
+                        note_event("Forget: disconnecting %s", ini->name[0] ? ini->name : "the headset");
+                        memcpy(forget_addr, c.addr, 6);
+                        rc = RUN_FORGOT;
+                        break;
+                    } else if (c.kind == CMD_SCAN) {
+                        /* A refresh asks for a scan. Don't drop a live headset for it. */
+                        log_line("scan: headset is up — not dropping it");
+                    } else if (!same && c.kind != CMD_NONE) {
                         log_line("stream: switching on request from the page — closing the current headset first");
                         if (c.kind == CMD_ADDR) want_device(c.addr);
                         g_pending = c;
@@ -1498,8 +2232,8 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     }
     log_line("stream: ended — pkts=%ld sbc=%ld reads ok=%ld empty=%ld",
              pk.pkts, pk.frames, reads_ok, reads_empty);
-    if (rc == RUN_DROPPED) {
-        write_status("disconnected waiting for %s", ini->name[0] ? ini->name : "-");
+    if (rc == RUN_DROPPED || rc == RUN_AWAY) {
+        write_status("disconnected");
         ctl_set_state("disconnected", ini->name);
     }
 
@@ -1509,7 +2243,7 @@ done:
     if (av.link) avdtp_teardown(&av);
     if (link) {
         btlink_disconnect(link);
-        if (rc == RUN_SWITCH) {
+        if (rc == RUN_SWITCH || rc == RUN_SWITCH_IN) {
             /* Only one headset at a time: wait for the old link to be gone. */
             log_line("switch: old headset %s", btlink_last_close_confirmed()
                      ? "disconnected (confirmed)" : "close not confirmed — waiting 1 s");
@@ -1517,7 +2251,72 @@ done:
         }
         btlink_destroy(link);
     }
-    if (rc == RUN_SWITCH) {
+    g_stream_up = 0;
+    set_target(NULL);
+    if (rc == RUN_DROPPED || rc == RUN_AWAY || rc == RUN_PAUSED || rc == RUN_SWITCH_IN) {
+        /* Turned off / out of range / case, or Disconnect pressed: AVDTP,
+         * AVRCP, L2CAP and our ACL handle went with the link above. Clear what outlives it, so the
+         * next connection starts clean; the key and settings stay saved. */
+        if (ini->ok) acl_track_request_clear(ini->addr);   /* a call from before the drop */
+        g_av_fail_ms = 0;
+        g_kept_link = 0;
+        if (g_cs.step != HB_CS_IDLE) {
+            log_line("stream: codec switch state cleared by the drop");
+            g_cs.step = HB_CS_IDLE;
+        }
+        log_line("stream: link state cleared (headset stays saved)");
+    }
+    if (rc == RUN_FORGOT) {
+        /* AVDTP closed, L2CAP closed, our ACL disconnected (0x13) and its
+         * Disconnection Complete waited for above: now delete it. */
+        log_line("saved: forgot a device (the current one) — after %s disconnect",
+                 btlink_last_close_confirmed() == 1 ? "a confirmed" : "an unconfirmed");
+        forget_device(forget_addr, ini, 1);
+        note_event("Forgot the headset");
+        memset(&g_pending, 0, sizeof g_pending);
+        g_pending.kind = CMD_SCAN;         /* show the chooser, as before */
+        write_status("scanning");
+        ctl_set_state("scanning", NULL);
+        CTL_LOCK(&g_ctl);
+        g_ctl.device[0] = 0;
+        CTL_UNLOCK(&g_ctl);
+    }
+    if (rc == RUN_SWITCH_IN) {
+        /* A is fully down (same teardown as Disconnect) and held so it does
+         * not call back over B. Now take B's waiting call. */
+        int bi = paired_find(g_paired, g_npaired, g_switch_addr);
+        hold_add(switch_from);
+        g_switch_req = 0;
+        rc = RUN_SWITCH;
+        if (bi >= 0) {
+            headset_ini b = g_paired[bi];
+            btlink *bl = NULL;
+            unsigned bpsm = 0;
+            b.ok = b.have_addr = 1;
+            set_target(b.addr);
+            if (listen_saved(hci, &b, &bl, &bpsm, 3000)) {
+                *ini = b;
+                keep_identity(ini);
+                if (!headset_ini_save(ini)) log_line("saved: cannot write headset.ini");
+                remember_device(ini);
+                publish_saved(ini);
+                g_ready = bl;
+                g_ready_psm = bpsm;
+                log_line("switch: %s is up", ini->name[0] ? ini->name : "the new headset");
+            } else {
+                log_line("switch: its call is gone — paging it");
+                memset(&g_pending, 0, sizeof g_pending);
+                g_pending.kind = CMD_ADDR;
+                memcpy(g_pending.addr, b.addr, 6);
+            }
+            set_target(NULL);
+        }
+        if (!g_ready) {
+            write_status("disconnected %s", ini->name[0] ? ini->name : "-");
+            publish_saved(NULL);
+            ctl_set_state("connecting", NULL);
+        }
+    } else if (rc == RUN_SWITCH) {
         write_status("disconnected %s", ini->name[0] ? ini->name : "-");
         publish_saved(NULL);
         ctl_set_state("connecting", NULL);
@@ -1565,6 +2364,64 @@ static void bt_failed_wait(const char *status)
     while (!hb_stop_requested()) usleep(500 * 1000);
 }
 
+
+/* 1 = g_ready is up. 2 = the page asked for something. 0 = stop. */
+static int gentle_rejoin(hci_t hci, headset_ini *ini)
+{
+    int pages = 0;
+    log_line("rejoin: waiting for the headset to connect in");
+    note_event("rejoin: waiting for the headset to connect in");
+    write_status("disconnected waiting for %s", ini->name[0] ? ini->name : "-");
+    ctl_set_state("disconnected", ini->name);
+    for (;;) {
+        int listen, left, sit;
+        if (hb_stop_requested()) return 0;
+        {
+            int go = 0, reset = 0;
+            CTL_LOCK(&g_ctl);
+            reset = g_ctl.req_reset;
+            CTL_UNLOCK(&g_ctl);
+            if (reset) return 0;          /* idle path clears our page / ACL */
+            CTL_LOCK(&g_ctl);
+            go = g_ctl.req_connect;
+            g_ctl.req_connect = 0;
+            if (go) g_ctl.paused = 0;
+            CTL_UNLOCK(&g_ctl);
+            if (go && !g_pending.kind) {
+                (void)poll_cmd(&g_pending, ini);
+                if (!g_pending.kind) g_nhold = 0;
+            }
+            if (!go && poll_cmd(&g_pending, ini)) go = 1;
+            if (go) {
+                g_user_connect = 1;
+                return 2;
+            }
+        }
+        sit = !hb_re_paging(pages);
+        listen = sit ? 8000 : hb_re_listen_ms(pages);
+        for (left = listen; left > 0; ) {
+            int slice = left > 5000 ? 5000 : left;
+            if (listen_saved(hci, ini, &g_ready, &g_ready_psm, slice)) {
+                note_event("rejoin: headset connected in");
+                return 1;
+            }
+            if (hb_stop_requested() || cmd_waiting()) break;
+            left -= slice;
+            if (sit) break;
+        }
+        if (hb_stop_requested()) return 0;
+        if (cmd_waiting()) continue;          /* a pick: checked at the top */
+        if (sit) continue;
+        pages++;
+        log_line("rejoin: gentle page %d of %d", pages, HB_RE_PAGES);
+        g_user_connect = 0;
+        if (try_saved(hci, ini, &g_ready, &g_ready_psm, HB_PAGE_MS)) {
+            note_event("rejoin: gentle page worked");
+            return 1;
+        }
+    }
+}
+
 int main(void)
 {
     hci_t hci;
@@ -1588,13 +2445,25 @@ int main(void)
     diag_init(NULL);           /* file path set once we own the lock */
     diag_set("hearbridge", "%s (one build for all firmwares, compiled %s)", HEARBRIDGE_VERSION,
              __DATE__);
-    lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
+    /* A newly sent ELF always wins, whatever version is running (same
+     * one included): the old instance is asked to stop (stop file +
+     * SIGTERM; it closes the headset, the page and the Bluetooth device),
+     * killed if it has not stopped after 10 s, and this one starts. */
+    {
+        long old_pid = 0;
+        lock_rc = lock_take_over(LOCK_PATH, HB_STOP_PATH, 10000, 3000, &lock_errno, &old_pid);
+        if (old_pid && lock_rc != LOCK_BUSY) {
+            log_line("HearBridge PS5 %s: replaced the running instance (pid %ld)", HEARBRIDGE_VERSION, old_pid);
+            notify("HearBridge %s: replaced the running copy", HEARBRIDGE_VERSION);
+            usleep(500 * 1000);   /* let the controller settle after its teardown */
+        }
+    }
     if (lock_rc == LOCK_BUSY) {
-        /* Running the ELF again still brings back a deleted icon. */
-        log_line("HearBridge PS5 %s: another instance is running; refreshing the home-screen icon only",
+        /* Could not stop it: still bring back a deleted icon. */
+        log_line("HearBridge PS5 %s: the running instance would not stop; refreshing the home-screen icon only",
                  HEARBRIDGE_VERSION);
         home_tile(1);
-        notify("HearBridge: already running");
+        notify("HearBridge: already running and could not be stopped. Use Stop on the page, then run it again.");
         log_close();
         return 1;
     }
@@ -1618,14 +2487,19 @@ int main(void)
     snprintf(g_ctl.saved_path, sizeof g_ctl.saved_path, "%s", SAVED_JSON);
     g_ctl.gain_pct = read_gain_pct();
     log_line("volume: base gain %d%% (%s)", g_ctl.gain_pct, GAIN_PATH);
-    g_ctl.stable = read_stable();
-    log_line("latency: %s mode (%s)", g_ctl.stable ? "stable" : "low-latency", LATENCY_PATH);
+    /* The old global mode file is the default for headsets without
+     * their own setting yet. */
+    g_ctl.latency_ms = HB_LAT_DEFAULT_MS;
+    log_line("latency: default target %d ms for a new headset", g_ctl.latency_ms);
     {
         char url[64];
         int port;
         a2dp_inquiry_abort = cmd_waiting;
         a2dp_inquiry_progress = inquiry_progress;
         btlink_abort_connect = btlink_forget_abort;
+        btlink_press_is_for = press_is_for;
+        btlink_saved_peer = saved_peer;
+        hci_usb_conn_req_hook = conn_req_hook;
         btlink_on_acl_up = on_acl_up;
         port = http_start(&g_ctl, url, (int)sizeof url);
         if (port) {
@@ -1674,7 +2548,7 @@ int main(void)
     }
 
     memset(&opts, 0, sizeof opts);
-    opts.inquiry_seconds = 10;
+    opts.inquiry_seconds = 3;
     if (ini.have_addr) memcpy(opts.prefer_addr, ini.addr, 6);
     asess = a2dp_open(hci, &opts);
     if (!asess) {
@@ -1693,20 +2567,31 @@ int main(void)
         int paused;
         persist_gain_if_dirty();
         if (r == RUN_STOP) { rc = 0; break; }
-        if (r == RUN_SWITCH) continue;
+        if (r == RUN_SWITCH || r == RUN_FORGOT) continue;   /* g_pending: the next step */
         CTL_LOCK(&g_ctl);
         paused = g_ctl.paused;
         g_ctl.req_connect = 0;
         CTL_UNLOCK(&g_ctl);
-        /* Manual only: idle until the user presses Connect (or picks a
-         * device / Scan). No background paging, no auto-reconnect. */
+        /* A Disconnect on the page stays idle. A drop does not page hard:
+         * listen, a few short pages, then sit until the headset connects in. */
         if ((r == RUN_PAUSED || paused) && ini.ok) hold_add(ini.addr);
         if (r == RUN_DROPPED) {
             g_want_until = 0;
             notify("HearBridge: connection lost");
         }
+        /* Case / power-off (RUN_AWAY): stay disconnected and listen.
+         * Don't page a headset that just went away. */
+        if (r == RUN_DROPPED && !paused && ini.ok && !held(ini.addr)) {
+            int j = gentle_rejoin(hci, &ini);
+            if (j == 1) continue;
+            if (hb_stop_requested()) { rc = 0; break; }
+            if (j == 2) {
+                (void)headset_ini_load(&ini);
+                continue;
+            }
+        }
         publish_saved(NULL);
-        if (r == RUN_PAUSED || paused || r == RUN_DROPPED || !g_ctl.detail[0] ||
+        if (r == RUN_PAUSED || paused || r == RUN_DROPPED || r == RUN_AWAY || !g_ctl.detail[0] ||
             strncmp(g_ctl.detail, "error", 5)) {
             write_status("disconnected");
             ctl_set_state("disconnected", NULL);
@@ -1717,7 +2602,15 @@ int main(void)
         g_ctl.device[0] = 0;
         CTL_UNLOCK(&g_ctl);
         log_line("hearbridge: idle — waiting for Connect");
+        if (g_npaired || ini.ok) btlink_page_scan_hold(hci, 1);   /* once for the idle period */
         {
+            /* Auto-connect: headsets that page us on power-on are accepted
+             * (listen below). For ones that only wait to be paged: one short
+             * page of the most recent saved headset every 12 s, for 10 min,
+             * never after a manual Disconnect or a case close (it pages us
+             * itself when it comes out), never while a page command waits. */
+            long idle_t0 = now_ms(), next_auto = now_ms() + 12000;
+            int auto_ok = r != RUN_AWAY;
             for (;;) {
                 int go;
                 if (hb_stop_requested()) break;
@@ -1738,10 +2631,65 @@ int main(void)
                     g_user_connect = 1;
                     break;
                 }
+                {
+                    int reset = 0;
+                    CTL_LOCK(&g_ctl);
+                    reset = g_ctl.req_reset;
+                    if (reset) g_ctl.req_reset = 0;
+                    CTL_UNLOCK(&g_ctl);
+                    if (reset && ini.ok) {
+                        unsigned h = acl_track_handle(ini.addr);
+                        btlink *rl = btlink_create(hci, 1021, 7);
+                        if (hci.ops && hci.ops->cmd)
+                            hci.ops->cmd(hci.ctx, 0x0402, NULL, 0); /* our inquiry */
+                        if (rl) {
+                            if (hci.ops && hci.ops->cmd)
+                                hci.ops->cmd(hci.ctx, 0x0408, ini.addr, 6); /* our page */
+                            if (h) btlink_drop_handle(rl, h, 800); /* this headset only */
+                            btlink_destroy(rl);
+                        }
+                        note_event("link: reset");
+                        log_line("link: reset our page and our headset ACL only");
+                    }
+                }
                 persist_gain_if_dirty();
-                idle_pump(hci, 100);
+                if (g_npaired || ini.ok) {
+                    btlink *back = NULL;
+                    unsigned bpsm = 0;
+                    if (answer_saved_calls(hci, &ini, &back, &bpsm) ||
+                        listen_any_saved(hci, &ini, &back, &bpsm, 400)) {
+                        g_ready = back;
+                        g_ready_psm = bpsm;
+                        break;
+                    }
+                } else {
+                    idle_pump(hci, 100);
+                }
+                CTL_LOCK(&g_ctl);
+                paused = g_ctl.paused;
+                CTL_UNLOCK(&g_ctl);
+                if (auto_ok && !paused && ini.ok && !held(ini.addr) && !cmd_waiting() &&
+                    now_ms() >= next_auto && now_ms() - idle_t0 < 600000) {
+                    btlink *back = NULL;
+                    unsigned bpsm = 0;
+                    log_line("auto: one background page of %s", ini.name[0] ? ini.name : "the saved headset");
+                    g_user_connect = 0;
+                    btlink_page_scan_hold(hci, 0);
+                    if (try_saved(hci, &ini, &back, &bpsm, HB_PAGE_MS)) {
+                        note_event("auto: %s turned on — connecting", ini.name[0] ? ini.name : "headset");
+                        g_ready = back;
+                        g_ready_psm = bpsm;
+                        break;
+                    }
+                    btlink_page_scan_hold(hci, 1);
+                    set_why("");
+                    write_status("disconnected");
+                    ctl_set_state("disconnected", NULL);
+                    next_auto = now_ms() + 12000;   /* 12 s after this attempt ended */
+                }
             }
         }
+        btlink_page_scan_hold(hci, 0);                          /* put back once */
         if (hb_stop_requested()) { rc = 0; break; }
         (void)headset_ini_load(&ini);
         continue;

@@ -6,6 +6,7 @@
 #include "hci_cmd.h"
 #include "log.h"
 #include "util.h"
+#include "rate.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,6 +116,8 @@ struct btlink {
     int retry_create; /* set on ACL-already-exists 0x0b */
     int create_retries;
     int purge_fail; /* Disconnect transport/errno fail — stop cleanly */
+    int disc_wait;  /* L2CAP DISC_REQs sent, DISC_RSP not seen yet */
+    int join_logged;
     unsigned pending_disc; /* handle we are waiting Disconnection Complete for */
     int pending_disc_done;
     int need_drop; /* set in on_event on 0x0b; connect loop performs drop */
@@ -129,9 +132,27 @@ struct btlink {
 };
 
 static int g_connect_fail;
+/* Saved headset whose last accept as central failed: next accept keeps
+ * the peripheral role (no role switch). */
+static unsigned char g_acc_peri_addr[6];
+static int g_acc_peri;
+static int g_disc_reason;     /* HCI reason of the last drop of OUR link */
 
 /* Last successful ACL handle (this process). Used to drop stale links. */
 static unsigned g_last_acl_handle;
+static unsigned g_last_acl_epoch;   /* acl_track epoch when it came up */
+
+/* The remembered own handle is only ours while nothing disconnected (or
+ * reconnected) it since. Its Disconnection Complete may have been read by
+ * another pump (idle, inquiry) or the system: then forget it, never send a
+ * Disconnect to a handle that may belong to a pad now. */
+static void last_handle_check(void)
+{
+    if (g_last_acl_handle && acl_track_handle_epoch(g_last_acl_handle) != g_last_acl_epoch) {
+        log_line("btlink: own ACL %#05x is already gone — forgetting it", g_last_acl_handle);
+        g_last_acl_handle = 0;
+    }
+}
 static int g_close_confirmed = -1; /* -1 never closed, 0 unconfirmed, 1 ok */
 
 static int same_addr(const unsigned char a[6], const unsigned char b[6])
@@ -293,6 +314,7 @@ static int sig_send(btlink *l, unsigned char code, unsigned char id,
 {
     unsigned char cmd[64];
 
+    if (!l->connected) return 0;         /* never signal on a dead link */
     if (len < 0 || len + 4 > (int)sizeof cmd) return 0;
     cmd[0] = code;
     cmd[1] = id;
@@ -458,11 +480,11 @@ static void chan_close_disc(btlink *l, chan *c)
 {
     unsigned char r[4];
     if (!c || c->st == CH_CLOSED) return;
-    if (c->dcid &&
+    if (c->dcid && l->connected &&      /* link gone: close locally, nothing to send */
         (c->st == CH_OPEN || c->st == CH_CONFIG || c->st == CH_CONNECTING)) {
         put16(r, c->dcid);
         put16(r + 2, c->scid);
-        sig_send(l, L2SIG_DISC_REQ, next_sig_id(l), r, 4);
+        if (sig_send(l, L2SIG_DISC_REQ, next_sig_id(l), r, 4)) l->disc_wait++;
         log_line("l2cap: DISC_REQ PSM %#x scid %#x dcid %#x",
                  c->psm, c->scid, c->dcid);
     }
@@ -514,6 +536,13 @@ static void sdp_reply_inbound(btlink *l, chan *c, const unsigned char *d, int le
     if (len < 5 || c->st != CH_OPEN) return;
     if (c->peer_mtu >= 48 && (int)c->peer_mtu < max) max = (int)c->peer_mtu;
     n = sdp_server_handle(d, len, rsp, max);
+    {
+        char hx[3 * 32 + 1];
+        int i, m = len < 32 ? len : 32;
+        for (i = 0; i < m; i++) snprintf(hx + 3 * i, 4, "%02x ", d[i]);
+        hx[3 * m] = 0;
+        log_line("sdp: inbound request (%d bytes): %s", len, hx);
+    }
     if (n > 0 && l2_send_raw(l, c->dcid, rsp, n))
         log_line("sdp: request %#04x -> response %#04x (%d bytes)", d[0], rsp[0], n);
 }
@@ -762,6 +791,8 @@ static void on_signaling(btlink *l, const unsigned char *d, int len)
             break;
 
         case L2SIG_DISC_RSP:
+            if (l->disc_wait > 0) l->disc_wait--;
+            break;
         case L2SIG_ECHO_RSP:
             break;
 
@@ -1007,13 +1038,14 @@ static int drop_known_handles(btlink *l, unsigned hint)
     int n = 0, i, rc, got = 0;
 
     (void)hint; /* handle field of a failed Connection Complete is not ours */
+    last_handle_check();
     if (l->connected) cand_add(cands, &n, 2, l->handle);
     if (g_last_acl_handle && g_last_acl_handle != l->handle)
         cand_add(cands, &n, 2, g_last_acl_handle);
 
     if (n == 0) {
         log_line("btlink: no ACL owned by this app — nothing to drop");
-        return 0;
+        return 1;
     }
     log_line("btlink: dropping %d ACL handle(s) owned by this app", n);
     for (i = 0; i < n; i++) {
@@ -1024,7 +1056,36 @@ static int drop_known_handles(btlink *l, unsigned hint)
     }
     if (got)
         log_line("btlink: own ACL dropped");
-    return 0;
+    return 0;   /* something was dropped: let the controller settle */
+}
+
+/* Page scan for the whole idle period: read and set once when idle starts,
+ * put back once when it ends (not every listen slice). */
+static int g_ps_held, g_ps_old = -1;
+void btlink_page_scan_hold(hci_t hci, int on)
+{
+    unsigned char cc[16], se;
+    int cc_len = 0;
+    if (on && !g_ps_held) {
+        g_ps_old = -1;
+        if (hci_cmd_sync(hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) &&
+            cc_len >= 7)
+            g_ps_old = cc[6];
+        if (g_ps_old < 0) return;         /* no answer: listen slices handle it themselves */
+        if (!(g_ps_old & 0x02)) {
+            se = (unsigned char)(g_ps_old | 0x02);
+            if (!hci_cmd_sync(hci, HB_OP_WRITE_SCAN_ENABLE, &se, 1, NULL, NULL, 0)) return;
+        }
+        g_ps_held = 1;
+        log_line("btlink: page scan on for idle (was %#x)", g_ps_old);
+    } else if (!on && g_ps_held) {
+        g_ps_held = 0;
+        if (g_ps_old >= 0 && !(g_ps_old & 0x02)) {
+            se = (unsigned char)g_ps_old;
+            (void)hci_cmd_sync(hci, HB_OP_WRITE_SCAN_ENABLE, &se, 1, NULL, NULL, 0);
+        }
+        log_line("btlink: page scan restored after idle (%#x)", g_ps_old);
+    }
 }
 
 /* Public: best-effort drop before CREATE (connect start). */
@@ -1035,9 +1096,13 @@ int btlink_drop_stale(btlink *l, const unsigned char addr[6])
     if (addr) memcpy(l->addr, addr, 6);
     l->purge_fail = 0;
     log_line("btlink: checking for an ACL left by this app");
-    if (drop_known_handles(l, 0) < 0) {
-        log_line("btlink: preemptive drop aborted (transport)");
-        return 0;
+    {
+        int dr = drop_known_handles(l, 0);
+        if (dr < 0) {
+            log_line("btlink: preemptive drop aborted (transport)");
+            return 0;
+        }
+        if (dr == 1) return 1;     /* nothing dropped: no settle wait, page at once */
     }
     w = now_ms() + 400;
     while (now_ms() < w) {
@@ -1064,6 +1129,14 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
             } else {
                 log_line("btlink: CREATE_CONNECTION status %#04x", ev[2]);
             }
+        } else if ((rop == 0x0409 || rop == 0x040A) && ev[2] != 0) {
+            /* Accept / Reject refused (request already gone: 0x02). */
+            log_line("btlink: %s Connection Request: status %#04x",
+                     rop == 0x0409 ? "Accept" : "Reject", ev[2]);
+            if (rop == 0x0409 && l->acc_got && !l->connected) {
+                l->cc_fail = ev[2];
+                acl_track_request_clear(l->addr);
+            }
         } else if (rop == HB_OP_AUTH_REQUESTED && ev[2] != 0) {
             log_line("btlink: AUTH cmd-status %#04x — will retry", ev[2]);
             l->auth_sent = 0;
@@ -1072,9 +1145,11 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
         return;
     }
 
-    if (ev[0] == 0x04 && nEv >= 12 && l->acc_n && !l->connected && !l->acc_got &&
-        ev[11] == 0x01) {                 /* Connection Request, ACL */
+    if (ev[0] == 0x04 && nEv >= 12 && ev[11] == 0x01) {   /* Connection Request, ACL */
         int k;
+        /* Requests this link does not take are answered by the
+         * transport hook (main: accept / switch / reject), not here. */
+        if (!l->acc_n || l->connected || l->acc_got) return;
         for (k = 0; k < l->acc_n; k++) {
             if (!same_addr(ev + 2, l->acc_addr[k])) continue;
             {
@@ -1087,10 +1162,16 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
                 l->fresh_pair = 0;
                 l->acc_got = k + 1;
                 memcpy(ap, ev + 2, 6);
-                ap[6] = 0x00;             /* become central: we stream */
+                /* Become central: we stream, and the radio is already central
+                 * to the pads (no scatternet). The Xbox headset took this
+                 * role switch in the 12 log. A headset that failed it last
+                 * time is accepted as peripheral instead. */
+                ap[6] = (g_acc_peri && same_addr(ev + 2, g_acc_peri_addr)) ? 0x01 : 0x00;
                 fire_cmd(l->hci, 0x0409, ap, 7);   /* Accept Connection Request */
+                acl_track_request_clear(ev + 2);  /* answered */
                 hci_addr_str(ev + 2, astr);
-                log_line("btlink: incoming connection from saved %s — accepting", astr);
+                log_line("btlink: incoming connection from saved %s — accepting (%s)", astr,
+                         ap[6] ? "stay peripheral" : "as central");
             }
             break;
         }
@@ -1111,13 +1192,21 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
                 l->retry_create = 1;
             } else {
                 l->cc_fail = ev[2];
+                if (l->acc_got && ev[2] != 0x10) {
+                    /* Accepted request failed (role switch refused etc.). */
+                    memcpy(g_acc_peri_addr, ev + 5, 6);
+                    g_acc_peri = 1;
+                    log_line("btlink: incoming link failed — next time without role switch");
+                }
             }
             return;
         }
         l->handle = le16(ev + 3) & 0x0FFF;
         l->connected = 1;
+        g_disc_reason = 0;
         l->t_conn = now_ms();
         g_last_acl_handle = l->handle;
+        g_last_acl_epoch = acl_track_handle_epoch(l->handle);
         log_line("btlink: ACL up handle %#05x", l->handle);
         if (btlink_on_acl_up) btlink_on_acl_up(l->addr);
         {
@@ -1158,9 +1247,10 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
         }
         if (l->connected && dh == (l->handle & 0x0FFF)) {
             log_line("btlink: disconnected (reason %#04x)", ev[5]);
+            g_disc_reason = ev[5];
             l->connected = 0;
-            if (g_last_acl_handle == dh) g_last_acl_handle = 0;
         }
+        if (g_last_acl_handle == dh) g_last_acl_handle = 0;   /* whichever link reads it */
         return;
     }
 
@@ -1398,6 +1488,25 @@ int btlink_pump(btlink *l, int timeout_ms)
 }
 
 int (*btlink_abort_connect)(const unsigned char addr[6]);
+int (*btlink_saved_peer)(const unsigned char addr[6]);
+
+void btlink_reject_request(hci_t hci, const unsigned char addr[6], unsigned char reason)
+{
+    unsigned char rp[7];
+    char astr[18];
+    memcpy(rp, addr, 6);
+    rp[6] = reason;                        /* 0x0D limited resources, 0x0F unacceptable */
+    (void)fire_cmd(hci, 0x040A, rp, 7);    /* Reject Connection Request */
+    acl_track_request_clear(addr);
+    hci_addr_str(addr, astr);
+    log_line("btlink: turned down a connection from saved %s (reason %#04x)", astr, reason);
+}
+
+int btlink_is_incoming(const btlink *l)
+{
+    return l && l->acc_got != 0;
+}
+int (*btlink_press_is_for)(const unsigned char addr[6]);
 void (*btlink_on_acl_up)(const unsigned char addr[6]);
 
 static void link_reset(btlink *l)
@@ -1440,6 +1549,7 @@ int btlink_adopt(btlink *l, unsigned handle, const unsigned char addr[6],
     l->auth_sent = l->enc_sent = 1;
     l->t_conn = now_ms();
     g_last_acl_handle = l->handle;
+    g_last_acl_epoch = acl_track_handle_epoch(l->handle);
     log_line("btlink: took over the pairing ACL %#05x (encrypted)", l->handle);
     put16(lp, l->handle);
     put16(lp + 2, 0x0001);                 /* role switch only, no sniff */
@@ -1458,6 +1568,7 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
     if (!l || n <= 0) return 0;
     if (n > 8) n = 8;
     link_reset(l);
+    l->join_logged = 0;
     memset(l->addr, 0, 6);
     l->acc_n = n;
     for (k = 0; k < n; k++) {
@@ -1465,7 +1576,25 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
         memcpy(l->acc_key[k], keys[k], 16);
         l->acc_kt[k] = key_types[k];
     }
-    if (hci_cmd_sync(l->hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) &&
+    /* A request from one of these headsets that arrived just before we
+     * started listening (its event is already read) is still pending at
+     * the controller: accept it now instead of waiting for another one.
+     * Unanswered, it blocks our page with 0x0b until it times out. */
+    for (k = 0; k < n; k++) {
+        long age = acl_track_request_age(l->acc_addr[k], now_ms());
+        if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(l->acc_addr[k])) {
+            unsigned char fake[12];
+            fake[0] = 0x04; fake[1] = 10;
+            memcpy(fake + 2, l->acc_addr[k], 6);
+            fake[8] = fake[9] = fake[10] = 0; fake[11] = 0x01;
+            log_line("btlink: request from this headset %ld ms ago still pending — accepting it", age);
+            on_event(l, fake, 12);
+            break;
+        }
+    }
+    if (g_ps_held) {
+        old = 0x02;                       /* idle already holds page scan on: no rewrite */
+    } else if (hci_cmd_sync(l->hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) &&
         cc_len >= 7)
         old = cc[6];
     if (old < 0 || !(old & 0x02)) {
@@ -1478,6 +1607,16 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
         if (btlink_abort_connect) {
             int stop = 0;
             for (k = 0; k < l->acc_n && !stop; k++) stop = btlink_abort_connect(l->acc_addr[k]);
+            if (stop && l->acc_got && btlink_press_is_for &&
+                btlink_press_is_for(l->acc_addr[l->acc_got - 1])) {
+                /* The same headset is connecting in right now: finish that
+                 * link instead of killing it and paging (that ends in 0x0b). */
+                if (!l->join_logged) {
+                    l->join_logged = 1;
+                    log_line("btlink: Connect pressed while this headset is connecting in — finishing the incoming link");
+                }
+                stop = 0;
+            }
             if (stop) {
                 log_line("btlink: listening stopped for a page command");
                 if (l->connected) {
@@ -1505,6 +1644,9 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
     if (ok) {
         if (which) *which = l->acc_got - 1;
         log_line("btlink: incoming link ready (encrypted)");
+        acl_track_request_clear(l->acc_addr[l->acc_got - 1]);
+    } else if (l->acc_got) {
+        acl_track_request_clear(l->acc_addr[l->acc_got - 1]);   /* tried: do not retry it */
     }
     l->acc_n = 0;
     return ok;
@@ -1513,6 +1655,20 @@ int btlink_accept(btlink *l, const unsigned char (*addrs)[6],
 int btlink_last_connect_fail(void)
 {
     return g_connect_fail;
+}
+
+int btlink_last_disc_reason(void)
+{
+    return g_disc_reason;
+}
+
+/* Stop OUR page to this address. Does not disconnect any ACL, so a
+ * DualSense on another handle is left alone. */
+static void cancel_our_page(btlink *l)
+{
+    if (!l || !l->hci.ops) return;
+    fire_cmd(l->hci, 0x0408, l->addr, 6);
+    log_line("btlink: cancelled our page");
 }
 
 int btlink_connect(btlink *l, const unsigned char addr[6],
@@ -1533,6 +1689,7 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
     l->need_drop = 0;
     l->cc_fail = 0;
     g_connect_fail = 0;
+    g_disc_reason = 0;
     l->drop_hint = 0;
     l->pending_disc = 0;
     l->pending_disc_done = 0;
@@ -1569,9 +1726,10 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         }
     }
     {
-        /* Explicit page timeout: 0x8000 slots = 20.48 s. */
-        unsigned char pt[2] = { 0x00, 0x80 }, o[16]; int ol = 0;
-        (void)hci_cmd_sync(l->hci, 0x0C18, pt, 2, o, &ol, (int)sizeof o);
+        /* Page timeout 0x8000 slots = 20.48 s. Fire and don't wait:
+         * a missing Command Complete used to stall Connect for seconds. */
+        unsigned char pt[2] = { 0x00, 0x80 };
+        (void)fire_cmd(l->hci, 0x0C18, pt, 2);
     }
     memcpy(p, addr, 6);
     put16(p + 6, 0xCC18);
@@ -1609,6 +1767,10 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
                     log_line("btlink: drop aborted — connect FAIL (stale ACL)");
                     return 0;
                 }
+                /* 0x0b with no handle of ours is a page we left running,
+                 * not some other device's ACL. Cancel that page only. */
+                if (!l->connected && !g_last_acl_handle)
+                    cancel_our_page(l);
             }
             if (l->purge_fail) {
                 log_line("btlink: purge_fail set — refusing CREATE retry");
@@ -1627,10 +1789,21 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         } else if (!l->connected && l->retry_create && l->create_retries >= 1) {
             log_line("btlink: 0x0b again after retry — FAIL (case-cycle buds?)");
             l->retry_create = 0;
+            cancel_our_page(l);
+            g_connect_fail = 0x0B;
             return 0;
         }
 
-        if (btlink_abort_connect && btlink_abort_connect(l->addr)) {
+        if (btlink_abort_connect && l->connected && btlink_press_is_for &&
+            btlink_press_is_for(l->addr)) {
+            /* Same headset pressed again while its link is already up:
+             * keep going (closing it here makes many headsets stop
+             * answering pages, then 0x0b for ~20 s). */
+            if (!l->join_logged) {
+                l->join_logged = 1;
+                log_line("btlink: pressed again while the link is up — keeping it");
+            }
+        } else if (btlink_abort_connect && btlink_abort_connect(l->addr)) {
             unsigned char dp[3];
             if (!l->connected) {
                 fire_cmd(l->hci, 0x0408, l->addr, 6);    /* Create Connection Cancel */
@@ -1650,6 +1823,7 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         if (!l->connected && l->cc_fail) {
             /* 0x04 page timeout etc.: no point waiting out the full timeout. */
             g_connect_fail = l->cc_fail;
+            cancel_our_page(l);
             log_line("btlink: connect failed (status %#04x%s)", l->cc_fail,
                      l->cc_fail == 0x04 ? ", page timeout" : "");
             return 0;
@@ -1662,6 +1836,7 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         }
         if (!l->connected && now_ms() - t0 > 20000) {
             g_connect_fail = 0x04;          /* no answer: same as a page timeout */
+            cancel_our_page(l);
             log_line("btlink: connection timeout");
             return 0;
         }
@@ -1671,6 +1846,10 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         }
     }
     log_line("btlink: overall timeout");
+    if (!l->connected) {
+        cancel_our_page(l);
+        g_connect_fail = 0x04;
+    }
     return 0;
 }
 
@@ -1694,8 +1873,22 @@ void btlink_disconnect(btlink *l)
     int i;
 
     if (!l) return;
+    if (l->connected) {
+        /* Graceful order: every channel still up (AVRCP, SDP, anything the
+         * AVDTP teardown left) gets its DISC_REQ, then up to 200 ms for the
+         * DISC_RSPs, then the HCI Disconnect (0x13). */
+        long w;
+        for (i = 0; i < BTLINK_CHAN_MAX; i++) chan_close_disc(l, &l->ch[i]);
+        w = now_ms() + 200;
+        while (l->disc_wait > 0 && l->connected && now_ms() < w)
+            if (btlink_pump(l, 20) < 0) break;
+        if (l->disc_wait > 0)
+            log_line("l2cap: %d DISC_RSP not seen in 200 ms — disconnecting anyway", l->disc_wait);
+    }
+    l->disc_wait = 0;
     for (i = 0; i < BTLINK_CHAN_MAX; i++)
         chan_set(&l->ch[i], CH_CLOSED);
+    last_handle_check();
     if (l->connected) {
         int rc;
         h = l->handle & 0x0FFF;
@@ -1819,6 +2012,17 @@ int btlink_chan_is_open(const btlink *l, unsigned scid)
     if (!l) return 0;
     c = chan_by_scid((btlink *)l, scid);
     return c && c->st == CH_OPEN;
+}
+
+unsigned btlink_chan_find_inbound_other(const btlink *l, unsigned psm, unsigned not_scid)
+{
+    int i;
+    if (!l) return 0;
+    for (i = 0; i < BTLINK_CHAN_MAX; i++)
+        if (l->ch[i].st == CH_OPEN && l->ch[i].psm == psm && l->ch[i].inbound &&
+            l->ch[i].scid != not_scid)
+            return l->ch[i].scid;
+    return 0;
 }
 
 unsigned btlink_chan_find_inbound(const btlink *l, unsigned psm)
@@ -1976,6 +2180,11 @@ long btlink_ms_since_credit(const btlink *l)
     return now_ms() - l->pool.last_credit_ms;
 }
 
+long btlink_acl_gap_avg(const btlink *l)
+{
+    return l ? l->pool.gap_avg : 0;
+}
+
 long btlink_tx_dropped(const btlink *l)
 {
     return l ? (long)l->pool.media_dropped : 0;
@@ -1994,7 +2203,7 @@ int btlink_media_cap(const btlink *l)
 void btlink_set_media_cap(btlink *l, int n)
 {
     if (!l) return;
-    if (n < 8) n = 8;
+    if (n < HB_QUEUE_FLOOR_PKTS) n = HB_QUEUE_FLOOR_PKTS;
     if (n > MEDIA_Q_MAX) n = MEDIA_Q_MAX;
     l->media_cap = n;
 }
@@ -2065,6 +2274,11 @@ int btlink_avrcp_state(const btlink *l)
     if (avrcp_open(l)) st |= 1;
     if (l->avrcp.remote_abs) st |= 2;
     if (l->avrcp.ct_registered || l->avrcp.notify_label >= 0) st |= 4;
+    if (l->avrcp.sink_renders) st |= 8;
+    /* Bit 0 is what the page calls "connected". The volume number is shown
+     * once the headset has reported it, so the chip has to agree even when
+     * the channel-open check is false (seen on Sony WF-1000XM6). */
+    if (avrcp_reported(&l->avrcp)) st |= 1;
     return st;
 }
 
@@ -2082,5 +2296,6 @@ int btlink_last_close_confirmed(void)
 
 int btlink_own_acl_pending(void)
 {
+    last_handle_check();
     return g_last_acl_handle != 0;
 }

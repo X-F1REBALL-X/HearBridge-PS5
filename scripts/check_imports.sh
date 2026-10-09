@@ -5,7 +5,8 @@
 # 1.0.2 release did not. The ps5-payload-sdk runtime loads every DT_NEEDED
 # module and binds every import before main(); any failure there ends the
 # payload with no notification and no log, so new symbols have to be looked
-# up at run time instead. The NEEDED list must also match in order.
+# up at run time instead. NEEDED must be 1.0.2's list, in the same order,
+# minus modules that are now loaded at run time.
 set -eu
 elf=$1
 allow=$2
@@ -21,8 +22,10 @@ grep -v '^#' "$allow" | grep -v '^needed ' | sed '/^$/d' | sort -u > "$tmp.sym_o
     awk '$7 == "UND" && $8 != "" { sub(/@.*/, "", $8); print $8 }' | sort -u > "$tmp.sym"
 
 status=0
-if ! cmp -s "$tmp.need" "$tmp.need_ok"; then
-    echo "check_imports: DT_NEEDED differs from 1.0.2 (want, got):" >&2
+# ordered subset: every NEEDED entry appears in 1.0.2's list, in order
+if ! awk 'NR == FNR { ok[++n] = $0; next } { while (i < n && ok[++i] != $0) ; if (ok[i] != $0) bad = 1 }
+          END { exit bad }' "$tmp.need_ok" "$tmp.need"; then
+    echo "check_imports: DT_NEEDED not an ordered subset of 1.0.2's (want, got):" >&2
     diff "$tmp.need_ok" "$tmp.need" >&2 || true
     status=1
 fi
@@ -32,5 +35,5 @@ if [ -n "$new" ]; then
     echo "$new" | sed 's/^/  /' >&2
     status=1
 fi
-[ $status -eq 0 ] && echo "check_imports: $(wc -l < "$tmp.sym") imports, NEEDED as 1.0.2: ok"
+[ $status -eq 0 ] && echo "check_imports: $(wc -l < "$tmp.sym") imports, NEEDED $(tr "\n" " " < "$tmp.need")within 1.0.2: ok"
 exit $status

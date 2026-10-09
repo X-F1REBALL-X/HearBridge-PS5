@@ -76,10 +76,33 @@ static const sdp_attr ct_a[] = {
 };
 static const unsigned ct_u[] = { 0x110E, 0x110F, 0x0100, 0x0017, 0x1002 };
 
+/* Device ID (PnP Information 0x1200, DI 1.3). Some headsets (the Xbox one)
+ * look it up first and hang up on an empty answer. Generic values:
+ * vendor id source 0x0002 (USB-IF), vendor 0x1D6B (Linux Foundation),
+ * product 0x0001, version 1.0.0, primary record. */
+static const unsigned char di_h[]   = { H32(0x00010004) };
+static const unsigned char di_cl[]  = { 0x35, 3, UU(0x1200) };
+static const unsigned char di_pf[]  = { 0x35, 8, 0x35, 6, UU(0x1200), U16(0x0103) };
+static const unsigned char di_spec[] = { U16(0x0103) };
+static const unsigned char di_vid[]  = { U16(0x1D6B) };
+static const unsigned char di_pid[]  = { U16(0x0001) };
+static const unsigned char di_ver[]  = { U16(0x0100) };
+static const unsigned char di_prim[] = { 0x28, 0x01 };            /* boolean true */
+static const unsigned char di_src[]  = { U16(0x0002) };           /* USB-IF */
+static const sdp_attr di_a[] = {
+    { 0x0000, di_h, sizeof di_h }, { 0x0001, di_cl, sizeof di_cl },
+    { 0x0005, browse, sizeof browse }, { 0x0009, di_pf, sizeof di_pf },
+    { 0x0200, di_spec, sizeof di_spec }, { 0x0201, di_vid, sizeof di_vid },
+    { 0x0202, di_pid, sizeof di_pid }, { 0x0203, di_ver, sizeof di_ver },
+    { 0x0204, di_prim, sizeof di_prim }, { 0x0205, di_src, sizeof di_src },
+};
+static const unsigned di_u[] = { 0x1200, 0x1002 };
+
 static const sdp_record records[] = {
     { 0x00010001, src_a, 7, src_u, 5 },
     { 0x00010002, tg_a, 6, tg_u, 5 },
     { 0x00010003, ct_a, 6, ct_u, 5 },
+    { 0x00010004, di_a, 10, di_u, 2 },
 };
 #define NREC ((int)(sizeof records / sizeof records[0]))
 

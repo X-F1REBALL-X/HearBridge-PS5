@@ -11,6 +11,7 @@ const char *hb_dev_kind(uint32_t cod, const char *name);
  * other device whose name hints at headphones (Buds, WF-, WH-, AirPods,
  * Pods, Ear, Head); -1 = hidden (TV, set-top box, speaker, car, phone...). */
 int hb_dev_rank(uint32_t cod, const char *name);
+int hb_dev_rank_class(uint32_t cod);
 /* 1 if the name looks like headphones / earbuds. */
 int hb_dev_name_hints_headphones(const char *name);
 #endif

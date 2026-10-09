@@ -27,6 +27,9 @@
 
 static char held_path[256];
 static int held_fd = -1;
+static long last_pid;          /* holder seen by the last lock_take_ex() */
+static int last_flocked;       /* ...and it held the flock (pid is certain) */
+static int quiet;              /* takeover retries: log once, not every try */
 
 long lock_boot_time(void)
 {
@@ -110,9 +113,12 @@ int lock_take_ex(const char *path, int *err)
     fe = fr ? errno : 0;
     fields = read_record(fd, &pid, &when, &flocked);
     d = lock_decide(fr, fe, fields, pid, when, flocked, boot, (long)getpid());
+    last_pid = fields >= 1 ? pid : 0;
+    last_flocked = fr && (fe == EWOULDBLOCK || fe == EAGAIN);
     if (d == LOCK_BUSY) {
-        log_line("lock: %s belongs to a running instance (pid %ld%s)", path, pid,
-                 fr ? ", flock held" : ", 1.0.1-style record");
+        if (!quiet)
+            log_line("lock: %s belongs to a running instance (pid %ld%s)", path, pid,
+                     fr ? ", flock held" : ", 1.0.1-style record");
         close(fd);
         return LOCK_BUSY;
     }
@@ -130,9 +136,69 @@ int lock_take_ex(const char *path, int *err)
         if (err) *err = e;
         return LOCK_NO_WRITE;
     }
+    {
+        /* The instance we replaced unlinks the file when it exits: if that
+         * happened after our open(), we hold the flock of a deleted file.
+         * The path must hold our record, else try again. */
+        long p2 = 0, w2 = 0;
+        int f2 = 0, rd = open(path, O_RDONLY);
+        if (rd < 0 || read_record(rd, &p2, &w2, &f2) < 1 || p2 != (long)getpid()) {
+            if (rd >= 0) close(rd);
+            close(fd);
+            last_pid = 0;
+            last_flocked = 0;
+            return LOCK_BUSY;
+        }
+        close(rd);
+    }
     held_fd = fd;                      /* keep open: the flock lives with it */
     snprintf(held_path, sizeof held_path, "%s", path);
     return LOCK_OK;
+}
+
+/* Wait up to ms for the lock, trying every 100 ms. */
+static int wait_lock(const char *path, int *err, int ms)
+{
+    int r = LOCK_BUSY, t;
+    for (t = 0; t < ms && r == LOCK_BUSY; t += 100) {
+        usleep(100 * 1000);
+        r = lock_take_ex(path, err);
+    }
+    return r;
+}
+
+int lock_take_over(const char *path, const char *stop_path, int graceful_ms, int kill_ms,
+                   int *err, long *old_pid)
+{
+    long pid, self = (long)getpid();
+    int r = lock_take_ex(path, err), certain, fd;
+
+    if (old_pid) *old_pid = 0;
+    if (r != LOCK_BUSY) return r;
+    pid = last_pid;
+    certain = last_flocked && pid > 1 && pid != self;
+    if (old_pid) *old_pid = pid;
+    log_line("lock: replacing the running instance (pid %ld): stop file%s", pid,
+             certain ? " + SIGTERM" : "");
+    /* Ask it to stop the clean way: it closes the headset link, the page
+     * and the Bluetooth device, then drops the lock. */
+    fd = open(stop_path, O_WRONLY | O_CREAT, 0644);
+    if (fd >= 0) close(fd);
+    if (certain) kill((pid_t)pid, SIGTERM);
+    quiet = 1;
+    r = wait_lock(path, err, graceful_ms);
+    if (r == LOCK_BUSY && certain && last_flocked && last_pid == pid) {
+        log_line("lock: pid %ld still running after %d ms - SIGKILL", pid, graceful_ms);
+        kill((pid_t)pid, SIGKILL);
+        r = wait_lock(path, err, kill_ms);
+    }
+    quiet = 0;
+    unlink(stop_path);       /* ours either way: never stop the next run */
+    if (r == LOCK_OK)
+        log_line("lock: took over from pid %ld", pid);
+    else if (r == LOCK_BUSY)
+        log_line("lock: the running instance (pid %ld) did not stop", pid);
+    return r;
 }
 
 int lock_take(const char *path)
