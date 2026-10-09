@@ -30,6 +30,23 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث
 
 إرسال ملف ELF مرة أخرى يستبدل النسخة العاملة. زر **Stop HearBridge** في الصفحة يوقفها.
 
+## ما الشريحة الموجودة لدي؟
+
+ابحث عن طرازك في الجدول. أجهزة Fat و Slim تأتي بإحدى شريحتي بلوتوث، لذا افحص السجل فيها.
+
+| الطراز | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+|---|---|---|
+| CFI-10xx (الإطلاق) | ✅ يعمل (مُختبر، fw 10.20) | غير مطلوب |
+| CFI-11xx, CFI-12xx (Fat) | ✅ إذا كانت الشريحة Marvell/NXP | ⚠️ إذا كانت الشريحة MediaTek (غير مُختبر) |
+| CFI-20xx, CFI-21xx (Slim, معظم Slim فيها MediaTek*) | ✅ إذا كانت الشريحة Marvell/NXP | ⚠️ إذا كانت الشريحة MediaTek (غير مُختبر) |
+| CFI-70xx, CFI-71xx (Pro) | ❌ لن يعمل (MediaTek) | ✅ استخدم هذا (غير مُختبر) |
+
+\* من تقارير منتديات الصيانة، غير مؤكد من Sony
+
+**طريقة الفحص:** شغّل HearBridge مرة واحدة، افتح `/data/hearbridge/hearbridge.log` وابحث عن السطر `usb: /dev/ugen0.2 is XXXX:YYYY` (قد يختلف رقم ugen). `1286` = Marvell/NXP، استخدم **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek، استخدم **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+
+المصادر: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
+
 ## الميزات
 
 - **الإقران:** ضع السماعات في وضع الإقران، اضغط **Scan for devices** (20 ثانية)، ثم **Connect**.
