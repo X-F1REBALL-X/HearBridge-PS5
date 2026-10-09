@@ -27,7 +27,7 @@ background:var(--lime);transform:skewX(var(--sk));box-shadow:0 0 1.2rem rgba(200
 .brand h1 b{color:var(--lime)}
 .meta{display:flex;align-items:center;margin-top:.2rem}
 .ver{color:var(--void);background:var(--ember);font-size:.72rem;font-weight:800;padding:0 .5em;margin-inline-end:.6em;letter-spacing:.06em;transform:skewX(var(--sk))}
-.by{color:var(--mute);font-size:.75rem;direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+.by{color:var(--lime);font-size:.95rem;font-weight:800;letter-spacing:.08em;direction:ltr;unicode-bidi:isolate;white-space:nowrap;text-shadow:0 0 .6rem rgba(200,255,61,.35)}
 .diag{color:var(--mute);font-size:.7rem;margin-inline-start:.8em;direction:ltr;unicode-bidi:isolate;white-space:nowrap;text-decoration:underline;opacity:.75}
 .diag:hover,.diag:focus{color:var(--ember);opacity:1}
 .live{display:flex;align-items:center;padding:.45rem 1.1rem;background:var(--deck);border:2px solid var(--edge);font-size:.9rem;font-weight:800;
@@ -141,7 +141,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:.6rem;heig
 input[type=range]::-moz-range-track{height:1.6rem;background:var(--void)}
 input[type=range]::-moz-range-progress{height:1.6rem;background:var(--lime)}
 input[type=range]::-moz-range-thumb{width:.6rem;height:1.6rem;border:0;border-radius:0;background:#fff}
-.vol .btns{margin-top:var(--s1)}
+.vol .btns{margin-top:var(--s1)}.devbtns{margin-top:var(--s2)}.devbtns button{min-width:0}
 /* equalizer: colour per band, live response curve */
 body{--b0:#ff6a2b;--b1:#ffb23d;--b2:#c8ff3d;--b3:#3dd6ff;--b4:#b06bff}
 .eqp{border-inline-start-color:var(--b3)}
@@ -190,7 +190,7 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .lt .v{text-align:end}
 .latm .lt input[type=range]{margin:0}
 /* connection */
-.conn .cbox{display:grid;grid-template-columns:1fr;grid-gap:var(--s2);align-items:center}
+.conn .cbox{display:grid;grid-template-columns:auto minmax(0,1fr);grid-gap:var(--s4);align-items:center}
 .conn .note{margin:0;font-size:.8rem;line-height:1.3}
 #stop{min-width:13rem}
 /* status: name, compact key/value list, slim level meters */
@@ -227,7 +227,7 @@ background:linear-gradient(90deg,rgba(255,255,255,.07) 0 85%,rgba(255,61,90,.3) 
 background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25% - 1px) 25%,transparent 25% calc(50% - 1px),var(--deck) calc(50% - 1px) 50%,transparent 50% calc(75% - 1px),var(--deck) calc(75% - 1px) 75%,transparent 75%)}
 /* mid widths: two columns, page may scroll */
 @media(min-width:760px){
-.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "log log" "dev vol" "dev eq" "dev conn";grid-template-rows:auto auto auto auto 1fr}
+.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"dev st" "dev vol" "dev eq" "dev conn" "log log";grid-template-rows:auto auto auto 1fr auto}
 .conn{align-self:start}
 }
 /* TV: one screen, no page scroll. Everything is rem, rem follows the viewport. */
@@ -235,13 +235,15 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 html{font-size:13px;font-size:clamp(12px,min(1.04vw,1.9vh),26px)}
 .wrap{height:100vh}
 .grid{flex:1;min-height:0;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr) minmax(0,1fr);
-grid-template-areas:"dev st log" "dev vol conn";grid-template-rows:minmax(0,1fr) auto}
+grid-template-areas:"dev st eq" "dev vol conn" "log vol conn";grid-template-rows:minmax(0,1fr) auto auto}
+.logp .evlog{max-height:7.5rem;overflow-y:auto}
 .eqp{min-height:0}
+.eqp .presets button{min-height:1.9rem;margin:.1rem 0;padding:.1rem .65rem}
 .conn{align-self:stretch}
 #savedlist{flex:0 1 auto;max-height:34%}
 /* one screen: the longer hints only show on phones and laptops */
 #codecnote,#latnote{display:none}
-.eqp .curve{flex:1 1 0;height:auto;min-height:2.4rem;max-height:6rem}.eqp .bands,.eqp .presets,.eqp .eqhead{flex:0 0 auto}
+.eqp .curve{flex:1 1 0;height:auto;min-height:1.4rem;max-height:6rem}.eqp .bands,.eqp .presets,.eqp .eqhead{flex:0 0 auto}
 #devlist{flex:1 1 0;min-height:4rem}
 /* spare height goes to the status card (meters sit at its bottom, idle art fills it) */
 .status #stats{flex:1}.status .meters{margin-top:auto;padding-top:var(--s3)}
@@ -280,8 +282,7 @@ grid-template-areas:"dev st log" "dev vol conn";grid-template-rows:minmax(0,1fr)
 <main class="grid">
 <section class="panel hero" id="devpanel"><p class="label" data-i18n="devices">Devices</p>
 <button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
-<button id="reconnect" class="act xl" data-i18n="reconnect">Reconnect</button>
-<button id="reset" class="xl" data-i18n="reset">Reset link</button>
+<div class="btns devbtns"><button id="reconnect" data-i18n="reconnect">Reconnect</button><button id="reset" data-i18n="reset">Reset link</button></div>
 <p class="k hint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p>
 <p class="sub" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div>
 <p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div>
