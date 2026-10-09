@@ -12,7 +12,7 @@
 
 HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带的蓝牙把主机声音传到普通蓝牙耳机或音箱（A2DP）。通过主机提供的网页进行控制。它不会改动游戏、固件或破解。
 
-<p align="center"><img src="docs/img/ui-en.png" alt="HearBridge PS5 网页" width="520"></p>
+<p align="center"><img src="docs/img/ui-en.png" alt="HearBridge PS5 网页" width="900"></p>
 
 ## 要求
 
@@ -30,18 +30,18 @@ HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带�
 
 ## 我的是哪种芯片？
 
-在表中找到你的型号。fat 和 Slim 装的是两种蓝牙芯片之一，这些型号请查看日志。
+PS5 使用两种蓝牙芯片之一：Marvell/NXP 或 MediaTek。初代机型（CFI-11xx/12xx）和 Slim（CFI-20xx/21xx）两种都有可能，即使型号相同。
 
-| 型号 | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-|---|---|---|
-| CFI-10xx (首发) | ✅ 可用（已测试，fw 10.20） | 不需要 |
-| CFI-11xx, CFI-12xx (fat) | ✅ Marvell/NXP 芯片时 | ⚠️ MediaTek 芯片时（未测试） |
-| CFI-20xx, CFI-21xx (Slim, 大多数 Slim 是 MediaTek*) | ✅ Marvell/NXP 芯片时 | ⚠️ MediaTek 芯片时（未测试） |
-| CFI-70xx, CFI-71xx (Pro) | ❌ 不可用（MediaTek） | ✅ 用这个（未测试） |
+| 型号 | 下载 |
+|---|---|
+| CFI-10xx (首发) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
+| CFI-11xx, CFI-12xx (初代) | 查看芯片: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-20xx, CFI-21xx (Slim) | 查看芯片: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-70xx, CFI-71xx (Pro，始终是 MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-\* 来自维修论坛的报告，未经 Sony 确认
+mediatek test 版本尚未测试。1.1.0 仅在 CFI-10xx 上测试过。欢迎反馈结果。
 
-**如何检查：** 运行一次 HearBridge，打开 `/data/hearbridge/hearbridge.log`，找到 `usb: /dev/ugen0.2 is XXXX:YYYY` 这一行（ugen 编号可能不同）。`1286` = Marvell/NXP，用 **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**。`0e8d` = MediaTek，用 **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**。
+**如何检查：** 运行 1.1.0，查看 **Status** 面板底部的 **Chip** 行。`Marvell/NXP (1286:…)` → 继续用 1.1.0。`MediaTek (0e8d:…)` → 用 mediatek test（页面还会显示橙色提示）。或者打开 `/data/hearbridge/hearbridge.log`，找到 `usb: /dev/ugen0.2 is 1286:2059 …`（ugen 编号可能不同）。"is" 后面的前四个字符就是芯片：`1286` = Marvell/NXP，`0e8d` = MediaTek。
 
 来源: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
@@ -54,7 +54,8 @@ HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带�
 - **均衡器：**5 个频段（±12 dB），带预设，按耳机保存，带限幅器，增益不会失真。
 - **延迟：**缓冲目标 60 到 200 ms（默认 200 ms），并实时估算延迟。
 - **Clean sound：**关闭均衡器，增益恢复到 250 %，缓冲恢复到 200 ms。
-- 页面上有记录每一步的**日志**。页面支持 11 种语言。
+- 页面上有记录每一步的彩色**日志**：绿色表示成功，红色表示失败，蓝色表示你的操作。页面支持 11 种语言。
+- **芯片：** **Status** 底部显示你的蓝牙芯片。如果是 MediaTek 芯片，会显示 mediatek test 版本的链接。
 
 ## 编解码器
 
@@ -68,7 +69,7 @@ HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带�
 - 一次只能连一个耳机，没有麦克风。电视也会继续播放声音。
 - 耳机必须支持 48 kHz 立体声 SBC。
 - 一次只运行一个使用蓝牙的 payload。DualSense 照常工作。
-- 仅在固件 10.20（PS5 fat）上测试过。其他型号和固件未测试；有报告称 PS5 Pro 和部分 13.x 环境无法启动（[#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1)、[#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)）。
+- 仅在固件 10.20（PS5 fat，CFI-10xx）上测试过。其他型号和固件未测试。有报告称旧版本在 PS5 Pro 和部分 13.x 环境无法启动（[#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1)、[#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)）；MediaTek 芯片请试用 mediatek test 版本。
 - 已测试耳机：Sony WF-1000XM6、OnePlus Buds Ace 2、Xbox Wireless Headset。
 
 ## 故障排除 / 报告问题

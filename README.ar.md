@@ -14,7 +14,7 @@
 
 HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث صوت الجهاز عبر بلوتوث PS5 نفسه إلى سماعات أو مكبر صوت بلوتوث عادي (A2DP). يتم التحكم فيها من صفحة ويب يقدمها الجهاز. لا تمس الألعاب ولا البرنامج الثابت ولا كسر الحماية.
 
-<p align="center"><img src="docs/img/ui-en.png" alt="صفحة ويب HearBridge PS5" width="520"></p>
+<p align="center"><img src="docs/img/ui-en.png" alt="صفحة ويب HearBridge PS5" width="900"></p>
 
 ## المتطلبات
 
@@ -32,18 +32,18 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث
 
 ## ما الشريحة الموجودة لدي؟
 
-ابحث عن طرازك في الجدول. أجهزة Fat و Slim تأتي بإحدى شريحتي بلوتوث، لذا افحص السجل فيها.
+تستخدم أجهزة PS5 واحدة من شريحتَي بلوتوث: Marvell/NXP أو MediaTek. أجهزة fat (CFI-11xx/12xx) وSlim (CFI-20xx/21xx) قد تأتي بأيٍّ منهما، حتى مع رقم الطراز نفسه.
 
-| الطراز | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
-|---|---|---|
-| CFI-10xx (الإطلاق) | ✅ يعمل (مُختبر، fw 10.20) | غير مطلوب |
-| CFI-11xx, CFI-12xx (Fat) | ✅ إذا كانت الشريحة Marvell/NXP | ⚠️ إذا كانت الشريحة MediaTek (غير مُختبر) |
-| CFI-20xx, CFI-21xx (Slim, معظم Slim فيها MediaTek*) | ✅ إذا كانت الشريحة Marvell/NXP | ⚠️ إذا كانت الشريحة MediaTek (غير مُختبر) |
-| CFI-70xx, CFI-71xx (Pro) | ❌ لن يعمل (MediaTek) | ✅ استخدم هذا (غير مُختبر) |
+| الطراز | التنزيل |
+|---|---|
+| CFI-10xx (الإصدار الأول) | [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0) |
+| CFI-11xx, CFI-12xx (fat) | افحص الشريحة: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-20xx, CFI-21xx (Slim) | افحص الشريحة: Marvell/NXP → [1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0), MediaTek → [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
+| CFI-70xx, CFI-71xx (Pro، دائمًا MediaTek) | [mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test) |
 
-\* من تقارير منتديات الصيانة، غير مؤكد من Sony
+إصدار mediatek test لم يُختبر بعد. الإصدار 1.1.0 مختبر فقط على CFI-10xx. أخبرنا كيف سار الأمر.
 
-**طريقة الفحص:** شغّل HearBridge مرة واحدة، افتح `/data/hearbridge/hearbridge.log` وابحث عن السطر `usb: /dev/ugen0.2 is XXXX:YYYY` (قد يختلف رقم ugen). `1286` = Marvell/NXP، استخدم **[1.1.0](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0)**. `0e8d` = MediaTek، استخدم **[mediatek test](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.1.0-mtk-test)**.
+**طريقة الفحص:** شغّل 1.1.0 وانظر إلى سطر **Chip** أسفل لوحة **Status**. `Marvell/NXP (1286:…)` → ابقَ على 1.1.0. `MediaTek (0e8d:…)` → استخدم mediatek test (تعرض الصفحة أيضًا تنبيهًا برتقاليًا). أو افتح `/data/hearbridge/hearbridge.log` وابحث عن `usb: /dev/ugen0.2 is 1286:2059 …` (قد يختلف رقم ugen). الأحرف الأربعة الأولى بعد "is" هي الشريحة: `1286` = Marvell/NXP، `0e8d` = MediaTek.
 
 المصادر: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
@@ -56,7 +56,8 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث
 - **المعادل:** 5 نطاقات (±12 dB) مع إعدادات جاهزة، محفوظ لكل سماعة، مع محدد حتى لا يتشوه التعزيز.
 - **التأخير:** هدف المخزن المؤقت من 60 إلى 200 ms (الافتراضي 200 ms) وتقدير مباشر للتأخير.
 - **Clean sound:** يطفئ المعادل، ويعيد التعزيز إلى 250 % والمخزن المؤقت إلى 200 ms.
-- **سجل** في الصفحة بكل خطوة. الصفحة متوفرة بـ 11 لغة.
+- **سجل** في الصفحة بكل خطوة، بالألوان: الأخضر نجح، الأحمر فشل، والأزرق لضغطاتك. الصفحة متوفرة بـ 11 لغة.
+- **الشريحة:** أسفل **Status** تظهر شريحة البلوتوث في جهازك. مع شريحة MediaTek يظهر هناك رابط لإصدار mediatek test.
 
 ## الترميزات
 
@@ -70,7 +71,7 @@ HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث
 - سماعة واحدة في كل مرة، بدون ميكروفون. التلفاز يستمر في تشغيل الصوت أيضًا.
 - يجب أن تقبل السماعات SBC بتردد 48 kHz ستيريو.
 - شغّل حمولة بلوتوث واحدة فقط في كل مرة. ذراع DualSense يستمر في العمل.
-- تم الاختبار فقط على 10.20 (PS5 fat). الطرازات والبرامج الثابتة الأخرى غير مختبرة؛ أُبلغ أن PS5 Pro وبعض إعدادات 13.x لا تبدأ ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1)، [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)).
+- تم الاختبار فقط على 10.20 (PS5 fat، CFI-10xx). الطرازات والبرامج الثابتة الأخرى غير مختبرة. أُبلغ أن PS5 Pro وبعض إعدادات 13.x لم تبدأ مع الإصدارات السابقة ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1)، [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2))؛ مع شريحة MediaTek جرّب إصدار mediatek test.
 - سماعات مختبرة: Sony WF-1000XM6، OnePlus Buds Ace 2، Xbox Wireless Headset.
 
 ## حل المشكلات / الإبلاغ عن مشكلة
