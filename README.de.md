@@ -16,7 +16,7 @@ HearBridge PS5 ist ein Payload (ELF) für eine gejailbreakte PS5. Er überträgt
 
 ## Voraussetzungen
 
-- Eine gejailbreakte PS5 mit ELF-Loader auf Port **9021** (elfldr). Getestet auf einer PS5 fat (CFI-10xx) mit Firmware **10.20**.
+- Eine gejailbreakte PS5 mit ELF-Loader auf Port **9021** (elfldr).
 - Bluetooth-Kopfhörer oder -Lautsprecher mit A2DP (SBC, 48 kHz Stereo).
 - Ein Browser im selben Netzwerk (PS5, Handy oder PC).
 
@@ -54,8 +54,7 @@ Quellen: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/complian
 - **Equalizer:** 5 Bänder (±12 dB) mit Presets, pro Kopfhörer gespeichert, mit Limiter, damit der Boost nicht übersteuert.
 - **Latenz:** Pufferziel von 60 bis 200 ms (Standard 200 ms) und eine Live-Schätzung der Verzögerung.
 - **Clean sound:** Equalizer aus, Boost zurück auf 250 %, Puffer zurück auf 200 ms.
-- **Log** auf der Seite mit jedem Schritt, farbig: grün geklappt, rot fehlgeschlagen, blau für deine Klicks. Die Seite gibt es in 11 Sprachen.
-- **Chip:** unten in **Status** steht dein Bluetooth-Chip. Bei einem MediaTek-Chip gibt es dort einen Link zum mediatek test Build.
+- **Log** auf der Seite mit jedem Schritt, farbig: grün geklappt, rot fehlgeschlagen, blau für deine Klicks.
 
 ## Codecs
 
@@ -67,9 +66,8 @@ AAC, aptX und LDAC werden nicht unterstützt.
 ## Bekannte Grenzen
 
 - Ein Kopfhörer gleichzeitig, kein Mikrofon. Der Fernseher spielt den Ton weiter.
-- Kopfhörer müssen SBC mit 48 kHz Stereo annehmen.
 - Immer nur einen Bluetooth-Payload laufen lassen. Der DualSense funktioniert weiter.
-- Nur auf fw 10.20 (PS5 fat, CFI-10xx) getestet. Andere Modelle und Firmwares sind ungetestet. Laut Berichten starteten PS5 Pro und manche 13.x-Setups mit älteren Versionen nicht ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)); mit MediaTek-Chip probier den mediatek test Build.
+- Nur auf fw 10.20 (PS5 fat, CFI-10xx) getestet. Andere Modelle und Firmwares sind ungetestet.
 - Getestete Kopfhörer: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Fehlerbehebung / Problem melden
@@ -93,7 +91,3 @@ make send PS5_HOST=<console-ip>
 ## Lizenz
 
 GPL-3.0-or-later. Siehe [LICENSE](LICENSE) und [NOTICE](NOTICE).
-
----
-
-<p align="center">Developed by X-F1REBALL-X</p>

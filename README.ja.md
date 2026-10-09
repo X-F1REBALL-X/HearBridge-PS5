@@ -16,7 +16,7 @@ HearBridge PS5 は脱獄した PS5 用のペイロード（ELF）です。本体
 
 ## 必要なもの
 
-- ポート **9021** で ELF ローダー（elfldr）が動いている脱獄済み PS5。PS5 fat（CFI-10xx）、ファームウェア **10.20** でテスト済み。
+- ポート **9021** で ELF ローダー（elfldr）が動いている脱獄済み PS5。
 - A2DP（SBC、48 kHz ステレオ）対応の Bluetooth ヘッドホンまたはスピーカー。
 - 同じネットワーク上のブラウザ（PS5、スマホ、PC）。
 
@@ -54,8 +54,7 @@ mediatek test ビルドはまだテストされていません。1.1.0 は CFI-1
 - **イコライザー：** 5 バンド（±12 dB）、プリセット付き、ヘッドホンごとに保存。リミッター付きでブーストしても音割れしません。
 - **遅延：** バッファ目標 60〜200 ms（初期値 200 ms）と遅延のライブ推定値。
 - **Clean sound：** イコライザーをオフにし、ブーストを 250 %、バッファを 200 ms に戻します。
-- ページに全ステップの**ログ**を色分けで表示（緑は成功、赤は失敗、青はボタン操作）。ページは 11 言語対応。
-- **チップ：** **Status** の下部に Bluetooth チップが表示されます。MediaTek チップなら mediatek test ビルドへのリンクが出ます。
+- ページに全ステップの**ログ**を色分けで表示（緑は成功、赤は失敗、青はボタン操作）。
 
 ## コーデック
 
@@ -67,9 +66,8 @@ AAC、aptX、LDAC には対応していません。
 ## 既知の制限
 
 - 同時に 1 台のみ、マイクなし。テレビからも音が出続けます。
-- ヘッドホンは SBC 48 kHz ステレオに対応している必要があります。
 - Bluetooth を使うペイロードは 1 つだけ実行してください。DualSense はそのまま使えます。
-- テストは fw 10.20（PS5 fat、CFI-10xx）のみ。他のモデルやファームウェアは未テストです。以前のバージョンでは PS5 Pro と一部の 13.x 環境で起動しないという報告がありました（[#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1)、[#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)）。MediaTek チップなら mediatek test ビルドを試してください。
+- テストは fw 10.20（PS5 fat、CFI-10xx）のみ。他のモデルやファームウェアは未テストです。
 - テスト済みヘッドホン：Sony WF-1000XM6、OnePlus Buds Ace 2、Xbox Wireless Headset。
 
 ## トラブルシューティング / 問題の報告
@@ -93,7 +91,3 @@ make send PS5_HOST=<console-ip>
 ## ライセンス
 
 GPL-3.0-or-later。[LICENSE](LICENSE) と [NOTICE](NOTICE) を参照。
-
----
-
-<p align="center">Developed by X-F1REBALL-X</p>

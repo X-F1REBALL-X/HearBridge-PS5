@@ -16,7 +16,7 @@ HearBridge PS5 è un payload (ELF) per una PS5 con jailbreak. Trasmette l'audio 
 
 ## Requisiti
 
-- Una PS5 con jailbreak e un loader ELF sulla porta **9021** (elfldr). Testato su una PS5 fat (CFI-10xx) con firmware **10.20**.
+- Una PS5 con jailbreak e un loader ELF sulla porta **9021** (elfldr).
 - Cuffie o altoparlante Bluetooth con A2DP (SBC, 48 kHz stereo).
 - Un browser sulla stessa rete (PS5, telefono o PC).
 
@@ -54,8 +54,7 @@ Fonti: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance
 - **Equalizzatore:** 5 bande (±12 dB) con preset, salvato per cuffia, con limiter così il boost non distorce.
 - **Latenza:** obiettivo del buffer da 60 a 200 ms (predefinito 200 ms) e una stima del ritardo in tempo reale.
 - **Clean sound:** spegne l'equalizzatore, riporta il boost a 250 % e il buffer a 200 ms.
-- **Log** nella pagina con ogni passaggio, a colori: verde riuscito, rosso fallito, blu per quello che premi. La pagina è in 11 lingue.
-- **Chip:** in fondo a **Status** compare il tuo chip Bluetooth. Con un chip MediaTek c'è un link alla versione mediatek test.
+- **Log** nella pagina con ogni passaggio, a colori: verde riuscito, rosso fallito, blu per quello che premi.
 
 ## Codec
 
@@ -67,9 +66,8 @@ AAC, aptX e LDAC non sono supportati.
 ## Limiti noti
 
 - Una cuffia alla volta, niente microfono. Anche la TV continua a riprodurre l'audio.
-- Le cuffie devono accettare SBC a 48 kHz stereo.
 - Esegui un solo payload Bluetooth alla volta. Il DualSense continua a funzionare.
-- Testato solo su fw 10.20 (PS5 fat, CFI-10xx). Altri modelli e firmware non sono testati. È stato segnalato che su PS5 Pro e alcune configurazioni 13.x le versioni precedenti non si avviavano ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)); con un chip MediaTek prova la versione mediatek test.
+- Testato solo su fw 10.20 (PS5 fat, CFI-10xx). Altri modelli e firmware non sono testati.
 - Cuffie testate: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Risoluzione dei problemi / segnalare un problema
@@ -93,7 +91,3 @@ make send PS5_HOST=<console-ip>
 ## Licenza
 
 GPL-3.0-or-later. Vedi [LICENSE](LICENSE) e [NOTICE](NOTICE).
-
----
-
-<p align="center">Developed by X-F1REBALL-X</p>
