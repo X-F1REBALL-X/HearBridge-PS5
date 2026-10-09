@@ -16,6 +16,9 @@
  * other web pages or LAN devices cannot drive HearBridge blindly. */
 /* Pure request handler (host testable): req = raw HTTP request bytes.
  * Writes a complete HTTP response into out; returns its length. */
+/* 1 when req is "GET /api/gameicon?id=<title id>" (id copied out). */
+int http_gameicon_id(const char *req, int reqlen, char *id, int idmax);
+
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max);
 
 /* Start the server thread on HB_HTTP_PORT (tries the next few ports if

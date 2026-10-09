@@ -40,6 +40,11 @@ int  hb_games_drop(hb_games *gs, const char *id);
 enum { HB_GAME_KEEP = 0, HB_GAME_APPLY = 1, HB_GAME_RESTORE = 2 };
 int  hb_game_decide(const char *applied, const char *cur, int cur_has_profile);
 
+/* i-th place to look for the game's icon (0, 1, ...): appmeta icon0.png
+ * under /user then /system_data/priv. 0 when i is past the last or id is
+ * not a title id. */
+int  hb_game_icon_path(const char *id, int i, char *out, int max);
+
 /* "titleName" from a param.json (first one found), UTF-8 kept, escapes
  * \" \\ \/ handled, others dropped. 1 if found. */
 int  hb_game_json_title(const char *json, char *out, int max);

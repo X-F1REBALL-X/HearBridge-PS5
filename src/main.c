@@ -1576,6 +1576,17 @@ static void games_save(void)
     rename(HB_GAMES_PATH ".tmp", HB_GAMES_PATH);
 }
 
+/* Saved games for the page's Games list. Caller holds the lock. */
+static void games_publish_locked(void)
+{
+    int i;
+    g_ctl.games_n = g_games.n < 32 ? g_games.n : 32;
+    for (i = 0; i < g_ctl.games_n; i++) {
+        snprintf(g_ctl.games_id[i], sizeof g_ctl.games_id[i], "%s", g_games.g[i].id);
+        snprintf(g_ctl.games_name[i], sizeof g_ctl.games_name[i], "%s", g_games.g[i].name);
+    }
+}
+
 /* The headset's own EQ / boost / volume back (game closed or forgotten).
  * Caller holds the lock. */
 static void game_restore_locked(void)
@@ -1591,9 +1602,19 @@ static void game_restore_locked(void)
 /* Running game changed, or Save / Forget on the page. Once a second. */
 static void game_tick(void)
 {
-    char id[16], name[HB_GAME_NAME];
-    int req, act, gi;
+    char id[16], name[HB_GAME_NAME], drop[16], dname[HB_GAME_NAME];
+    int req, act, gi, dropped = 0;
     CTL_LOCK(&g_ctl);
+    snprintf(drop, sizeof drop, "%s", g_ctl.req_game_drop);
+    g_ctl.req_game_drop[0] = 0;
+    dname[0] = 0;
+    if (drop[0] && (gi = hb_games_find(&g_games, drop)) >= 0) {
+        snprintf(dname, sizeof dname, "%s", g_games.g[gi].name);
+        hb_games_drop(&g_games, drop);
+        if (!strcmp(g_game_applied, drop)) game_restore_locked();
+        if (!strcmp(g_game_applied, drop)) g_game_applied[0] = 0;
+        dropped = 1;
+    }
     snprintf(id, sizeof id, "%s", g_ctl.game_id);
     snprintf(name, sizeof name, "%s", g_ctl.game_name);
     req = g_ctl.req_game;
@@ -1630,8 +1651,10 @@ static void game_tick(void)
     }
     g_ctl.game_profile = gi >= 0;
     g_ctl.game_active = g_game_applied[0] != 0;
+    if (req || dropped) games_publish_locked();
     CTL_UNLOCK(&g_ctl);
-    if (req) games_save();
+    if (req || dropped) games_save();
+    if (dropped) note_event("Game profile removed (%s)", dname[0] ? dname : drop);
     if (req == 1) note_event("Saved for %s", name[0] ? name : id);
     if (req == 2) note_event("Game profile removed (%s)", name[0] ? name : id);
     if (act == HB_GAME_APPLY && !req) note_event("Game sound on for %s", name[0] ? name : id);
@@ -1727,6 +1750,7 @@ static void reload_settings(headset_ini *ini)
     }
     CTL_LOCK(&g_ctl);
     games_load();
+    games_publish_locked();
     g_game_applied[0] = 0;               /* re-applied on the next tick */
     if (g_prefs_have) {
         hb_prefs p;
@@ -2995,6 +3019,9 @@ int main(void)
     home_tile(0);
 
     games_load();
+    CTL_LOCK(&g_ctl);
+    games_publish_locked();
+    CTL_UNLOCK(&g_ctl);
     g_game_thr_up = pthread_create(&g_game_thr, NULL, game_thread, NULL) == 0;
     g_rest_thr_up = pthread_create(&g_rest_thr, NULL, rest_thread, NULL) == 0;
 

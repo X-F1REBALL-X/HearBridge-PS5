@@ -9,6 +9,7 @@
 #include "backup.h"
 #include "avrcp.h"
 #include "version.h"
+#include "gameprof.h"
 #ifndef HB_HTTP_HOST_TEST
 #include "hcidbg.h"
 #endif
@@ -103,6 +104,7 @@ static int is_write_path(const char *path)
 static int status_json(hb_ctl *c, char *o, int max)
 {
     char dev[140], st[70], url[140], det[200], why[40], ev[2400], cid[2][8], gname[100];
+    static char gl[32 * 140];
     const char *cven = btchip_vendor(c->chip_vid);
     int ei, en, chip_ok = c->chip_vid >= 0 && c->chip_vid <= 0xffff &&
                           c->chip_pid >= 0 && c->chip_pid <= 0xffff;
@@ -112,6 +114,20 @@ static int status_json(hb_ctl *c, char *o, int max)
     json_esc(det, sizeof det, c->detail);
     json_esc(why, sizeof why, c->why);
     json_esc(gname, sizeof gname, c->game_name);
+    {
+        int gi, gn = 1;
+        gl[0] = '[';
+        for (gi = 0; gi < c->games_n && gi < 32; gi++) {
+            char nm[100];
+            json_esc(nm, sizeof nm, c->games_name[gi]);
+            if (!hb_game_id_ok(c->games_id[gi])) continue;
+            gn += snprintf(gl + gn, sizeof gl - (size_t)gn, "%s{\"id\":\"%s\",\"name\":\"%s\"}",
+                           gn > 1 ? "," : "", c->games_id[gi], nm);
+            if (gn >= (int)sizeof gl - 2) { gn = 1; break; }
+        }
+        gl[gn] = ']';
+        gl[gn + 1] = 0;
+    }
     ev[0] = '[';
     en = 1;
     for (ei = 0; ei < c->event_n && ei < HB_EVENT_N; ei++) {
@@ -141,7 +157,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"battery\":{\"status\":\"%s\",\"level\":%d},\"hs_moves\":%d,"
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
         "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,"
-        "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d},\"events\":%s}",
+        "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d,\"saved\":%s},\"events\":%s}",
         c->version, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
@@ -159,7 +175,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->hs_moves,
         c->link_score, c->link_rssi == 127 ? 0 : c->link_rssi, c->link_lq, c->drops_min,
         c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch,
-        c->game_avail, c->game_id, gname, c->game_profile, c->game_active, ev);
+        c->game_avail, c->game_id, gname, c->game_profile, c->game_active, gl, ev);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,
@@ -305,10 +321,21 @@ static int backup_api(hb_ctl *c, const char *path, const char *q, const char *re
     }
 }
 
+int http_gameicon_id(const char *req, int reqlen, char *id, int idmax)
+{
+    static const char pre[] = "GET /api/gameicon?id=";
+    int n = (int)sizeof pre - 1, k = 0;
+    if (idmax > 0) id[0] = 0;
+    if (reqlen < n || memcmp(req, pre, (size_t)n)) return 0;
+    while (n < reqlen && k < idmax - 1 && req[n] != ' ' && req[n] != '&' && req[n] != '\r') id[k++] = req[n++];
+    id[k] = 0;
+    return hb_game_id_ok(id);
+}
+
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 {
     char method[8], path[128], *q;
-    char body[8192];
+    static char body[16384];   /* status with the saved games list */
     int i = 0, j = 0, v, bl, is_api;
 
     while (i < reqlen && req[i] != ' ' && j < (int)sizeof method - 1) method[j++] = req[i++];
@@ -364,6 +391,8 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
                                : respond(out, max, 409, "application/json", "{\"error\":\"busy or bad\"}", 24);
     }
 #endif
+    if (!strcmp(path, "/api/gameicon"))   /* a good id is streamed by the server (big file) */
+        return respond(out, max, 404, "text/plain", "no icon\n", 8);
     if (!strcmp(path, "/api/diag")) {
         /* Plain-text diagnostics report (see diag.h), also in diag.txt. */
         static char dt[60000];
@@ -548,10 +577,19 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
     } else if (!strcmp(path, "/api/game")) {
         /* do=1 save the live EQ / boost / headset volume for the running
          * game, do=2 forget its profile. The stream loop does it. */
+        char gid[16];
+        if (query_int(q, "do", &v) && v == 3) {
+            /* do=3&id=PPSA01234: forget that saved game (Games list) */
+            if (!query_word(q, "id", gid, sizeof gid) || !hb_game_id_ok(gid)) goto bad;
+            snprintf(c->req_game_drop, sizeof c->req_game_drop, "%s", gid);
+            if (!strcmp(gid, c->game_id)) { c->game_profile = 0; c->game_active = 0; }
+            goto done_game;
+        }
         if (!query_int(q, "do", &v) || v < 1 || v > 2 || !c->game_id[0]) goto bad;
         c->req_game = v;
         if (v == 1) { c->game_profile = 1; c->game_active = 1; }
         else { c->game_profile = 0; c->game_active = 0; }
+    done_game:;
     } else if (!strcmp(path, "/api/mute")) {
         c->muted = query_int(q, "on", &v) ? (v != 0) : !c->muted;
     } else if (!strcmp(path, "/api/tone")) {
@@ -589,11 +627,13 @@ bad:
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -616,6 +656,42 @@ static void console_ip(char *ip, size_t n)
         break;
     }
     freeifaddrs(ifa);
+}
+
+static int send_all(int fd, const char *b, int n)
+{
+    int off = 0;
+    while (off < n) {
+        int w = (int)send(fd, b + off, (size_t)(n - off), 0);
+        if (w <= 0) return -1;
+        off += w;
+    }
+    return 0;
+}
+
+/* Game icon from the console's appmeta, streamed (icon0.png can be bigger
+ * than the reply buffer). The browser keeps it for a week. 0 = not found. */
+static int send_gameicon(int fd, const char *id)
+{
+    static char buf[16384];
+    char path[96], hdr[200];
+    struct stat st;
+    int i, f = -1, n;
+    for (i = 0; f < 0 && hb_game_icon_path(id, i, path, sizeof path); i++)
+        if (stat(path, &st) == 0 && st.st_size > 0 && st.st_size < 8 * 1024 * 1024)
+            f = open(path, O_RDONLY);
+    if (f < 0) return 0;
+    n = snprintf(hdr, sizeof hdr, "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: %ld\r\n"
+                 "Cache-Control: public, max-age=604800\r\nConnection: close\r\n\r\n", (long)st.st_size);
+    if (send_all(fd, hdr, n) == 0) {
+        long left = (long)st.st_size;
+        while (left > 0 && (n = (int)read(f, buf, sizeof buf)) > 0) {
+            if (send_all(fd, buf, n)) break;
+            left -= n;
+        }
+    }
+    close(f);
+    return 1;
 }
 
 static void serve_one(int fd)
@@ -644,6 +720,10 @@ static void serve_one(int fd)
         if (need >= 0 && got >= need) break;
     }
     if (got <= 0) return;
+    {
+        char gid[16];
+        if (http_gameicon_id(req, got, gid, sizeof gid) && send_gameicon(fd, gid)) return;
+    }
     n = http_handle(g_c, req, got, out, (int)sizeof out);
     {
         int stop;

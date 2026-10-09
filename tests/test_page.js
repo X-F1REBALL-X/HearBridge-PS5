@@ -59,14 +59,21 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=120' 
 check(/id="lat" min="40" max="200" step="1"/.test(html), 'page: slider goes 40-200 ms in 1 ms steps');
 calls.length = 0; el('lat').value = 150; el('lat').oninput.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150', 'page: moving the slider posts the buffer target');
-check(html.indexOf('id="evlog"') > html.indexOf('id="pg5"') && html.indexOf('id="evlog"') > html.indexOf('id="setm"') &&
-  html.indexOf('data-i18n="log"') > 0 && html.indexOf('data-i18n="logEmpty"') > 0,
-  'page: log lives in Settings (Status & log), not on the main screen');
+{
+  const main0 = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+  check(main0.indexOf('class="panel logp"') > 0 && main0.indexOf('id="evlog"') > 0 && main0.indexOf('class="panel status"') > 0 &&
+    html.indexOf('data-i18n="logEmpty"') > 0, 'page: status and log are on the main screen');
+  check(main0.indexOf('class="panel conn"') > 0 && main0.indexOf('id="codecs"') > 0 && main0.indexOf('id="stop"') > 0,
+    'page: connection (codec, chip, stop) is on the main screen');
+  const hdr = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
+  check(hdr.indexOf('id="setbtn"') >= 0 && hdr.indexOf('id="setbtn"') < hdr.indexOf('class="brand"') &&
+    /class="drawer" id="setm"/.test(html), 'page: settings button top left, opens a drawer');
+}
 {
   const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
-  check(main.indexOf('id="savedlist"') < 0 && main.indexOf('id="devlist"') < 0 && main.indexOf('id="codecs"') < 0 &&
-        main.indexOf('id="eq0"') < 0 && main.indexOf('id="bkdo"') < 0 && main.indexOf('id="evlog"') < 0 && main.indexOf('id="lqv"') < 0,
-        'page: main screen has no lists, codec, EQ bands, backup, log or link details');
+  check(main.indexOf('id="savedlist"') < 0 && main.indexOf('id="devlist"') < 0 &&
+        main.indexOf('id="eq0"') < 0 && main.indexOf('id="bkdo"') < 0 && main.indexOf('id="gsave"') < 0,
+        'page: device lists, EQ bands, game profiles and backup stay in Settings');
   check(main.indexOf('id="qs"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="gain"') > 0 && main.indexOf('id="hs"') > 0 &&
         main.indexOf('id="lat"') > 0 && main.indexOf('id="lbar"') > 0 && main.indexOf('id="pr0"') > 0 && main.indexOf('id="night"') > 0,
         'page: main screen has headset switch, battery, volume, latency + meter, EQ presets and night mode');
@@ -189,5 +196,18 @@ check(/toast\(t\('battToast'\)\.replace\('%s',ba\.level\)\)/.test(html) && /hb_b
   const i18n = fs.readFileSync(require('path').join(__dirname, '..', 'src', 'web', 'i18n.json'), 'utf8');
   check(!/mtkhint|mtk-test|mtk_build/i.test(html) && !/mtkHint/.test(i18n), 'page: no link to a separate mediatek build');
 }
+{
+  const i18n = JSON.parse(fs.readFileSync(require('path').join(__dirname, '..', 'src', 'web', 'i18n.json'), 'utf8'));
+  check(!i18n.langs.some(l => l.code === 'he') && !i18n.strings.he && i18n.langs.length === 10 && !/[\u0590-\u05ff]/.test(html),
+    'page: no Hebrew (language list, strings, text)');
+  const de = {}; let saved = null;
+  const c2 = Object.assign({}, ctx, { document: { getElementById: el, querySelectorAll: () => [], documentElement: de },
+    localStorage: { getItem: () => 'he', setItem(k, v) { saved = v; } } });
+  new Function(...Object.keys(c2), js)(...Object.values(c2));
+  check(de.lang === 'en' && de.dir === 'ltr' && saved === 'en', 'page: a saved he preference falls back to English');
+}
+check(/src="\/api\/gameicon\?id='\+encodeURIComponent\(id\)/.test(html) && /onerror="this\.parentNode\.removeChild\(this\)"/.test(html) &&
+  /<i>'\+esc\(L\)/.test(html) && /id="glist"/.test(html), 'page: games show the console icon, letter tile when missing');
+check(/act\('\/api\/game\?do=3&id='\+encodeURIComponent\(id\)\)/.test(html) && /gListSig/.test(html), 'page: saved games list, remove by id, redrawn only on change');
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);

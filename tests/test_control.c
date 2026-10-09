@@ -518,6 +518,28 @@ int main(int argc, char **argv)
         }
     }
 
+    {
+        char id[16];
+        static const char r1[] = "GET /api/gameicon?id=PPSA01325 HTTP/1.1\r\n\r\n";
+        static const char r2[] = "GET /api/gameicon?id=../etc/x HTTP/1.1\r\n\r\n";
+        static const char r3[] = "POST /api/gameicon?id=PPSA01325 HTTP/1.1\r\n\r\n";
+        CHECK(http_gameicon_id(r1, (int)strlen(r1), id, sizeof id) && !strcmp(id, "PPSA01325"), "game icon: id taken from the GET");
+        CHECK(!http_gameicon_id(r2, (int)strlen(r2), id, sizeof id) && !http_gameicon_id(r3, (int)strlen(r3), id, sizeof id),
+              "game icon: bad id or POST refused");
+        get(&c, "/api/gameicon?id=PPSA01325");
+        CHECK(!strncmp(out, "HTTP/1.1 404", 12), "game icon: not streamed -> 404 (page shows the letter tile)");
+        c.games_n = 2;
+        snprintf(c.games_id[0], 16, "PPSA01325"); snprintf(c.games_name[0], 48, "ASTRO \"BOT\"");
+        snprintf(c.games_id[1], 16, "CUSA00001"); c.games_name[1][0] = 0;
+        get(&c, "/api/status");
+        CHECK(strstr(out, "\"saved\":[{\"id\":\"PPSA01325\",\"name\":\"ASTRO \\\"BOT\\\"\"},{\"id\":\"CUSA00001\",\"name\":\"\"}]") != NULL,
+              "status: saved games list (escaped names)");
+        post(&c, "/api/game?do=3&id=CUSA00001");
+        CHECK(!strcmp(c.req_game_drop, "CUSA00001"), "game: remove a saved game by id");
+        c.req_game_drop[0] = 0;
+        post(&c, "/api/game?do=3&id=../../x");
+        CHECK(!strncmp(out, "HTTP/1.1 400", 12) && !c.req_game_drop[0], "game: remove with a bad id -> 400");
+    }
     printf("%s (%d failures)\n", fails ? "FAILED" : "ALL OK", fails);
     return fails ? 1 : 0;
 }
