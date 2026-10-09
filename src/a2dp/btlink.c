@@ -1147,15 +1147,8 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
 
     if (ev[0] == 0x04 && nEv >= 12 && ev[11] == 0x01) {   /* Connection Request, ACL */
         int k;
-        if (l->connected && !same_addr(ev + 2, l->addr) &&
-            btlink_saved_peer && btlink_saved_peer(ev + 2)) {
-            /* Another of our saved headsets calls while this link is up:
-             * turn it down now. Left unanswered it waits at the controller
-             * and every later page to it fails 0x0b. Only our own saved
-             * headsets; anything else is the system's to answer. */
-            btlink_reject_request(l->hci, ev + 2, 0x0D);
-            return;
-        }
+        /* Requests this link does not take are answered by the
+         * transport hook (main: accept / switch / reject), not here. */
         if (!l->acc_n || l->connected || l->acc_got) return;
         for (k = 0; k < l->acc_n; k++) {
             if (!same_addr(ev + 2, l->acc_addr[k])) continue;
@@ -1175,6 +1168,7 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
                  * time is accepted as peripheral instead. */
                 ap[6] = (g_acc_peri && same_addr(ev + 2, g_acc_peri_addr)) ? 0x01 : 0x00;
                 fire_cmd(l->hci, 0x0409, ap, 7);   /* Accept Connection Request */
+                acl_track_request_clear(ev + 2);  /* answered */
                 hci_addr_str(ev + 2, astr);
                 log_line("btlink: incoming connection from saved %s — accepting (%s)", astr,
                          ap[6] ? "stay peripheral" : "as central");

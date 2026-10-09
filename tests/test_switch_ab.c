@@ -7,6 +7,7 @@
 #include "btlink.h"
 #include "acl_track.h"
 #include "util.h"
+#include "connreq.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -46,6 +47,12 @@ static int f_cmd(void *s, unsigned op, const void *a, int n)
     } else if (op == 0x0406) {                           /* Disconnect */
         unsigned char e[6] = { 0x05, 4, 0, p[0], p[1], 0x16 };
         cstatus(op); push(e, 6);
+    } else if (op == 0x0409) {                           /* Accept Connection Request */
+        unsigned char e[13] = { 0x03, 11, 0, (unsigned char)next_handle, 0 };
+        cstatus(op); memcpy(e + 5, p, 6); e[11] = 1; e[12] = 0; push(e, 13); next_handle++;
+    } else if (op == 0x040A) {                           /* Reject Connection Request */
+        unsigned char e[13] = { 0x03, 11, 0, 0, 0 };
+        cstatus(op); e[2] = p[6]; memcpy(e + 5, p, 6); e[11] = 1; push(e, 13);
     } else if (op == 0x041F || op == 0x0419) {
         cstatus(op);
     } else ccomplete(op);
@@ -124,6 +131,52 @@ int main(void)
     CHECK(count_op(mark, 0x0406) == 0, "a handle that already went away is not disconnected again (pad safety)");
     CHECK(!btlink_own_acl_pending(), "and it is not counted as ours any more");
     btlink_destroy(b);
+
+    /* Auto switch: A streams, saved B calls in. Newest wins: A is torn
+     * down on its own handle, B's waiting call is accepted, B comes up. */
+    {
+        unsigned char req[12] = { 0x04, 10 };
+        hb_cr_in in;
+        int which = -1, d;
+        unsigned hb;
+        unsigned char ab[1][6], kb[1][16], ktb[1] = { 4 };
+        a = btlink_create(hci, 1021, 7);
+        strcpy(nm, "A");
+        CHECK(btlink_connect(a, A, 1, 0, key, 4, nm, sizeof nm, 3000) && btlink_is_up(a), "switch: A up (streaming)");
+        ha = btlink_handle(a);
+        memcpy(req + 2, B, 6); req[8] = 0x04; req[9] = 0x04; req[10] = 0x24; req[11] = 1;   /* CoD 0x240404 headset */
+        mark = nops;
+        push(req, 12);
+        memset(&in, 0, sizeof in);
+        in.is_av = hb_cod_is_av(0x240404); in.saved = 1; in.streaming_other = 1; in.busy_other = 1;
+        d = hb_connreq_decide(&in);
+        CHECK(d == HB_CR_SWITCH, "switch: saved B calling while A streams -> switch");
+        for (i = 0; i < 5; i++) (void)btlink_pump(a, 10);
+        CHECK(count_op(mark, 0x0409) == 0 && count_op(mark, 0x040A) == 0, "switch: A's link leaves B's call alone");
+        CHECK(acl_track_request_age(B, now_ms()) >= 0, "switch: B's call still waiting");
+        btlink_disconnect(a);                                   /* same teardown as Disconnect */
+        btlink_destroy(a);
+        CHECK(count_op(mark, 0x0406) == 1 && btlink_last_close_confirmed() == 1, "switch: A disconnected once, confirmed");
+        for (i = mark; i < nops; i++)
+            if (ops[i] == 0x0406)
+                CHECK((unsigned)(opargs[i][0] | (opargs[i][1] << 8)) == ha && opargs[i][2] == 0x13,
+                      "switch: A's Disconnect on A's own handle, reason 0x13");
+        memcpy(ab[0], B, 6); memcpy(kb[0], key, 16);
+        b = btlink_create(hci, 1021, 7);
+        CHECK(btlink_accept(b, (const unsigned char (*)[6])ab, (const unsigned char (*)[16])kb, ktb, 1, 3000, &which) &&
+              which == 0 && btlink_is_up(b), "switch: B's waiting call accepted, B up and encrypted");
+        hb = btlink_handle(b);
+        first = -1;
+        for (i = mark; i < nops; i++) if (ops[i] == 0x0409) { first = i; break; }
+        CHECK(first >= 0 && !memcmp(opargs[first], B, 6) && opargs[first][6] == 0x00, "switch: accepted B as central");
+        CHECK(count_op(mark, 0x0405) == 0, "switch: no page needed");
+        CHECK(hb != ha && hb != 0, "switch: B on its own new handle, A's handle gone");
+        CHECK(acl_track_request_age(B, now_ms()) < 0 && acl_track_request_age(A, now_ms()) < 0, "switch: no call left waiting");
+        CHECK(count_op(mark, 0x0406) == 1, "switch: nothing else disconnected");
+        btlink_disconnect(b);
+        btlink_destroy(b);
+        CHECK(!btlink_own_acl_pending(), "switch: no leftover ACL of ours at the end");
+    }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

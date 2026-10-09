@@ -74,6 +74,14 @@ struct slot {
     unsigned char buf[HCI_PKT_MAX];
 };
 
+void (*hci_usb_conn_req_hook)(hci_t hci, const unsigned char *ev, int n);
+
+/* Connection Requests seen in one reap, answered after it (commands are not
+ * sent from inside the completion loop). */
+#define CREQ_MAX 4
+static unsigned char g_creq[CREQ_MAX][16];
+static int g_ncreq;
+
 struct usb_hci {
     int    fd;
     int    dead;
@@ -236,6 +244,8 @@ static int reap(struct usb_hci *u)
         if (idx >= SLOT_EVT0 && idx < SLOT_ACL0) {
             if (!st && s->len >= 2) {
                 acl_track_event(s->buf, (int)s->len, now_ms());   /* every link, any owner */
+                if (s->buf[0] == 0x04 && s->len >= 12 && g_ncreq < CREQ_MAX)
+                    memcpy(g_creq[g_ncreq++], s->buf, 12);
                 ring_put(&u->evq, s->buf, (int)s->len); u->n_evt++; got = 1;
             }
             arm_read(u, idx);
@@ -263,6 +273,25 @@ static int op_next_acl(void *self, unsigned char *dst, int cap)
     return ring_take(&((struct usb_hci *)self)->aclq, dst, cap);
 }
 
+static const hci_ops usb_ops;
+
+/* Answer (or hand over) every Connection Request read so far, and give the
+ * hook its periodic tick (ev NULL). */
+static void creq_flush(struct usb_hci *u)
+{
+    hci_t h;
+    int i, n = g_ncreq;
+    static int busy;
+    if (!hci_usb_conn_req_hook || busy) return;   /* no recursion from the hook's own pumps */
+    h.ctx = u;
+    h.ops = &usb_ops;
+    busy = 1;
+    g_ncreq = 0;
+    for (i = 0; i < n; i++) hci_usb_conn_req_hook(h, g_creq[i], 12);
+    hci_usb_conn_req_hook(h, NULL, 0);
+    busy = 0;
+}
+
 static int op_pump(void *self, int wait_ms)
 {
     struct usb_hci *u = self;
@@ -275,6 +304,7 @@ static int op_pump(void *self, int wait_ms)
         struct pollfd pf;
         long left;
         int got = reap(u), k;
+        creq_flush(u);
         /* A read whose re-arm failed (EBUSY/transient error) would leave
          * the event or ACL pipe silent for good: re-arm idle readers. */
         for (k = SLOT_EVT0; k < SLOT_OUT; k++)
