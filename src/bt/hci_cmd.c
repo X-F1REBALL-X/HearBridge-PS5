@@ -116,6 +116,11 @@ void hci_scan_pause_enable(int on)
     g_scan_pause_on = on;
 }
 
+static int g_mediatek;
+
+void hci_set_mediatek(int on) { g_mediatek = on; }
+int  hci_is_mediatek(void) { return g_mediatek; }
+
 void hci_scan_pause(hci_t hci, const char *why)
 {
     unsigned char cc[16], off = 0;

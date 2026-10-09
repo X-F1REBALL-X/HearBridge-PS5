@@ -542,6 +542,7 @@ static int try_node(struct usb_hci *u, const char *path)
     for (i = SLOT_EVT0; i < SLOT_OUT; i++) arm_read(u, i);
     u->tx_slot = SLOT_OUT;
     hci_scan_pause_enable(mtk);
+    hci_set_mediatek(mtk);
     log_line("hci_usb: opened %s (%d event / %d ACL reads in flight)", path,
              READS_EVT, READS_ACL);
     diag_set("bt controller", "%s %s; HCI iface %d evt 0x%02x in 0x%02x out 0x%02x", path, id,
