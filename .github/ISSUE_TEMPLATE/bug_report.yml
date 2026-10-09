@@ -33,11 +33,25 @@ body:
     validations:
       required: true
   - type: dropdown
+    id: chip
+    attributes:
+      label: Bluetooth chip
+      description: >-
+        Shown in the **Chip** row at the bottom of the Status panel on the page, or in the log line `usb: ... is XXXX:YYYY`. See [Which chip do I have?](https://github.com/X-F1REBALL-X/HearBridge-PS5#which-chip-do-i-have)
+      options:
+        - Marvell/NXP (1286:...)
+        - MediaTek (0e8d:...)
+        - Other (write the ID below)
+        - Don't know / page does not open
+    validations:
+      required: true
+  - type: dropdown
     id: elf
     attributes:
       label: Which HearBridge file did you run?
       options:
         - HearBridge-PS5-1.1.0.elf
+        - HearBridge-PS5-1.1.0-mtk-test.elf (MediaTek test build)
         - HearBridge-PS5-1.0.2.elf
         - HearBridge-PS5-1.0.2-fw13.60.elf
         - Other / older version (say which below)
@@ -83,5 +97,5 @@ body:
     attributes:
       label: Log files
       description: |
-        Attach (drag and drop) or paste `/data/hearbridge/hearbridge.log` and, with the fw13.60 build, `/data/hearbridge/diag.txt` (or the text of http://<console-ip>:8090/api/diag).
+        Attach (drag and drop) or paste `/data/hearbridge/hearbridge.log` and `/data/hearbridge/diag.txt` (or the text of http://<console-ip>:8090/api/diag).
         The log contains your headphones' Bluetooth address and name; remove them if you prefer.
