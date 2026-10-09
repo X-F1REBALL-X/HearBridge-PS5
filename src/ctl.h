@@ -5,7 +5,7 @@
 
 #include <pthread.h>
 
-#define HB_GAIN_DEFAULT_PCT 500   /* software base gain 5.0 */
+#define HB_GAIN_DEFAULT_PCT 250   /* software base gain, middle of the slider */
 #define HB_GAIN_MAX_PCT     500
 
 /* Per-run random token: the page carries it and sends it back in the
