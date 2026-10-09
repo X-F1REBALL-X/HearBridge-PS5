@@ -2,5 +2,6 @@ HearBridge-PS5
 Copyright © 2026 X-F1REBALL-X
 Licensed under GPL-3.0-or-later (see LICENSE).
 
-assets/fonts/he-*.woff: Hebrew subset of Heebo (c) 2014 The Heebo Project Authors,
-SIL Open Font License 1.1 (see assets/fonts/OFL-Heebo.txt).
+assets/fonts/he-*.woff: Hebrew-only subsets of Assistant (weights 400 and 600),
+(c) 2020 The Assistant Project Authors, (c) 2010 The Source Sans Pro Authors,
+SIL Open Font License 1.1 (see assets/fonts/OFL-Assistant.txt).

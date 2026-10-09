@@ -202,11 +202,11 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
     }
 
     /* Hebrew glyphs for the page: a clean console has no Hebrew font */
-    if (!strcmp(path, "/fonts/he-400.woff") || !strcmp(path, "/fonts/he-700.woff")) {
-        int bold = path[10] == '7';
+    if (!strcmp(path, "/fonts/he-400.woff") || !strcmp(path, "/fonts/he-600.woff")) {
+        int bold = path[10] == '6';
         return respond_c(out, max, 200, "font/woff",
-                         (const char *)(bold ? hb_font_he_700 : hb_font_he_400),
-                         bold ? (int)sizeof hb_font_he_700 : (int)sizeof hb_font_he_400,
+                         (const char *)(bold ? hb_font_he_600 : hb_font_he_400),
+                         bold ? (int)sizeof hb_font_he_600 : (int)sizeof hb_font_he_400,
                          "max-age=86400");
     }
 
