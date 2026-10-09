@@ -101,5 +101,22 @@ check(/link dropped/.test(el('evlog').innerHTML), 'page: recent switches and dis
 STATUS.state = 'disconnected'; STATUS.connected = 0; STATUS.why = 'dropped';
 global.hbTest.req('/api/status');
 check(/headset dropped the link/.test(el('state').textContent), 'page: shows why the headset disconnected');
+// Device row after a drop: the status says disconnected -> row not connected at once.
+const B = () => global.hbTest.badge(1);
+STATUS.state = 'streaming'; STATUS.connected = 1; STATUS.why = '';
+global.hbTest.req('/api/status');
+check(/>Connected</.test(B()), 'page: saved row shows connected while streaming');
+STATUS.state = 'disconnected'; STATUS.connected = 0; STATUS.why = 'away';
+global.hbTest.req('/api/status');
+check(!/>Connected</.test(B()), 'page: saved row shows not connected on the first poll after the drop');
+// Stale status (no answer for > 4 s): never keep "connected".
+STATUS.state = 'streaming'; STATUS.connected = 1;
+global.hbTest.req('/api/status');
+const realNow = Date.now;
+Date.now = () => realNow() + 10000;
+global.hbTest.draw();
+check(!/>Connected</.test(B()) && el('dev').textContent !== 'X',
+  'page: an old status (tab asleep, no answer) does not keep showing connected');
+Date.now = realNow;
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);

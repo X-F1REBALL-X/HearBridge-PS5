@@ -314,6 +314,7 @@ static int sig_send(btlink *l, unsigned char code, unsigned char id,
 {
     unsigned char cmd[64];
 
+    if (!l->connected) return 0;         /* never signal on a dead link */
     if (len < 0 || len + 4 > (int)sizeof cmd) return 0;
     cmd[0] = code;
     cmd[1] = id;
@@ -479,7 +480,7 @@ static void chan_close_disc(btlink *l, chan *c)
 {
     unsigned char r[4];
     if (!c || c->st == CH_CLOSED) return;
-    if (c->dcid &&
+    if (c->dcid && l->connected &&      /* link gone: close locally, nothing to send */
         (c->st == CH_OPEN || c->st == CH_CONFIG || c->st == CH_CONNECTING)) {
         put16(r, c->dcid);
         put16(r + 2, c->scid);
