@@ -35,6 +35,7 @@
 #include "diag.h"
 #include "util.h"
 #include "stop.h"
+#include "btchip.h"
 
 enum {
     RING_DEPTH      = 64,
@@ -470,9 +471,20 @@ static void pick_endpoints(int fd, struct usbhci_iface *ifc)
              k > 0 ? "using" : "fallback, no", k, ifc->evt_ep, ifc->in_ep, ifc->out_ep);
 }
 
+/* VID:PID of the controller hci_usb_open() picked (-1 until then). */
+static int g_chip_vid = -1, g_chip_pid = -1;
+
+int hci_usb_chip(int *vid, int *pid)
+{
+    if (vid) *vid = g_chip_vid;
+    if (pid) *pid = g_chip_pid;
+    return g_chip_vid >= 0;
+}
+
 /* "1286:2059 \"product\" by \"vendor\"" for an open ugen fd (read-only
- * ioctls: nothing is sent to the device). */
-static void device_id(int fd, char *out, size_t cap, unsigned *vid)
+ * ioctls: nothing is sent to the device). vid/pid (may be NULL) get the
+ * IDs, or -1 when the device descriptor cannot be read. */
+static void device_id(int fd, char *out, size_t cap, int *vid, int *pid)
 {
     struct usb_device_descriptor dd;
     struct usb_device_info di;
@@ -480,11 +492,13 @@ static void device_id(int fd, char *out, size_t cap, unsigned *vid)
 
     memset(&dd, 0, sizeof dd);
     memset(&di, 0, sizeof di);
-    if (vid) *vid = 0;
+    if (vid) *vid = -1;
+    if (pid) *pid = -1;
     if (ioctl(fd, USB_GET_DEVICE_DESC, &dd) == 0) {
-        if (vid) *vid = UGETW(dd.idVendor);
         n = snprintf(out, cap, "%04x:%04x class %02x", UGETW(dd.idVendor),
                      UGETW(dd.idProduct), dd.bDeviceClass);
+        if (vid) *vid = UGETW(dd.idVendor);
+        if (pid) *pid = UGETW(dd.idProduct);
     } else
         n = snprintf(out, cap, "????:???? (device descriptor errno %d)", errno);
     if (n > 0 && (size_t)n < cap && ioctl(fd, USB_GET_DEVICEINFO, &di) == 0)
@@ -495,16 +509,15 @@ static void device_id(int fd, char *out, size_t cap, unsigned *vid)
 static int try_node(struct usb_hci *u, const char *path)
 {
     struct usb_fs_init in;
-    char id[128];
-    unsigned vid = 0;
-    int i, mtk;
+    char id[128], chip[64];
+    int i, vid, pid, mtk;
     u->fd = open(path, O_RDWR);
     if (u->fd < 0) {
         log_line("hci_usb: open %s: errno %d", path, errno);
         return 0;
     }
     snprintf(u->node, sizeof u->node, "%s", path);
-    device_id(u->fd, id, sizeof id, &vid);
+    device_id(u->fd, id, sizeof id, &vid, &pid);
     log_line("usb: %s is %s", path, id);
     pick_endpoints(u->fd, &u->ifc);
     mtk = vid == 0x0E8D;                  /* MediaTek (PS5 Pro) */
@@ -533,6 +546,11 @@ static int try_node(struct usb_hci *u, const char *path)
              READS_EVT, READS_ACL);
     diag_set("bt controller", "%s %s; HCI iface %d evt 0x%02x in 0x%02x out 0x%02x", path, id,
              u->ifc.number, u->ifc.evt_ep, u->ifc.in_ep, u->ifc.out_ep);
+    g_chip_vid = vid;
+    g_chip_pid = pid;
+    btchip_describe(vid, pid, chip, (int)sizeof chip);
+    diag_set("bt chip", "%s", chip[0] ? chip : "unknown (no device descriptor)");
+    log_line("hci_usb: chip %s", chip[0] ? chip : "unknown");
     return 1;
 fail:
     log_line("hci_usb: %s unusable: %s", path, strerror(errno));
@@ -588,7 +606,7 @@ static void survey_one(const char *path, int *count)
         (*count)++;
         return;
     }
-    device_id(fd, id, sizeof id, NULL);
+    device_id(fd, id, sizeof id, NULL, NULL);
     memset(&gd, 0, sizeof gd);
     gd.ugd_data = cfg;
     gd.ugd_maxlen = (uint16_t)sizeof cfg;

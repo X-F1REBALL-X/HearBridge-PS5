@@ -7,6 +7,7 @@
 #include "diag.h"
 #include "avrcp.h"
 #include "sdp_server.h"
+#include "btchip.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -144,6 +145,42 @@ int main(int argc, char **argv)
     c.xq_low = 1;
     get(&c, "/api/status");
     CHECK(strstr(out, "\"xq_low\":1"), "status: low SBC-XQ note flag");
+
+    /* ---- Bluetooth chip ---- */
+    {
+        char d[64];
+        CHECK(btchip_vendor(0x1286) && !strcmp(btchip_vendor(0x1286), "Marvell/NXP"), "chip: 1286 is Marvell/NXP");
+        CHECK(btchip_vendor(0x0e8d) && !strcmp(btchip_vendor(0x0e8d), "MediaTek"), "chip: 0e8d is MediaTek");
+        CHECK(!btchip_vendor(0x8087) && !btchip_vendor(-1), "chip: other VIDs unknown");
+        CHECK(btchip_is_mediatek(0x0e8d) && !btchip_is_mediatek(0x1286) && !btchip_is_mediatek(-1),
+              "chip: only 0e8d counts as MediaTek");
+        btchip_describe(0x1286, 0x2059, d, (int)sizeof d);
+        CHECK(!strcmp(d, "Marvell/NXP (1286:2059)"), "chip: Marvell description");
+        btchip_describe(0x0e8d, 0x0608, d, (int)sizeof d);
+        CHECK(!strcmp(d, "MediaTek (0e8d:0608)"), "chip: MediaTek description");
+        btchip_describe(0xabcd, 0x0012, d, (int)sizeof d);
+        CHECK(!strcmp(d, "abcd:0012"), "chip: unknown vendor shows only the IDs");
+        btchip_describe(-1, -1, d, (int)sizeof d);
+        CHECK(d[0] == 0, "chip: nothing before the controller is open");
+    }
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"chip\":{\"vid\":\"\",\"pid\":\"\",\"vendor\":\"\",\"mediatek\":0,") != NULL,
+          "status: empty chip until the controller is open");
+    c.chip_vid = 0x1286; c.chip_pid = 0x2059;
+    get(&c, "/api/status");
+    CHECK(strstr(out, HB_MTK_BUILD ? "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"mediatek\":0,\"mtk_build\":1}"
+                                   : "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"mediatek\":0,\"mtk_build\":0}") != NULL,
+          "status: Marvell chip");
+    c.chip_vid = 0x0e8d; c.chip_pid = 0x0608;
+    get(&c, "/api/status");
+    CHECK(strstr(out, HB_MTK_BUILD ? "\"vid\":\"0e8d\",\"pid\":\"0608\",\"vendor\":\"MediaTek\",\"mediatek\":1,\"mtk_build\":1"
+                                   : "\"vid\":\"0e8d\",\"pid\":\"0608\",\"vendor\":\"MediaTek\",\"mediatek\":1,\"mtk_build\":0") != NULL,
+          HB_MTK_BUILD ? "status: MediaTek chip on the mediatek build" : "status: MediaTek chip on the regular build");
+    c.chip_vid = 0xabcd; c.chip_pid = 0x0012;
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"vid\":\"abcd\",\"pid\":\"0012\",\"vendor\":\"\",\"mediatek\":0") != NULL,
+          "status: unknown vendor, IDs only");
+    c.chip_vid = c.chip_pid = -1;
     diag_init(NULL);
     get(&c, "/api/diag");
     CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/plain") &&
