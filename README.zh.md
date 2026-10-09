@@ -16,7 +16,7 @@ HearBridge PS5 是用于破解 PS5 的 payload（ELF）。它通过 PS5 自带�
 
 ## 要求
 
-- 已破解的 PS5，ELF 加载器监听端口 **9021**（elfldr）。已在 PS5 fat（CFI-10xx）、固件 **10.20** 上测试。
+- 已破解的 PS5，ELF 加载器监听端口 **9021**（elfldr）。
 - 支持 A2DP（SBC，48 kHz 立体声）的蓝牙耳机或音箱。
 - 同一网络中的浏览器（PS5、手机或电脑）。
 
@@ -54,8 +54,7 @@ mediatek test 版本尚未测试。1.1.0 仅在 CFI-10xx 上测试过。欢迎�
 - **均衡器：**5 个频段（±12 dB），带预设，按耳机保存，带限幅器，增益不会失真。
 - **延迟：**缓冲目标 60 到 200 ms（默认 200 ms），并实时估算延迟。
 - **Clean sound：**关闭均衡器，增益恢复到 250 %，缓冲恢复到 200 ms。
-- 页面上有记录每一步的彩色**日志**：绿色表示成功，红色表示失败，蓝色表示你的操作。页面支持 11 种语言。
-- **芯片：** **Status** 底部显示你的蓝牙芯片。如果是 MediaTek 芯片，会显示 mediatek test 版本的链接。
+- 页面上有记录每一步的彩色**日志**：绿色表示成功，红色表示失败，蓝色表示你的操作。
 
 ## 编解码器
 
@@ -67,9 +66,8 @@ mediatek test 版本尚未测试。1.1.0 仅在 CFI-10xx 上测试过。欢迎�
 ## 已知限制
 
 - 一次只能连一个耳机，没有麦克风。电视也会继续播放声音。
-- 耳机必须支持 48 kHz 立体声 SBC。
 - 一次只运行一个使用蓝牙的 payload。DualSense 照常工作。
-- 仅在固件 10.20（PS5 fat，CFI-10xx）上测试过。其他型号和固件未测试。有报告称旧版本在 PS5 Pro 和部分 13.x 环境无法启动（[#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1)、[#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)）；MediaTek 芯片请试用 mediatek test 版本。
+- 仅在固件 10.20（PS5 fat，CFI-10xx）上测试过。其他型号和固件未测试。
 - 已测试耳机：Sony WF-1000XM6、OnePlus Buds Ace 2、Xbox Wireless Headset。
 
 ## 故障排除 / 报告问题
@@ -93,7 +91,3 @@ make send PS5_HOST=<console-ip>
 ## 许可证
 
 GPL-3.0-or-later。见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
-
----
-
-<p align="center">Developed by X-F1REBALL-X</p>

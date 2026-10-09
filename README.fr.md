@@ -16,7 +16,7 @@ HearBridge PS5 est un payload (ELF) pour une PS5 jailbreakée. Il diffuse le son
 
 ## Prérequis
 
-- Une PS5 jailbreakée avec un chargeur ELF sur le port **9021** (elfldr). Testé sur une PS5 fat (CFI-10xx) en firmware **10.20**.
+- Une PS5 jailbreakée avec un chargeur ELF sur le port **9021** (elfldr).
 - Un casque ou une enceinte Bluetooth A2DP (SBC, 48 kHz stéréo).
 - Un navigateur sur le même réseau (PS5, téléphone ou PC).
 
@@ -54,8 +54,7 @@ Sources: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/complian
 - **Égaliseur :** 5 bandes (±12 dB) avec préréglages, enregistré par casque, avec un limiteur pour que le boost ne sature pas.
 - **Latence :** cible de tampon de 60 à 200 ms (200 ms par défaut) et une estimation en direct du délai.
 - **Clean sound :** coupe l'égaliseur, remet le boost à 250 % et le tampon à 200 ms.
-- **Journal** sur la page avec chaque étape, en couleurs : vert réussi, rouge échoué, bleu pour vos appuis. La page existe en 11 langues.
-- **Puce :** le bas de **Status** affiche votre puce Bluetooth. Avec une puce MediaTek, un lien mène à la version mediatek test.
+- **Journal** sur la page avec chaque étape, en couleurs : vert réussi, rouge échoué, bleu pour vos appuis.
 
 ## Codecs
 
@@ -67,9 +66,8 @@ AAC, aptX et LDAC ne sont pas pris en charge.
 ## Limites connues
 
 - Un casque à la fois, pas de micro. La TV continue aussi à jouer le son.
-- Le casque doit accepter le SBC en 48 kHz stéréo.
 - Lancez un seul payload Bluetooth à la fois. La DualSense continue de fonctionner.
-- Testé uniquement en fw 10.20 (PS5 fat, CFI-10xx). Les autres modèles et firmwares ne sont pas testés. La PS5 Pro et certaines configurations 13.x ne démarraient pas avec les versions précédentes ([#1](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/1), [#2](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/2)) ; avec une puce MediaTek, essayez la version mediatek test.
+- Testé uniquement en fw 10.20 (PS5 fat, CFI-10xx). Les autres modèles et firmwares ne sont pas testés.
 - Casques testés : Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
 ## Dépannage / signaler un problème
@@ -93,7 +91,3 @@ make send PS5_HOST=<console-ip>
 ## Licence
 
 GPL-3.0-or-later. Voir [LICENSE](LICENSE) et [NOTICE](NOTICE).
-
----
-
-<p align="center">Developed by X-F1REBALL-X</p>
