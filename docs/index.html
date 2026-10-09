@@ -308,7 +308,7 @@ html[lang=ru] h1,html[lang=de] h1{font-size:2.7rem}
  <h2 data-i18n="shotsTitle"></h2>
  <div class="shots" style="margin-top:1.6rem">
   <figure class="shot"><div class="frame"><img id="altimg" src="img/ui-en.png" width="1920" height="1080" alt="HearBridge PS5 control page" loading="lazy"></div><figcaption data-i18n="shotEn"></figcaption></figure>
-  <figure class="shot"><div class="frame"><img src="img/ui-phone-en.png" width="390" height="640" alt="HearBridge PS5 control page on a phone" loading="lazy"></div><figcaption data-i18n="shotPhone"></figcaption></figure>
+  <figure class="shot"><div class="frame"><img id="phoneimg" src="img/ui-phone-en.png" width="390" height="640" alt="HearBridge PS5 control page on a phone" loading="lazy"></div><figcaption data-i18n="shotPhone"></figcaption></figure>
  </div>
 </div></section>
 
@@ -356,8 +356,7 @@ function applyLang(c){
   var els=document.querySelectorAll("[data-i18n]");
   for(var i=0;i<els.length;i++)els[i].innerHTML=fmt(t(els[i].getAttribute("data-i18n")));
   document.title="HearBridge PS5: "+t("h1a");
-  var shot=LANG=="he"?"img/ui-he.png":"img/ui-en.png";
-  document.getElementById("heroimg").src=shot;document.getElementById("altimg").src=shot;
+  document.getElementById("heroimg").src=document.getElementById("altimg").src="img/ui-"+LANG+".png";document.getElementById("phoneimg").src="img/ui-phone-"+LANG+".png";
   document.getElementById("langflag").innerHTML=FLAGS[L[2]];
   var o=document.querySelectorAll(".langopt");for(var j=0;j<o.length;j++)o[j].classList.toggle("on",o[j].getAttribute("data-lang")==LANG);
   fitHeader();

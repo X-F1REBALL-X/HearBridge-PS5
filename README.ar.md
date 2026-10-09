@@ -14,7 +14,7 @@
 
 HearBridge PS5 حمولة (ELF) لجهاز PS5 مكسور الحماية. تبث صوت الجهاز عبر بلوتوث PS5 نفسه إلى سماعات أو مكبر صوت بلوتوث عادي (A2DP). يتم التحكم فيها من صفحة ويب يقدمها الجهاز. لا تمس الألعاب ولا البرنامج الثابت ولا كسر الحماية.
 
-<p align="center"><img src="docs/img/ui-en.png" alt="صفحة ويب HearBridge PS5" width="900"></p>
+<p align="center"><img src="docs/img/ui-ar.png" alt="صفحة ويب HearBridge PS5" width="900"></p>
 
 ## المتطلبات
 
