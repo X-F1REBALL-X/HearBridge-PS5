@@ -8,8 +8,6 @@ body:
       value: |
         Thanks for reporting. HearBridge was developed and tested on a **PS5 fat (original model, CFI-10xx) on firmware 10.20**. Other models (Slim, Pro, later fat revisions) and other firmwares are untested and may use a different Bluetooth chip, so your report helps.
 
-        **On firmware 13.60**, please try `HearBridge-PS5-1.0.2-fw13.60.elf` from the [v1.0.2 release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/tag/v1.0.2) first; it writes extra diagnostics (`diag.txt`).
-
         How to get the log files: see [Troubleshooting / reporting a problem](https://github.com/X-F1REBALL-X/HearBridge-PS5#troubleshooting--reporting-a-problem).
   - type: input
     id: model
@@ -39,6 +37,7 @@ body:
     attributes:
       label: Which HearBridge file did you run?
       options:
+        - HearBridge-PS5-1.1.0.elf
         - HearBridge-PS5-1.0.2.elf
         - HearBridge-PS5-1.0.2-fw13.60.elf
         - Other / older version (say which below)
@@ -47,7 +46,7 @@ body:
   - type: dropdown
     id: toast
     attributes:
-      label: 'Did the "HearBridge 1.0.2: http://…" notification appear?'
+      label: 'Did the "HearBridge <version>: starting" notification appear?'
       options:
         - "Yes"
         - "No"
