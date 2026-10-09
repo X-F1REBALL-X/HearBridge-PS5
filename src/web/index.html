@@ -471,7 +471,9 @@ setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
 var ev=S.events||[],eh='';
 if(!ev.length)eh='<div class="k">'+esc(t('logEmpty'))+'</div>';
 else for(var ei=0;ei<ev.length;ei++)eh+='<div>'+esc(ev[ei])+'</div>';
-setHtml('evlog',eh);
+/* newest at the bottom; follow it unless the user scrolled up to read */
+var lg=$('evlog'),atEnd=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-6;
+setHtml('evlog',eh);if(atEnd)lg.scrollTop=lg.scrollHeight;
 $('pkv').textContent=S.peak.toFixed(3);$('m1').style.width=Math.min(100,S.peak*100)+'%';
 $('opv').textContent=S.out_peak.toFixed(3);$('m2').style.width=Math.min(100,S.out_peak*100)+'%';
 if(!busyG)$('gain').value=S.gain_pct;$('gv').textContent=pct(S.gain_pct);

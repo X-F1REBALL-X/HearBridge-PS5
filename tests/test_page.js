@@ -36,6 +36,7 @@ check(calls.length && calls[0].m === 'GET' && calls[0].p === '/api/status' && !c
 check(calls.some(function(c,i){return i>0 && c.m==='POST' && c.p==='/api/scan' && c.h['X-HB-Token']}), 'page: refresh starts a scan');
 check(/setInterval\(function\(\)\{if\(scanLive/.test(html), 'page: devices are polled during the scan, not after it');
 check(/Nothing yet/.test(el('evlog').innerHTML), 'page: empty log says nothing yet');
+check(/if\(atEnd\)lg\.scrollTop=lg\.scrollHeight/.test(html), 'page: log follows the newest line unless scrolled up');
 check(/patchList\('devlist'/.test(html) && /patchList\('savedlist'/.test(html) && !/\$\('(devlist|savedlist)'\)\.innerHTML=/.test(html),
   'page: device lists are patched in place (no rebuild per poll, no hover/focus blink)');
 const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], 

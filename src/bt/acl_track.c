@@ -30,6 +30,10 @@ void acl_track_event(const unsigned char *ev, int n, long now)
     if (!ev || n < 2) return;
     if (ev[0] == 0x04 && n >= 12 && ev[11] == 0x01) {          /* Connection Request, ACL */
         i = slot(ev + 2, 1);
+        if (i < 0) return;
+        if (g_t[i].req_ms < 0 || now - g_t[i].req_ms > 3000)
+            log_line("acl: connection request from %02X:%02X:%02X:%02X:%02X:%02X",
+                     ev[7], ev[6], ev[5], ev[4], ev[3], ev[2]);
         g_t[i].req_ms = now;
     } else if (ev[0] == 0x03 && n >= 13 && ev[12] == 0x01) {   /* Connection Complete, ACL */
         i = slot(ev + 5, ev[2] == 0);
