@@ -1671,10 +1671,10 @@ static void cancel_our_page(btlink *l)
     log_line("btlink: cancelled our page");
 }
 
-int btlink_connect(btlink *l, const unsigned char addr[6],
-                   unsigned char psrm, unsigned clock_offset,
-                   const unsigned char *link_key, unsigned char key_type,
-                   char *name_inout, int name_max, int timeout_ms)
+static int connect_paged(btlink *l, const unsigned char addr[6],
+                         unsigned char psrm, unsigned clock_offset,
+                         const unsigned char *link_key, unsigned char key_type,
+                         char *name_inout, int name_max, int timeout_ms)
 {
     unsigned char p[16];
     long t0, deadline;
@@ -2298,4 +2298,18 @@ int btlink_own_acl_pending(void)
 {
     last_handle_check();
     return g_last_acl_handle != 0;
+}
+
+/* Page with the system page scan paused (see hci_scan_pause). */
+int btlink_connect(btlink *l, const unsigned char addr[6],
+                   unsigned char psrm, unsigned clock_offset,
+                   const unsigned char *link_key, unsigned char key_type,
+                   char *name_inout, int name_max, int timeout_ms)
+{
+    int r;
+    if (!l || !addr) return 0;
+    hci_scan_pause(l->hci, "connect");
+    r = connect_paged(l, addr, psrm, clock_offset, link_key, key_type, name_inout, name_max, timeout_ms);
+    hci_scan_resume(l->hci);
+    return r;
 }
