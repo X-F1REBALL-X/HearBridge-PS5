@@ -99,7 +99,9 @@ void hb_prefs_parse(hb_prefs *p, const char *t)
         } else if (!strcmp(line, "lat_learned")) {
             const char *end;
             long ms = parse_long(v, &end);
-            if (end != v) p->lat_learned = ms <= 0 ? 0 : clampi((int)ms, 60, 400);
+            /* Above 250 ms it is not trusted (the first fix/1.3.1 build
+             * drove Auto to 400 ms on a starving link): start fresh. */
+            if (end != v) p->lat_learned = ms <= 0 || ms > 250 ? 0 : clampi((int)ms, 60, 250);
         } else if (!strcmp(line, "eq")) {
             p->eq_on = !strcmp(v, "on");
         } else if (!strcmp(line, "night")) {

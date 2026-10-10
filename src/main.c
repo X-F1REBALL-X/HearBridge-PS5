@@ -258,7 +258,7 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
                      * shows up close that link (it is this headset's, not
                      * a pad's) and page once more. */
                     long w = now_ms() + 1500;
-                    while (!(h = acl_track_handle(ini->addr)) && now_ms() < w && !connect_abort(ini->addr))
+                    while (!(h = acl_track_any_handle(ini->addr)) && now_ms() < w && !connect_abort(ini->addr))
                         if (btlink_pump(link, 50) < 0) break;
                     if (h) {
                         log_line("select: the console holds it on handle %#05x - closing that link and paging again", h);
@@ -2937,29 +2937,78 @@ stream_setup:
                 g_ctl.link_score = hb_linkq_score(rssi, lqv, dpm,
                                                   btlink_tx_backlog(link) > HB_RATE_SLACK ? btlink_tx_backlog(link) - HB_RATE_SLACK : 0,
                                                   btlink_media_cap(link));
+                {
+                    /* A saved headset the console's own stack holds while we
+                     * stream (a read pause let it take one): it shares the
+                     * radio and the HCI event pipe with our stream, so
+                     * completion events (credits) go missing and audio
+                     * drops. Saved headsets are ours: close that link. */
+                    static long last_close;
+                    unsigned own = btlink_handle(link);
+                    int i;
+                    if (!g_switch_req && !g_accdrop.on && now - last_close > 30000) {
+                        for (i = 0; i < g_npaired; i++) {
+                            unsigned h;
+                            const char *nm = g_paired[i].name[0] ? g_paired[i].name : "a saved headset";
+                            if (!memcmp(g_paired[i].addr, ini->addr, 6)) continue;
+                            h = acl_track_any_handle(g_paired[i].addr);
+                            if (!h || h == own) continue;
+                            log_line("stream: %s is connected to the console's own Bluetooth (handle %#05x) - "
+                                     "closing it, it takes airtime and credits from the stream", nm, h);
+                            btlink_hci_disconnect(hci, h, 0x13);
+                            {
+                                char evl[HB_EVENT_LEN];
+                                snprintf(evl, sizeof evl, "Disconnected %s from the PS5 itself", nm);
+                                (void)hb_utf8_clean(evl);
+                                ctl_event_locked(&g_ctl, evl);
+                            }
+                            last_close = now;
+                            break;
+                        }
+                    }
+                }
                 if (la_on) {
                     /* Auto: one step per status second, from the packets
                      * dropped since the last one. */
                     long dr = btlink_tx_dropped(link);
-                    int ch, was = la.cur_ms;
+                    int ch, was = la.cur_ms, was_bad = la.link_bad;
                     (void)hb_lat_auto_tick(&la, dr >= la_drops ? (int)(dr - la_drops) : 0, &ch);
                     la_drops = dr;
                     g_ctl.lat_auto_ms = la.cur_ms;
+                    if (la.link_bad && !was_bad) {
+                        unsigned long lsent, lcred;
+                        int llim;
+                        btlink_tx_counters(link, &lsent, &lcred, &llim);
+                        log_line("latency: auto: %d drops/min with RSSI %d, LQ %d: the link cannot carry "
+                                 "the stream (credits %lu of %lu sent, limit %d), buffer kept at %d ms",
+                                 dpm, rssi, lqv, lcred, lsent, llim, la.cur_ms);
+                        ctl_event_locked(&g_ctl, "Dropouts come from the link, not the buffer");
+                    }
                     if (ch) {
                         log_line("latency: auto %d -> %d ms (%s)", was, la.cur_ms,
-                                 ch > 0 ? "drops" : "clean link, trying lower");
+                                 ch > 0 ? "drops" : la.link_bad ? "link problem, a bigger buffer does not help"
+                                                    : "clean link, trying lower");
                         if (ch > 0) {
                             char evl[HB_EVENT_LEN];
                             snprintf(evl, sizeof evl, "Audio dropped, latency raised to %d ms (Auto)", la.cur_ms);
                             ctl_event_locked(&g_ctl, evl);
                         }
-                        if (g_prefs_have && g_prefs.lat_learned != la.cur_ms) {
-                            g_prefs.lat_learned = la.cur_ms;   /* next time it starts here */
-                            hs_dirty = 1;
+                        {
+                            /* Next time it starts here; not a level a bad
+                             * link pushed it to (link problem or above 250). */
+                            int keep = la.link_bad || la.cur_ms > HB_LAT_AUTO_TRUST_MS ? 0 : la.cur_ms;
+                            if (g_prefs_have && g_prefs.lat_learned != keep) {
+                                g_prefs.lat_learned = keep;
+                                hs_dirty = 1;
+                            }
                         }
                     }
                 }
-                {
+                if (la_on) {
+                    /* Auto owns the buffer: the slider step-back is off. */
+                    hb_lat_backoff_init(&bo);
+                    g_ctl.lat_backoff_ms = 0;
+                } else {
                     int was = bo.extra_ms;
                     (void)hb_lat_backoff_tick(&bo, g_ctl.latency_ms, dpm);
                     if (bo.extra_ms != was) {
@@ -2974,7 +3023,7 @@ stream_setup:
                         ctl_event_locked(&g_ctl, evl);
                     }
                 }
-                if (pk.queue_ms < HB_QUEUE_LOW_MS) {
+                if (pk.queue_ms != HB_QUEUE_LOW_MS) {   /* only the delay AT the 200 ms default */
                     lat_sum = 0;
                     lat_n = 0;
                 } else if (now - t_start > 8000) {

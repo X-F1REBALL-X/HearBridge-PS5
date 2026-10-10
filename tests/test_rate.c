@@ -250,14 +250,14 @@ int main(int argc, char **argv)
     {
         /* Adaptive latency (Auto). Simulated link: stalls longer than
          * `need` ms come every few seconds, so a target below it drops
-         * about one packet every 4 s (the Coral CM835 log: ~15 drops/min at
-         * 200 ms), a target at or above it never drops. */
-        static const int needs[] = { 250, 120, 0, 390 };
+         * about one packet every 4 s (the Coral CM835 on 1.3.0: ~15
+         * drops/min at 200 ms), a target at or above it never drops. */
+        static const int needs[] = { 250, 120, 0 };
         unsigned k;
         for (k = 0; k < sizeof needs / sizeof *needs; k++) {
             hb_lat_auto a;
             int t, need = needs[k], late_drops = 0, swings = 0, ch, minv = 1000, maxv = 0;
-            char what[128];
+            char what[160];
             hb_lat_auto_init(&a, 200);
             for (t = 0; t < 2 * 3600; t++) {
                 int d = a.cur_ms < need && t % 4 == 0;
@@ -282,6 +282,35 @@ int main(int argc, char **argv)
             }
         }
         {
+            /* The fix/1.3.1 console log: ~8 drops a second (credits starved,
+             * RSSI fine) drove Auto 200 -> 400 ms, and the drops stayed.
+             * That is a link problem: no raise at all. */
+            hb_lat_auto a;
+            int t, ch, ups = 0;
+            hb_lat_auto_init(&a, 200);
+            for (t = 0; t < 600; t++) {
+                (void)hb_lat_auto_tick(&a, 8, &ch);
+                if (ch > 0) ups++;
+            }
+            CHECK(a.cur_ms == 200 && a.link_bad, "auto: a huge drop rate is a link problem, the buffer stays at 200 ms");
+            /* Stalls first (one raise), then the link falls apart: the
+             * raise is undone. */
+            hb_lat_auto_init(&a, 200);
+            for (t = 0; t < 60; t++) (void)hb_lat_auto_tick(&a, t % 3 == 0, &ch);
+            CHECK(a.cur_ms > 200, "auto: occasional stalls raise the buffer");
+            for (t = 0; t < 30; t++) (void)hb_lat_auto_tick(&a, 5, &ch);
+            CHECK(a.cur_ms == 200 && a.link_bad, "auto: then a flood of drops: the raise is undone (it did not help)");
+            /* A link that needs more than any buffer: never above two steps. */
+            hb_lat_auto_init(&a, 200);
+            for (t = 0; t < 3600; t++) (void)hb_lat_auto_tick(&a, t % 4 == 0, &ch);
+            CHECK(a.cur_ms == HB_LAT_AUTO_MAX_MS, "auto: a link needing more stops at 260 ms, never 400");
+            hb_lat_auto_init(&a, 100);
+            for (t = 0; t < 3600; t++) (void)hb_lat_auto_tick(&a, t % 4 == 0, &ch);
+            CHECK(a.cur_ms == 100 + HB_LAT_AUTO_MAX_RAISES * HB_LAT_AUTO_UP_MS,
+                  "auto: at most two raises above where the stream started");
+            CHECK(HB_LAT_AUTO_MAX_MS <= 260, "auto: ceiling 260 ms");
+        }
+        {
             hb_lat_auto a;
             int ch, i, r = 0;
             hb_lat_auto_init(&a, 0);
@@ -290,15 +319,16 @@ int main(int argc, char **argv)
             for (i = 0; i < HB_LAT_AUTO_START_S; i++) r = hb_lat_auto_tick(&a, 5, &ch);
             CHECK(r == 130 && !ch, "auto: drops while the stream starts do not count");
             r = hb_lat_auto_tick(&a, 1, &ch);
-            r = hb_lat_auto_tick(&a, 0, &ch);
-            for (i = 0; i < HB_LAT_AUTO_BAD_WIN_S; i++) r = hb_lat_auto_tick(&a, 0, &ch);
+            for (i = 0; i < HB_LAT_AUTO_WIN_S; i++) r = hb_lat_auto_tick(&a, 0, &ch);
             r = hb_lat_auto_tick(&a, 1, &ch);
             CHECK(r == 130, "auto: an odd drop now and then is forgiven");
             r = hb_lat_auto_tick(&a, 3, &ch);
             CHECK(r == 130 + HB_LAT_AUTO_UP_MS && ch == 1, "auto: a burst of drops raises the target at once");
-            hb_lat_auto_init(&a, 9999);
-            CHECK(a.cur_ms == HB_LAT_AUTO_MAX_MS && hb_lat_auto_clamp(10) == HB_LAT_AUTO_MIN_MS,
-                  "auto: learned values stay within 60 to 400 ms");
+            hb_lat_auto_init(&a, 400);
+            CHECK(a.cur_ms == 200, "auto: a saved 400 ms (bad build) is not trusted, starts at 200 ms");
+            hb_lat_auto_init(&a, 240);
+            CHECK(a.cur_ms == 240 && hb_lat_auto_clamp(10) == HB_LAT_AUTO_MIN_MS && hb_lat_auto_clamp(9999) == HB_LAT_AUTO_MAX_MS,
+                  "auto: a sane learned value is kept, all within 60 to 260 ms");
         }
     }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
