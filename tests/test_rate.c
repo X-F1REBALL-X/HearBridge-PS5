@@ -215,8 +215,8 @@ int main(int argc, char **argv)
     {   /* latency slider + estimate */
         hb_latency L;
         int t, fit = 1;
-        CHECK(hb_latency_clamp(10) == 40 && hb_latency_clamp(5000) == 200 && hb_latency_clamp(180) == 180,
-              "latency target clamps to 40..200 ms");
+        CHECK(hb_latency_clamp(10) == 40 && hb_latency_clamp(5000) == 400 && hb_latency_clamp(300) == 300 && hb_latency_clamp(180) == 180,
+              "latency target clamps to 40..400 ms");
         {
             hb_lat_backoff b;
             int k, e = 0;
