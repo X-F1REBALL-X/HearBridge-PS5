@@ -45,3 +45,5 @@ Pause du scan MediaTek, correctif du pipe USB et outil de débogage HCI, par [Zi
 ## Licence
 
 GPL-3.0-or-later. Voir [LICENSE](LICENSE) et [NOTICE](NOTICE).
+
+[Soutenir le projet sur Ko-fi](https://ko-fi.com/xf1reballx). Le projet reste gratuit et open source.
