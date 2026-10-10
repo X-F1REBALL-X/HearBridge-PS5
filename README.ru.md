@@ -14,7 +14,7 @@
 
 HearBridge PS5 это payload (ELF), который выводит звук игр и системы PS5 на обычные Bluetooth-наушники через собственный Bluetooth консоли. Управление идёт через веб-страницу, которую отдаёт консоль.
 
-<p align="center"><img src="docs/img/ui-tv.png" alt="Веб-страница HearBridge PS5" width="900"></p>
+<p align="center"><img src="docs/img/ui-tv.png" alt="Веб-страница HearBridge PS5" width="440"> <img src="docs/img/ui-settings.png" alt="Веб-страница HearBridge PS5" width="440"></p>
 
 ## Главное
 

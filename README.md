@@ -14,7 +14,7 @@ Developed by **X-F1REBALL-X**
 
 HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on regular Bluetooth headphones, using the console's own Bluetooth. You control it from a web page served by the console.
 
-<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 web page" width="900"></p>
+<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 web page" width="440"> <img src="docs/img/ui-settings.png" alt="HearBridge PS5 web page" width="440"></p>
 
 ## Highlights
 
