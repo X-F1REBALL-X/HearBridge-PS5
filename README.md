@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/icon0.png" width="128" alt="HearBridge icon">
+
 # HearBridge PS5
 
 **Bluetooth headphones for a jailbroken PS5: game and system audio, no dongle.**
@@ -10,9 +12,9 @@ Developed by **X-F1REBALL-X**
 
 </div>
 
-HearBridge PS5 is a payload (ELF) for a jailbroken PS5. It streams the console's audio over the PS5's own Bluetooth to regular Bluetooth headphones or speakers (A2DP). You control it from a web page served by the console. It doesn't touch games, the firmware or the jailbreak.
+HearBridge PS5 is a payload (ELF) that streams the console's audio over the PS5's own Bluetooth to regular Bluetooth headphones or speakers. You control it from a web page served by the console. It doesn't touch games, the firmware or the jailbreak.
 
-<p align="center"><img src="docs/img/ui-en.png" alt="HearBridge PS5 web page" width="900"></p>
+<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 web page" width="900"></p>
 
 ## Requirements
 
@@ -22,15 +24,43 @@ HearBridge PS5 is a payload (ELF) for a jailbroken PS5. It streams the console's
 
 ## Install and run
 
-1. Download **HearBridge-PS5-1.2.0.elf** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
-2. Send it to the loader: `socat -u FILE:HearBridge-PS5-1.2.0.elf TCP:<console-ip>:9021`
+1. Download **HearBridge-PS5-1.3.0.elf** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+2. Send it to the loader: `socat -u FILE:HearBridge-PS5-1.3.0.elf TCP:<console-ip>:9021`
 3. Open **http://&lt;console-ip&gt;:8090**, or the **HearBridge** tile on the home screen.
+4. Open **Settings**, then **Headsets**. Put the headphones in pairing mode, press **Scan for devices** (about 12 s), then **Connect**.
 
-Sending the ELF again replaces the running copy. **Stop HearBridge** on the page ends it.
+Closing the page leaves HearBridge running. Sending the ELF again replaces the running copy, and **Stop HearBridge** ends it.
+
+## The page
+
+- **Headset:** battery percent (read over the hands-free link), signal and link quality. **Switch headset** jumps to another saved headset with one tap.
+- **Sound:** 5 band equalizer with presets, boost up to 500 %, headset volume that follows the headset's buttons, **Mute** and **Night mode** (quieter explosions, clearer voices).
+- **Connection:** codec and a latency slider from 40 to 200 ms with a live delay estimate.
+- **Log:** every step in color: green worked, red failed, blue for your presses.
+
+**Settings** opens a side menu:
+
+- **Home:** back to the main page.
+- **Headsets:** scan, connect, disconnect and forget.
+- **Sound & games:** Test tone, Clean sound, **Earbud next/previous changes volume** (for earbuds without volume keys) and your saved games.
+- **Details:** format, battery, AVRCP, latency breakdown and the Bluetooth chip.
+- **Backup & restore:** saved headsets with their pairing, settings and game profiles in one file, on a USB drive, the console or the device you're browsing from.
+
+### Game profiles
+
+Start a game, set the sound you like and save it. Profiles are kept per game and per headset, turn on by themselves when the game starts and hand back your usual sound when it closes. **Update Game Profile** on the Sound panel saves your changes.
+
+### Auto-connect and rest mode
+
+Saved headsets connect on their own when you turn them on or take them out of the case. Before rest mode HearBridge stops the headset cleanly and reconnects it after wake.
+
+### Codecs
+
+**Auto** is plain SBC and works with everything. **SBC HQ** and **SBC-XQ** can be picked by hand when the headset supports them. AAC, aptX and LDAC are not supported.
 
 ## Which chip do I have?
 
-One file works on both Bluetooth chips, Marvell/NXP and MediaTek. HearBridge finds the chip by itself and shows it in the **Chip** row of the **Status** panel.
+One file works on both Bluetooth chips. HearBridge finds the chip by itself and shows it under **Details**.
 
 | Model | Bluetooth chip |
 |---|---|
@@ -39,29 +69,9 @@ One file works on both Bluetooth chips, Marvell/NXP and MediaTek. HearBridge fin
 | CFI-20xx, CFI-21xx (Slim) | Marvell/NXP or MediaTek |
 | CFI-70xx, CFI-71xx (Pro) | MediaTek |
 
-Tested on: PS5 fat CFI-10xx (Marvell/NXP), PS5 Slim CFI-2008 (MediaTek). Other models: please report how it goes.
-
-In `/data/hearbridge/hearbridge.log` the line `usb: /dev/ugen0.2 is 1286:2059 …` names it too: `1286` = Marvell/NXP, `0e8d` = MediaTek.
+Tested on PS5 CFI-10xx (Marvell/NXP) and PS5 Slim CFI-2008 (MediaTek). Reports from other models are welcome.
 
 Sources: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
-
-## Features
-
-- **Pair:** put the headphones in pairing mode, press **Scan for devices** (20 s), then **Connect**.
-- **Auto-connect:** saved headphones connect on their own when you turn them on or take them out of the case. Taking out another saved pair switches to it. After a manual **Disconnect** they wait for **Connect**.
-- **Disconnect / Forget:** Disconnect drops the link and keeps the headphones saved. Forget disconnects and removes them.
-- **Volume:** boost (software gain up to 500 %, starts at 250 %) and headset volume (AVRCP, starts at 50 %). Saved per headset once you change them. **Mute** and **Test tone** for checks.
-- **Equalizer:** 5 bands (±12 dB) with presets, saved per headset, with a limiter so boosts don't clip.
-- **Latency:** buffer target from 60 to 200 ms (default 200 ms) and a live estimate of the delay.
-- **Clean sound:** equalizer off, boost back to 250 %, buffer back to 200 ms.
-- **Log** on the page with every step, in color: green worked, red failed, blue for your presses.
-
-## Codecs
-
-- **Auto:** plain SBC, works with everything.
-- **SBC HQ** and **SBC-XQ:** pick them by hand, only when the headphones support them. Unsupported ones are greyed out.
-
-AAC, aptX and LDAC are not supported.
 
 ## Known limits
 
@@ -69,11 +79,9 @@ AAC, aptX and LDAC are not supported.
 - Run only one Bluetooth payload at a time. The DualSense keeps working.
 - Headphones tested: Sony WF-1000XM6, OnePlus Buds Ace 2, Xbox Wireless Headset.
 
-## Troubleshooting / reporting a problem
+## Reporting a problem
 
 When the payload runs you should see a **"HearBridge &lt;version&gt;: starting"** notification. If you don't, the loader didn't run it.
-
-Settings, saved headphones and the log are in `/data/hearbridge/`. To report a problem:
 
 1. Get `/data/hearbridge/hearbridge.log` and `diag.txt` over FTP (for example [ftpsrv](https://github.com/ps5-payload-dev/ftpsrv), port 2121). `diag.txt` is also at http://&lt;console-ip&gt;:8090/api/diag.
 2. Open a [GitHub issue](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose) with the console model, firmware, loader, HearBridge version and the log files.

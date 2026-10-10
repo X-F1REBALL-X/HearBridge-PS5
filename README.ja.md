@@ -1,18 +1,20 @@
 <div align="center">
 
+<img src="assets/icon0.png" width="128" alt="HearBridge icon">
+
 # HearBridge PS5
 
-**脱獄した PS5 で Bluetooth ヘッドホン：ゲームとシステムの音声、ドングル不要。**
+**脱獄済み PS5 で Bluetooth ヘッドホン：ゲームとシステムの音を、ドングルなしで。**
 
-開発：**X-F1REBALL-X**
+開発： **X-F1REBALL-X**
 
 🇺🇸 [English](README.md) · 🇸🇦 [العربية](README.ar.md) · 🇪🇸 [Español](README.es.md) · 🇫🇷 [Français](README.fr.md) · 🇩🇪 [Deutsch](README.de.md) · 🇧🇷 [Português](README.pt.md) · 🇷🇺 [Русский](README.ru.md) · 🇯🇵 **日本語** · 🇨🇳 [中文](README.zh.md) · 🇮🇹 [Italiano](README.it.md)
 
 </div>
 
-HearBridge PS5 は脱獄した PS5 用のペイロード（ELF）です。本体の音声を PS5 自身の Bluetooth で普通の Bluetooth ヘッドホンやスピーカー（A2DP）に送ります。操作は本体が提供する Web ページから行います。ゲーム、ファームウェア、脱獄には手を加えません。
+HearBridge PS5 は、本体の音を PS5 内蔵の Bluetooth で普通の Bluetooth ヘッドホンやスピーカーに送るペイロード（ELF）です。操作は本体が提供する Web ページから行います。ゲーム、ファームウェア、脱獄には手を加えません。
 
-<p align="center"><img src="docs/img/ui-ja.png" alt="HearBridge PS5 の Web ページ" width="900"></p>
+<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 の Web ページ" width="900"></p>
 
 ## 必要なもの
 
@@ -22,70 +24,80 @@ HearBridge PS5 は脱獄した PS5 用のペイロード（ELF）です。本体
 
 ## インストールと起動
 
-1. [最新リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)から **HearBridge-PS5-1.2.0.elf** をダウンロード。
-2. ローダーに送信：`socat -u FILE:HearBridge-PS5-1.2.0.elf TCP:<console-ip>:9021`
-3. **http://&lt;console-ip&gt;:8090** を開くか、ホーム画面の **HearBridge** タイルを開く。
+1. [最新リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)から **HearBridge-PS5-1.3.0.elf** をダウンロードします。
+2. ローダーに送ります： `socat -u FILE:HearBridge-PS5-1.3.0.elf TCP:<console-ip>:9021`
+3. **http://&lt;console-ip&gt;:8090** を開くか、ホーム画面の **HearBridge** タイルを開きます。
+4. **設定** を開き、**ヘッドセット** を選びます。ヘッドホンをペアリングモードにして **デバイスを検索**（約 12 秒）を押し、**接続** を押します。
 
-ELF をもう一度送ると、動作中のものと入れ替わります。ページの **Stop HearBridge** で終了します。
+ページを閉じても HearBridge は動き続けます。ELF をもう一度送ると動作中のコピーと入れ替わり、**HearBridge を停止** で終了します。
 
-## どのチップ？
+## ページ
 
-1つのファイルで Marvell/NXP と MediaTek の両方の Bluetooth チップに対応します。HearBridge がチップを自動で判別し、**Status** パネルの **Chip** 行に表示します。
+- **ヘッドセット**：バッテリー残量（ハンズフリー接続で取得）、電波、リンク品質。**ヘッドセットを切り替え** で保存済みの別のヘッドセットにワンタップで切り替え。
+- **サウンド**：プリセット付き 5 バンドイコライザー、最大 500 % のブースト、ヘッドセットのボタンに追従する音量、**ミュート**、**ナイトモード**（爆発音は控えめ、声ははっきり）。
+- **接続**：コーデックと 40 から 200 ms のレイテンシスライダー、遅延のライブ推定。
+- **ログ**：すべての手順を色分け表示。緑は成功、赤は失敗、青は自分の操作。
+
+**設定** でサイドメニューが開きます：
+
+- **ホーム**：メインページに戻る。
+- **ヘッドセット**：検索、接続、切断、削除。
+- **サウンドとゲーム**：テストトーン、クリアな音、**イヤホンの次へ/前へで音量を変える**（音量ボタンのないイヤホン向け）、保存したゲーム。
+- **詳細**：フォーマット、バッテリー、AVRCP、レイテンシの内訳、Bluetooth チップ。
+- **バックアップと復元**：保存したヘッドセット（ペアリング情報込み）、設定、ゲームプロファイルを 1 つのファイルに。USB ドライブ、本体、閲覧中のデバイスに保存できます。
+
+### ゲームプロファイル
+
+ゲームを起動し、好みの音にして保存します。プロファイルはゲームごと、ヘッドセットごとに保存され、ゲーム開始時に自動で有効になり、終了するといつもの音に戻ります。サウンド パネルの **ゲームプロファイルを更新** で変更を保存します。
+
+### 自動接続とレストモード
+
+保存したヘッドセットは、電源を入れたりケースから出したりすると自動で接続します。レストモードの前に HearBridge はヘッドセットをきれいに停止し、復帰後に再接続します。
+
+### コーデック
+
+**自動** は通常の SBC で、どの機器でも使えます。**SBC HQ** と **SBC-XQ** はヘッドセットが対応していれば手動で選べます。 AAC、aptX、LDAC には対応していません。
+
+## 自分のチップはどれ？
+
+1 つのファイルで両方の Bluetooth チップに対応します。HearBridge がチップを自動で判別し、**詳細** に表示します。
 
 | モデル | Bluetooth チップ |
 |---|---|
-| CFI-10xx (発売時モデル) | Marvell/NXP |
-| CFI-11xx, CFI-12xx (初期型) | Marvell/NXP または MediaTek |
+| CFI-10xx (初期型) | Marvell/NXP |
+| CFI-11xx, CFI-12xx (通常型) | Marvell/NXP または MediaTek |
 | CFI-20xx, CFI-21xx (Slim) | Marvell/NXP または MediaTek |
 | CFI-70xx, CFI-71xx (Pro) | MediaTek |
 
-テスト済み: PS5 fat CFI-10xx（Marvell/NXP）、PS5 Slim CFI-2008（MediaTek）。ほかのモデルは結果を報告してください。
+PS5 CFI-10xx（Marvell/NXP）と PS5 Slim CFI-2008（MediaTek）で動作確認済み。他のモデルの報告も歓迎します。
 
-`/data/hearbridge/hearbridge.log` の `usb: /dev/ugen0.2 is 1286:2059 …` 行でも確認できます: `1286` = Marvell/NXP、`0e8d` = MediaTek。
-
-出典: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro teardown](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
-
-## 機能
-
-- **ペアリング：** ヘッドホンをペアリングモードにして **Scan for devices**（20 秒）を押し、**Connect** を押します。
-- **自動接続：** 保存済みのヘッドホンは電源を入れたりケースから出したりすると自動で接続します。別の保存済みヘッドホンを出すとそちらに切り替わります。手動で **Disconnect** した後は **Connect** を待ちます。
-- **Disconnect / Forget：** Disconnect は接続を切り、ヘッドホンは保存されたままです。Forget は切断して削除します。
-- **音量：** ブースト（ソフトウェアゲイン、最大 500 %、初期値 250 %）とヘッドホン音量（AVRCP、初期値 50 %）。変更するとヘッドホンごとに保存されます。確認用に **Mute** と **Test tone**。
-- **イコライザー：** 5 バンド（±12 dB）、プリセット付き、ヘッドホンごとに保存。リミッター付きでブーストしても音割れしません。
-- **遅延：** バッファ目標 60〜200 ms（初期値 200 ms）と遅延のライブ推定値。
-- **Clean sound：** イコライザーをオフにし、ブーストを 250 %、バッファを 200 ms に戻します。
-- ページに全ステップの**ログ**を色分けで表示（緑は成功、赤は失敗、青はボタン操作）。
-
-## コーデック
-
-- **Auto：** 通常の SBC。どれでも動きます。
-- **SBC HQ** と **SBC-XQ：** 手動で選択。ヘッドホンが対応している場合のみ。非対応のものはグレー表示です。
-
-AAC、aptX、LDAC には対応していません。
+出典: [Sony compliance (BR)](https://www.playstation.com/pt-br/legal/compliance/) · [24Wireless](https://24wireless.info/playstation-5-cfi-1100-series) · [TechInsights PS5 Pro 分解](https://www.techinsights.com/blog/sony-playstation-5-pro-teardown)
 
 ## 既知の制限
 
-- 同時に 1 台のみ、マイクなし。テレビからも音が出続けます。
-- Bluetooth を使うペイロードは 1 つだけ実行してください。DualSense はそのまま使えます。
-- テスト済みヘッドホン：Sony WF-1000XM6、OnePlus Buds Ace 2、Xbox Wireless Headset。
+- ヘッドセットは同時に 1 台、マイクは使えません。テレビからも音が出続けます。
+- Bluetooth を使うペイロードは同時に 1 つだけ動かしてください。DualSense はそのまま使えます。
+- 確認済みヘッドホン：Sony WF-1000XM6、OnePlus Buds Ace 2、Xbox Wireless Headset。
 
-## トラブルシューティング / 問題の報告
+## 問題の報告
 
-ペイロードを実行すると **「HearBridge &lt;version&gt;: starting」** の通知が出るはずです。出ない場合、ローダーが実行していません。
+ペイロードが動くと **"HearBridge &lt;version&gt;: starting"** という通知が出ます。出ない場合、ローダーが実行していません。
 
-設定、保存済みヘッドホン、ログは `/data/hearbridge/` にあります。問題を報告するには：
-
-1. FTP で `/data/hearbridge/hearbridge.log` と `diag.txt` を取得します（例：[ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)、ポート 2121）。`diag.txt` は http://&lt;console-ip&gt;:8090/api/diag でも見られます。
-2. 本体モデル、ファームウェア、ローダー、HearBridge のバージョン、ログを添えて [GitHub の issue](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose) を作成してください。
+1. `/data/hearbridge/hearbridge.log` と `diag.txt` を FTP で取得します（例：[ftpsrv](https://github.com/ps5-payload-dev/ftpsrv)、ポート 2121）。`diag.txt` は http://&lt;console-ip&gt;:8090/api/diag でも取得できます。
+2. 本体のモデル、ファームウェア、ローダー、HearBridge のバージョン、ログファイルを添えて [GitHub の issue](https://github.com/X-F1REBALL-X/HearBridge-PS5/issues/new/choose) を開いてください。
 
 ## ビルド
 
 ```sh
 export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk   # ps5-payload-sdk v0.43
 make ps5      # dist/HearBridge-PS5-<version>.elf
-make test
+make test     # host tests: cc, ffmpeg, python3 + numpy (node optional)
 make send PS5_HOST=<console-ip>
 ```
+
+## クレジット
+
+MediaTek のスキャン一時停止と USB パイプの修正、HCI デバッグツール： [ZiZc3](https://github.com/ZiZc3) ([#6](https://github.com/X-F1REBALL-X/HearBridge-PS5/pull/6))
 
 ## ライセンス
 
