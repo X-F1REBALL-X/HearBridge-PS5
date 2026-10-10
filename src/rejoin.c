@@ -64,3 +64,10 @@ int hb_rest_step(hb_rest *r, int going_down, int woke, int streaming, long now)
     r->had_stream = 0;
     return HB_REST_RESUME;
 }
+
+int hb_scan_slots_left(long deadline, long now)
+{
+    long left = deadline - now - 500;
+    if (deadline <= 0 || left < 1280) return 0;
+    return (int)(left / 1280);
+}

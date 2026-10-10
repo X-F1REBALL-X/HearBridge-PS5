@@ -63,6 +63,22 @@ int main(void)
         while (hb_re_paging(pages) && n < 100) { pages++; n++; }
         CHECK(n == 3 && hb_re_listen_ms(pages) == 0, "rejoin: 3 pages after a drop, then only listen");
     }
+    {
+        /* hb10.log: the scan ended with ~1.2 s of "deadline reached" spam every
+         * ~130 ms. Inquiry and scan loop now share one rule. */
+        long dl = 5314325;
+        int t, spins = 0;
+        CHECK(hb_scan_slots_left(dl, dl - 10000) == 7, "scan: 10 s left fits 7 inquiries of 1.28 s");
+        CHECK(hb_scan_slots_left(dl, dl - 1780) == 1 && hb_scan_slots_left(dl, dl - 1779) == 0,
+              "scan: the last inquiry must end 500 ms before the deadline");
+        CHECK(hb_scan_slots_left(0, 1000) == 0 && hb_scan_slots_left(dl, dl + 50) == 0, "scan: no deadline / past it: nothing fits");
+        /* the loop: inquiry skipped -> loop also done, no retries in between */
+        for (t = 5313666; t < dl; t += 128)
+            if (!hb_scan_slots_left(dl, t)) break; else spins++;
+        CHECK(spins == 0, "scan: once no inquiry fits, the scan loop is done at once (no spin)");
+        CHECK(HB_PAIR_CALLBACK_MS >= 8000 && HB_PAIR_CALLBACK_MS <= 10000,
+              "pairing link hung up: listen 8 to 10 s for the headset to call back before paging");
+    }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

@@ -919,10 +919,11 @@ static int try_device_(a2dp_session *asess, hci_t hci, const a2dp_inq_dev *d,
         if (k && !btlink_is_up(k) && !connect_abort(ini->addr)) {
             /* The headset itself dropped the new link: it usually comes
              * back on its own. Listen for it (stored key) before paging. */
-            log_line("select: headset closed the pairing link — listening briefly, then paging");
+            log_line("select: headset closed the pairing link, listening up to %d s for its call before paging",
+                     HB_PAIR_CALLBACK_MS / 1000);
             btlink_destroy(k);
             k = btlink_create(hci, 1021, 7);          /* fresh state for the new link */
-            if (k && accept_one(k, ini, 2000)) {
+            if (k && accept_one(k, ini, HB_PAIR_CALLBACK_MS)) {
                 int pr2 = probe_link(k, ini, linkp, psm);
                 if (pr2 == 1) {
                     log_choice("chosen", ini);
@@ -1382,7 +1383,7 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
             ncand = seen_publish(got, ngot, found, order, &nfound);
             /* Inquiries are chained for the whole window ("scanning"),
              * then the list stays and the page shows Not connected. */
-            if (now_ms() >= scan_until - 600) {     /* deadline: done */
+            if (!hb_scan_slots_left(scan_until, now_ms())) {   /* no room for another inquiry: done */
                 scan_until = 0;
                 a2dp_scan_deadline_ms = 0;
                 log_line("scan: finished (%d device(s) listed)", ncand);
