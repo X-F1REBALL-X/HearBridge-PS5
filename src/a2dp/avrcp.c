@@ -67,10 +67,32 @@ void avrcp_init(avrcp_state *a, int volume)
     a->batt_label = -1;
     a->our_set_ms = -100000;
     a->seek_vol = 1;
+    a->hold_vol = -1;
 }
 
 /* A volume report right after our own SetAbsoluteVolume is that change
  * coming back, not someone turning the headset. */
+/* 1 = a volume report of v must not overwrite our level: a key step not
+ * sent yet, or our SetAbsoluteVolume not echoed yet (AVRCP_HOLD_MS). The
+ * echo itself ends the hold. */
+static int stale_report(avrcp_state *a, int v)
+{
+    long d = a->now_ms - a->our_set_ms;
+    if (a->key_pending && v != a->volume) return 1;
+    if (a->hold_vol < 0) return 0;
+    if (d < 0 || d >= AVRCP_HOLD_MS) { a->hold_vol = -1; return 0; }
+    if (v == a->hold_vol) { a->hold_vol = -1; return 0; }
+    return 1;
+}
+
+int avrcp_key_due(avrcp_state *a)
+{
+    long d = a->now_ms - a->our_set_ms;
+    if (!a->key_pending) return 0;
+    if (!a->sink_renders && !a->remote_abs) { a->key_pending = 0; return 0; }
+    return d < 0 || d >= AVRCP_KEY_SEND_MS;
+}
+
 static int our_echo(const avrcp_state *a)
 {
     long d = a->now_ms - a->our_set_ms;
@@ -164,6 +186,8 @@ int avrcp_build_set_volume(avrcp_state *a, int vol, unsigned char *out, int max)
     if (vol > 127) vol = 127;
     a->volume = vol;
     a->our_set_ms = a->now_ms;
+    a->hold_vol = vol;
+    a->key_pending = 0;
     p[0] = (unsigned char)vol;
     return vendor(out, next_label(a), 0, CT_CONTROL, PDU_SET_ABSVOL, p, 1, max);
 }
@@ -213,7 +237,10 @@ static void on_response(avrcp_state *a, int label, const unsigned char *av, int 
                 if (rc == RSP_INTERIM && !a->batt_tried) a->need_batt = 1;
                 a->vol_reports++;
                 a->vol_refused = 0;
-                if ((par[1] & 0x7F) != a->volume || rc == RSP_CHANGED) {
+                if (stale_report(a, par[1] & 0x7F)) {
+                    log_line("avrcp: headset volume %d/127 ignored (we just set %d/127)",
+                             par[1] & 0x7F, a->volume);
+                } else if ((par[1] & 0x7F) != a->volume || rc == RSP_CHANGED) {
                     int moved = (par[1] & 0x7F) != a->volume;
                     a->volume = par[1] & 0x7F;
                     a->changed = 1;
@@ -308,6 +335,7 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
             int v = a->volume + (up ? 8 : -8);
             a->volume = v < 0 ? 0 : v > 127 ? 127 : v;
             a->changed = 1;
+            a->key_pending = 1;           /* the headset gets it (avrcp_key_due) */
             a->vol_from_headset++;
             a->vol_reports++;
             log_line("avrcp: %s key %s -> %d/127", seek ? (up ? "next" : "previous") : "volume",
@@ -363,6 +391,14 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
             return vendor(out, label, 1, RSP_STABLE, pdu, ps, 9, max);
         }
         case PDU_SET_ABSVOL:
+            if (np >= 1 && stale_report(a, par[0] & 0x7F)) {
+                a->remote_abs = 1;
+                a->vol_reports++;
+                r[0] = (unsigned char)a->volume;
+                log_line("avrcp: headset SetAbsoluteVolume %d/127 ignored (we just set %d/127)",
+                         par[0] & 0x7F, a->volume);
+                return vendor(out, label, 1, RSP_ACCEPTED, pdu, r, 1, max);
+            }
             if (np >= 1) {
                 if ((par[0] & 0x7F) != a->volume && !our_echo(a)) a->vol_from_headset++;
                 a->volume = par[0] & 0x7F;

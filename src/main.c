@@ -2589,7 +2589,9 @@ stream_setup:
 
         /* Web requests + headset volume (cheap; under the lock). */
         {
-            int v = btlink_avrcp_volume(link, &changed);
+            int v;
+            btlink_avrcp_key_flush(link);         /* earbud / volume keys reach the headset */
+            v = btlink_avrcp_volume(link, &changed);
             avst = btlink_avrcp_state(link);
             CTL_LOCK(&g_ctl);
             if (g_ctl.req_reset) {
