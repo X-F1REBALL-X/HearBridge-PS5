@@ -57,4 +57,9 @@ int  hci_is_mediatek(void);
 
 void hci_addr_str(const unsigned char addr[6], char buf[18]);
 
+/* Stop / exit: undo a scan pause still in effect (fired, not waited for). */
+void hci_scan_release(hci_t hci);
+/* Start-up: page scan found off (a copy died mid-pause): turn it on. */
+void hci_scan_check(hci_t hci);
+
 #endif

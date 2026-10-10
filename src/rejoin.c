@@ -3,7 +3,9 @@
 
 int hb_re_listen_ms(int pages)
 {
-    static const int ms[HB_RE_PAGES] = { 1200, 1800, 2500 };
+    /* Back off (#29): every page holds the radio up to 5 s, and the pad
+     * shares it. First one soon (the headset may just have glitched). */
+    static const int ms[HB_RE_PAGES] = { 2000, 15000, 45000 };
     if (pages < 0) pages = 0;
     if (pages >= HB_RE_PAGES) return 0;
     return ms[pages];
@@ -17,6 +19,14 @@ int hb_re_paging(int pages)
 int hb_auto_page_ok(int done)
 {
     return done >= 0 && done < HB_AUTO_PAGES;
+}
+
+int hb_auto_gap_ms(int done)
+{
+    static const int ms[HB_AUTO_PAGES] = { 12000, 30000, 90000 };
+    if (done < 0) done = 0;
+    if (done >= HB_AUTO_PAGES) return 0;
+    return ms[done];
 }
 
 int hb_resume_gap(long mp, long mn, long rp, long rn, long gap)

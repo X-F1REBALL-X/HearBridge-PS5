@@ -209,6 +209,7 @@ static int avdtp_cmd_inner(avdtp_session *s, unsigned char signal,
     unsigned char label = next_label(s);
     int n = 2 + (plen > 0 ? plen : 0);
     int tries, got;
+    int sink_delay = 0;     /* the sink sent DELAY_REPORT while we waited */
     long deadline;
 
     if (n > (int)sizeof pkt) return -1;
@@ -243,6 +244,10 @@ static int avdtp_cmd_inner(avdtp_session *s, unsigned char signal,
                     continue;
                 }
                 if (msg == AV_MSG_COMMAND) {
+                    /* A sink sends DELAY_REPORT only once a stream end
+                     * point is configured (AVDTP 1.3, 8.19): seen while we
+                     * wait for SET_CONFIGURATION, it took ours (#18/#25). */
+                    if (signal == 0x03 && sig == 0x0D) sink_delay = 1;
                     avdtp_answer_remote(s, s->sig_scid, rsp, got);
                     continue;
                 }
@@ -267,6 +272,13 @@ static int avdtp_cmd_inner(avdtp_session *s, unsigned char signal,
                              got - 2, tries ? " after resend" : "");
                     return AV_MSG_ACCEPT;
                 }
+                if (msg == AV_MSG_REJECT && tries > 0 && sink_delay) {
+                    log_line("avdtp: signal %#04x resend rejected (error %#04x) after the sink's "
+                             "delay report: the first one was accepted, continuing",
+                             signal, got > 2 ? rsp[got - 1] : 0);
+                    if (out_len) *out_len = 0;
+                    return AV_MSG_ACCEPT;
+                }
                 if (msg == AV_MSG_REJECT && tries > 0 && got > 2 &&
                     rsp[got - 1] == AV_ERR_BAD_STATE) {
                     log_line("avdtp: signal %#04x resend got BAD_STATE — first one "
@@ -274,13 +286,18 @@ static int avdtp_cmd_inner(avdtp_session *s, unsigned char signal,
                     if (out_len) *out_len = 0;
                     return AV_MSG_ACCEPT;
                 }
-                log_line("avdtp: signal %#04x rejected (msg=%u body0=%#04x)",
-                         signal, msg, (got > 2) ? rsp[2] : 0);
+                log_line("avdtp: signal %#04x rejected (msg=%u body0=%#04x error=%#04x)",
+                         signal, msg, (got > 2) ? rsp[2] : 0, (got > 2) ? rsp[got - 1] : 0);
                 return (int)msg;
             }
         }
         log_line("avdtp: signal %#04x unanswered after %d ms (try %d)", signal,
                  AV_RSP_TIMEOUT_MS, tries + 1);
+        if (sink_delay) {
+            log_line("avdtp: the sink sent its delay report meanwhile: configuration taken, continuing");
+            if (out_len) *out_len = 0;
+            return AV_MSG_ACCEPT;
+        }
         /* Resend with the SAME label: the response to either copy matches. */
     }
     return -1;

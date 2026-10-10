@@ -22,6 +22,20 @@ int hci_usb_chip(int *vid, int *pid);
  * event the controller sends, and once per pump with ev NULL. Set by main. */
 extern void (*hci_usb_conn_req_hook)(hci_t hci, const unsigned char *ev, int n);
 
+/* Idle duty cycle (#29). The system stack reads the same USB pipes as we
+ * do and a packet goes to whoever has a read pending, so while our reads
+ * are armed a DualSense waking up can miss its Connection Request. When
+ * nothing is playing or connecting, main turns this on: reads armed for
+ * listen_ms (a saved headset calling in is still seen), then all of them
+ * cancelled for rest_ms, so the console's own stack gets every packet.
+ * Our own HCI command or ACL frame keeps the reads armed for 4 s so its
+ * answer is read. 0, 0 = off: reads always armed. */
+void hci_usb_duty(int listen_ms, int rest_ms);
+/* Duty cycle on: start a rest now (a pad or phone is calling the console). */
+void hci_usb_yield(void);
+/* 1 while resting (no reads in flight). */
+int hci_usb_resting(void);
+
 /* Diagnostics: open every /dev/ugen* node read-only, log and report (diag.h)
  * its VID:PID, names, interfaces (class/subclass/protocol) and endpoints,
  * then close it again. Nothing is sent to any device. Call before

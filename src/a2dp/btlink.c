@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* RSSI / link quality poll period (alternating reads). */
 #ifndef BTLINK_LQ_POLL_MS
@@ -26,6 +27,12 @@ enum {
 };
 
 #define T_CHAN_CONNECT 4000
+/* AVDTP (#18): AirPods answer our CONN_REQ only after their own SDP
+ * queries of us, 3 s and more later, so 4 s timed out every attempt. */
+#define T_CHAN_CONNECT_AV 10000
+/* CONN_RSP "pending" (authentication / authorization on the peer): the
+ * final answer may take a while longer (L2CAP ERTX). */
+#define T_CHAN_PENDING 20000
 #define T_CFG_TIMEOUT  8000
 #define T_CFG_TIMEOUT_MEDIA 16000  /* second PSM 0x19 — some sinks are slow/racy */
 #define T_CFG_RESEND   1000
@@ -79,6 +86,7 @@ typedef struct {
     unsigned char pending_cfg_id;
     unsigned char pending_cfg_opt[CFG_OPT_MAX];
     int pending_cfg_optlen;
+    int conn_pending;     /* CONN_RSP result=1 seen: wait T_CHAN_PENDING */
 } chan;
 
 /* Controller ACL flow control (Core Vol 4 Part E 4.1.1). The controller's
@@ -180,6 +188,12 @@ static int g_disc_reason;     /* HCI reason of the last drop of OUR link */
 
 /* Last successful ACL handle (this process). Used to drop stale links. */
 static unsigned g_last_acl_handle;
+/* A page of ours that may still run in the controller (Stop / exit
+ * cancels it), and the controller's Page Timeout before we changed it
+ * (-1 = not read yet, 0 = unknown). */
+static int g_paging;
+static unsigned char g_page_addr[6];
+static int g_pt_orig = -1;
 static unsigned g_last_acl_epoch;   /* acl_track epoch when it came up */
 
 /* The remembered own handle is only ours while nothing disconnected (or
@@ -707,6 +721,12 @@ static void on_signaling(btlink *l, const unsigned char *d, int len)
                          cc->scid, dcid, result);
                 if (result == 1) { /* pending */
                     if (dcid) cc->dcid = dcid;
+                    if (!cc->conn_pending) {
+                        cc->conn_pending = 1;
+                        cc->t_state = now_ms();   /* the peer is working on it */
+                        log_line("l2cap: PSM %#x pending (status %u), waiting up to %d s",
+                                 cc->psm, blen >= 8 ? le16(pl + 6) : 0, T_CHAN_PENDING / 1000);
+                    }
                     if (cc->pending_cfg && cc->dcid)
                         chan_flush_pending_cfg(l, cc);
                     break;
@@ -1376,6 +1396,7 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
         }
         l->handle = le16(ev + 3) & 0x0FFF;
         l->connected = 1;
+        if (same_addr(ev + 5, g_page_addr)) g_paging = 0;   /* our page answered */
         g_disc_reason = 0;
         l->t_conn = now_ms();
         g_last_acl_handle = l->handle;
@@ -1579,7 +1600,9 @@ static void chan_tick(btlink *l, chan *c, long now)
     long cfg_lim = chan_is_avdtp_media(l, c) ? T_CFG_TIMEOUT_MEDIA :
                    (l->cfg_timeout_ms > 0 ? l->cfg_timeout_ms : T_CFG_TIMEOUT);
 
-    if (c->st == CH_CONNECTING && now - c->t_state > T_CHAN_CONNECT) {
+    if (c->st == CH_CONNECTING &&
+        now - c->t_state > (c->conn_pending ? T_CHAN_PENDING :
+                            c->psm == BTLINK_PSM_AVDTP ? T_CHAN_CONNECT_AV : T_CHAN_CONNECT)) {
         log_line("l2cap: PSM %#x connect timeout", c->psm);
         chan_close_disc(l, c); /* P3: DISC if dcid known (pending path) */
     } else if (c->st == CH_CONFIG && c->cfg_deferred) {
@@ -1930,7 +1953,15 @@ static void cancel_our_page(btlink *l)
 {
     if (!l || !l->hci.ops) return;
     fire_cmd(l->hci, 0x0408, l->addr, 6);
+    g_paging = 0;
     log_line("btlink: cancelled our page");
+}
+
+/* The transport went down (Stop, rest mode) in the middle of a page: the
+ * controller would keep paging for up to 20 s with the radio busy. */
+static void page_gone(btlink *l)
+{
+    if (l && !l->connected && g_paging) cancel_our_page(l);
 }
 
 static int connect_paged(btlink *l, const unsigned char addr[6],
@@ -1987,6 +2018,16 @@ static int connect_paged(btlink *l, const unsigned char addr[6],
             if (!(clock_offset & 0x8000)) clock_offset = tc;
         }
     }
+    if (g_pt_orig < 0) {
+        /* The controller's own Page Timeout, put back on Stop (#29): ours
+         * below is controller-wide and 4x the usual 5.12 s. */
+        unsigned char cc[16];
+        int cc_len = 0;
+        if (hci_cmd_sync(l->hci, 0x0C17, NULL, 0, cc, &cc_len, (int)sizeof cc) && cc_len >= 9)
+            g_pt_orig = cc[7] | (cc[8] << 8);
+        else
+            g_pt_orig = 0;                       /* unknown: leave it on Stop */
+    }
     {
         /* Page timeout 0x8000 slots = 20.48 s. Fire and don't wait:
          * a missing Command Complete used to stall Connect for seconds. */
@@ -2009,12 +2050,14 @@ static int connect_paged(btlink *l, const unsigned char addr[6],
 
     if (!l->hci.ops->cmd(l->hci.ctx, HB_OP_CREATE_CONNECTION, p, 13))
         return 0;
+    memcpy(g_page_addr, addr, 6);
+    g_paging = 1;
 
     t0 = now_ms();
     deadline = t0 + (timeout_ms > 0 ? timeout_ms : 45000);
 
     while (now_ms() < deadline) {
-        if (btlink_pump(l, 40) < 0) return 0;
+        if (btlink_pump(l, 40) < 0) { page_gone(l); return 0; }
 
         /* After 0x0b: drop known handles, wait Disc Complete, settle, retry
          * CREATE once (max 2 attempts total). Never infinite errno-5 loop. */
@@ -2040,7 +2083,7 @@ static int connect_paged(btlink *l, const unsigned char addr[6],
             }
             w = now_ms() + 500;
             while (now_ms() < w) {
-                if (btlink_pump(l, 40) < 0) return 0;
+                if (btlink_pump(l, 40) < 0) { page_gone(l); return 0; }
             }
             l->create_retries++;
             log_line("btlink: retry CREATE_CONNECTION (attempt %d of 2)",
@@ -2244,6 +2287,8 @@ unsigned btlink_chan_open(btlink *l, unsigned psm, int timeout_ms)
     while (now_ms() < deadline) {
         if (btlink_pump(l, 40) < 0) return 0;
         if (c->st == CH_OPEN) return c->scid;
+        if (c->conn_pending && c->st == CH_CONNECTING && deadline < c->t_state + T_CHAN_PENDING + 2000)
+            deadline = c->t_state + T_CHAN_PENDING + 2000;   /* the peer said pending */
         if (sig_phase) {
             /* Simultaneous open: the peer opened the same PSM to us. Its
              * channel wins (peers often never configure ours then). */
@@ -2657,4 +2702,44 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
     r = connect_paged(l, addr, psrm, clock_offset, link_key, key_type, name_inout, name_max, timeout_ms);
     hci_scan_resume(l->hci);
     return r;
+}
+
+/* Stop / exit (#29): leave the controller as the system expects it, with
+ * fire-and-forget commands only (the pump already reports the transport
+ * gone once Stop is set, so nothing here waits for an answer):
+ *   - an inquiry or page of ours still running is cancelled,
+ *   - our own headset ACL (never a pad's) is closed,
+ *   - page scan and the Page Timeout are put back. */
+void btlink_release(hci_t hci)
+{
+    unsigned char p[6];
+    if (!hci.ops || !hci.ops->cmd) return;
+    (void)fire_cmd(hci, HB_OP_INQUIRY_CANCEL, NULL, 0);
+    if (g_paging) {
+        (void)fire_cmd(hci, 0x0408, g_page_addr, 6);       /* Create Connection Cancel */
+        g_paging = 0;
+        log_line("stop: our page cancelled");
+    }
+    last_handle_check();
+    if (g_last_acl_handle) {
+        put16(p, g_last_acl_handle);
+        p[2] = 0x13;
+        (void)fire_cmd(hci, HB_OP_DISCONNECT, p, 3);
+        log_line("stop: own ACL %#05x closed", g_last_acl_handle);
+        g_last_acl_handle = 0;
+    }
+    if (g_ps_held) {
+        g_ps_held = 0;
+        if (g_ps_old >= 0 && !(g_ps_old & 0x02)) {
+            p[0] = (unsigned char)g_ps_old;
+            (void)fire_cmd(hci, HB_OP_WRITE_SCAN_ENABLE, p, 1);
+        }
+        log_line("stop: page scan put back (%#x)", g_ps_old);
+    }
+    if (g_pt_orig > 0 && g_pt_orig != 0x8000) {
+        put16(p, (unsigned)g_pt_orig);
+        (void)fire_cmd(hci, 0x0C18, p, 2);
+        log_line("stop: page timeout put back (%#06x)", g_pt_orig);
+    }
+    usleep(100 * 1000);                     /* let the control pipe take them */
 }

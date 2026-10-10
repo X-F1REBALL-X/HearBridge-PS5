@@ -34,7 +34,7 @@ new Function(...Object.keys(ctx), js)(...Object.values(ctx));
 let fails = 0;
 const check = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 check(calls.length && calls[0].m === 'GET' && calls[0].p === '/api/status' && !calls[0].h['X-HB-Token'], 'page: status poll is a plain GET');
-check(calls.some(function(c,i){return i>0 && c.m==='POST' && c.p==='/api/scan' && c.h['X-HB-Token']}), 'page: refresh starts a scan');
+check(!calls.some(function(c){return c.p.indexOf('/api/scan')===0}) && calls.some(function(c){return c.p==='/api/devices'}), 'page: a page load never starts a scan, it only shows the last list');
 check(/setInterval\(function\(\)\{if\(scanLive/.test(html), 'page: devices are polled during the scan, not after it');
 check(/Nothing yet/.test(el('evlog').innerHTML), 'page: empty log says nothing yet');
 check(/if\(lg\.hbFollow\)lg\.scrollTop=lg\.scrollHeight/.test(html) && /this\.hbFollow=this\.scrollTop/.test(html), 'page: log follows the newest line unless scrolled up');

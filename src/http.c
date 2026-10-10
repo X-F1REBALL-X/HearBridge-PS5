@@ -463,9 +463,13 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         FILE *f;
         line[0] = 0;
         if (path[5] == 's' && path[6] == 'c') {
-            /* "scanu": the Scan / Add headset button (stops a stream for it);
-             * "scan": the refresh scan a page load sends (never drops audio). */
-            strcpy(line, query_int(q, "user", &v) && v == 1 ? "scanu" : "scan");
+            /* "scanu": the Scan / Add headset button (stops a stream for it).
+             * A scan nobody pressed (old pages sent one on every load) is
+             * ignored: an inquiry holds the radio the DualSense shares, and
+             * it started background pages again (#29). */
+            if (!(query_int(q, "user", &v) && v == 1))
+                return respond(out, max, 200, "application/json", "{\"ok\":1}", 8);
+            strcpy(line, "scanu");
             a = NULL;
             q = NULL;
         }
@@ -831,20 +835,31 @@ int http_start(hb_ctl *c, char *url, int url_max)
     char ip[48];
     g_c = c;
     for (port = HB_HTTP_PORT; port < HB_HTTP_PORT + 6; port++) {
-        struct sockaddr_in a;
-        int s = socket(AF_INET, SOCK_STREAM, 0);
-        if (s < 0) return 0;
-        setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
-        memset(&a, 0, sizeof a);
-        a.sin_family = AF_INET;
-        a.sin_port = htons((unsigned short)port);
-        a.sin_addr.s_addr = htonl(INADDR_ANY);
-        if (bind(s, (struct sockaddr *)&a, sizeof a) == 0 && listen(s, 4) == 0) {
-            g_srv = s;
-            break;
+        int wait;
+        /* The usual port: a copy that is closing may hold it a moment
+         * longer (#25), so wait for it before moving to the next one. */
+        for (wait = 0; ; wait += 250) {
+            struct sockaddr_in a;
+            int s = socket(AF_INET, SOCK_STREAM, 0), e;
+            if (s < 0) return 0;
+            setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+            memset(&a, 0, sizeof a);
+            a.sin_family = AF_INET;
+            a.sin_port = htons((unsigned short)port);
+            a.sin_addr.s_addr = htonl(INADDR_ANY);
+            if (bind(s, (struct sockaddr *)&a, sizeof a) == 0 && listen(s, 4) == 0) {
+                g_srv = s;
+                break;
+            }
+            e = errno;
+            close(s);
+            if (port != HB_HTTP_PORT || e != EADDRINUSE || wait >= 3000) {
+                log_line("http: port %d unavailable (errno %d)", port, e);
+                break;
+            }
+            usleep(250 * 1000);
         }
-        log_line("http: port %d unavailable (errno %d)", port, errno);
-        close(s);
+        if (g_srv >= 0) break;
     }
     if (g_srv < 0) return 0;
     g_quit = 0;

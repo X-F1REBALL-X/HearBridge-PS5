@@ -151,3 +151,32 @@ void hci_scan_resume(hci_t hci)
         log_line("scan: system page scan restored (%d)", g_scan_saved);
     g_scan_saved = -1;
 }
+
+/* Stop / exit while the system scan is paused for our page or inquiry
+ * (MediaTek): put it back right away. The pump is down by then, so the
+ * command is fired, not waited for. Left at 0, no pad could reconnect. */
+void hci_scan_release(hci_t hci)
+{
+    unsigned char v;
+    if (g_scan_depth <= 0) return;
+    g_scan_depth = 0;
+    if (g_scan_saved > 0 && hci.ops && hci.ops->cmd) {
+        v = (unsigned char)g_scan_saved;
+        if (hci.ops->cmd(hci.ctx, HB_OP_WRITE_SCAN_ENABLE, &v, 1))
+            log_line("stop: system page scan put back (%d)", g_scan_saved);
+    }
+    g_scan_saved = -1;
+}
+
+/* Start-up: a copy that died while the system scan was paused left page
+ * scan off, so no pad or headset can connect to the console. */
+void hci_scan_check(hci_t hci)
+{
+    unsigned char cc[16], v = 0x02;
+    int cc_len = 0;
+    if (!hci_cmd_sync(hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) || cc_len < 7)
+        return;
+    if (cc[6] & 0x02) return;
+    if (hci_cmd_sync(hci, HB_OP_WRITE_SCAN_ENABLE, &v, 1, NULL, NULL, 0))
+        log_line("scan: page scan was off (%d), probably left by an earlier copy - turned back on", cc[6]);
+}
