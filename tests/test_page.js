@@ -80,13 +80,24 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150',
   const c3 = main.slice(main.indexOf('class="col c3"'));
   check(c1.indexOf('class="panel conn"') > 0 && c1.indexOf('id="codecnote"') < 0 && /id="stop" class="red sm"/.test(c1),
         'page: connection is compact (codec, chip, small stop button)');
-  check(c3.indexOf('class="panel status"') < c3.indexOf('id="hspanel"') && c3.indexOf('id="hspanel"') < c3.indexOf('class="panel logp"'),
-        'page: right column is status, headset, log');
+  const c2 = main.slice(main.indexOf('class="col c2"'), main.indexOf('class="col c3"'));
+  check(c3.indexOf('class="panel status"') < c3.indexOf('id="hspanel"') && c2.indexOf('id="eqp"') < c2.indexOf('class="panel logp"') && c2.indexOf('id="eqp"') >= 0,
+        'page: status + headset in one column, sound then log in the middle');
   check(/class="side"><p class="navgrp"/.test(html) && /class="dmain"/.test(html) && /id="pgtitle"/.test(html),
         'page: settings side menu (categories left, page right)');
   check(main.indexOf('id="qs"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="gain"') > 0 && main.indexOf('id="hs"') > 0 &&
-        main.indexOf('id="lat"') > 0 && main.indexOf('id="lbar"') > 0 && main.indexOf('id="pr0"') > 0 && main.indexOf('id="night"') > 0,
-        'page: main screen has headset switch, battery, volume, latency + meter, EQ presets and night mode');
+        main.indexOf('id="lat"') > 0 && main.indexOf('id="latv"') > 0 && main.indexOf('id="pr0"') > 0 && main.indexOf('id="night"') > 0,
+        'page: main screen has headset switch, battery, volume, latency + estimate, EQ presets and night mode');
+  check(main.indexOf('id="pk"') < 0 && main.indexOf('id="av"') < 0 && main.indexOf('id="m1"') < 0 && main.indexOf('id="lbar"') < 0 &&
+        main.indexOf('id="fmt"') > 0 && main.indexOf('id="batv"') > 0 && main.indexOf('id="lqv"') > 0,
+        'page: status shows format, battery, link; counters, AVRCP, peaks and latency breakdown are in Settings');
+  {
+    const pg4 = html.slice(html.indexOf('id="pg4"'));
+    check(/id="tb4"/.test(html) && pg4.indexOf('id="pk"') > 0 && pg4.indexOf('id="av"') > 0 && pg4.indexOf('id="m2"') > 0 && pg4.indexOf('id="lkeys"') > 0,
+          'page: Settings > Details has the counters, AVRCP, peaks and latency breakdown');
+    check(pg4.indexOf('id="chipv"') > 0 && pg4.indexOf('id="latnote"') > 0 && pg4.indexOf('id="fmtd"') > 0 && main.indexOf('id="chipv"') < 0,
+          'page: chip, latency hint and full format details live in Settings > Details');
+  }
   check(!/[\u2013\u2014]/.test(html) && !/[\u2013\u2014]/.test(i18n), 'page: no em / en dashes anywhere the user reads');
 }
 check(html.indexOf('id="reset"') < 0 && html.indexOf('/api/reset') < 0 &&
