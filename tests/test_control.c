@@ -541,6 +541,7 @@ int main(int argc, char **argv)
         CHECK(n == 18 && r[3] == 0x03 && r[9] == 0x31 && r[13] == 0x0D,
               "AVRCP: our REGISTER_NOTIFICATION");
         a.changed = 0;
+        a.now_ms = 5000;                      /* well after our SetAbsoluteVolume */
         avrcp_input(&a, interim, sizeof interim, r, sizeof r);
         CHECK(a.volume == 0x50 && a.remote_abs && a.ct_registered, "AVRCP: INTERIM volume read");
         avrcp_input(&a, chg, sizeof chg, r, sizeof r);
@@ -559,16 +560,72 @@ int main(int argc, char **argv)
             e.now_ms = 50000;
             avrcp_build_set_volume(&e, 64, r, sizeof r);
             e.now_ms = 50400;
-            avrcp_input(&e, chg2, sizeof chg2, r, sizeof r);     /* 62: the headset rounded ours */
-            CHECK(e.volume == 0x3E && e.changed && e.vol_from_headset == 0,
-                  "AVRCP: volume report within 1 s of our SetAbsoluteVolume is our own change");
+            avrcp_input(&e, chg2, sizeof chg2, r, sizeof r);     /* 62: stale / rounded */
+            CHECK(e.volume == 64 && e.vol_from_headset == 0,
+                  "AVRCP: another level within 1.5 s of our SetAbsoluteVolume does not overwrite ours");
             avrcp_input(&e, hsset, sizeof hsset, r, sizeof r);
-            CHECK(e.volume == 0x28 && e.vol_from_headset == 0, "AVRCP: headset SetAbsoluteVolume echo ignored too");
+            CHECK(e.volume == 64 && e.vol_from_headset == 0 && r[3] == 0x09 && r[13] == 64,
+                  "AVRCP: headset SetAbsoluteVolume in that window: accepted, our level kept");
             e.now_ms = 52000;
             avrcp_input(&e, chg3, sizeof chg3, r, sizeof r);
             CHECK(e.volume == 0x30 && e.vol_from_headset == 1, "AVRCP: a later change we did not make proves the headset reports its volume");
             avrcp_input(&e, chg3, sizeof chg3, r, sizeof r);
             CHECK(e.vol_from_headset == 1, "AVRCP: the same level again is not a move");
+        }
+        {
+            /* hb log [5866]: earbud previous key moved the slider to 48 but the
+             * headset stayed at 113; the re-query then snapped us back. */
+            avrcp_state k;
+            static const unsigned char prev[] = { 0xA0, 0x11, 0x0E, 0x00, 0x48, 0x7C, 0x4C, 0x00 };
+            static const unsigned char vdn[] = { 0xB0, 0x11, 0x0E, 0x00, 0x48, 0x7C, 0x42, 0x00 };
+            static const unsigned char rep113[] = { 0x12, 0x11, 0x0E, 0x0F, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x02, 0x0D, 0x71 };
+            static const unsigned char echo[] = { 0x12, 0x11, 0x0E, 0x0D, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x02, 0x0D, 0x61 };
+            int i, sends = 0;
+            avrcp_init(&k, 113);
+            k.sink_renders = 1;
+            k.now_ms = 100000;
+            CHECK(!avrcp_key_due(&k), "AVRCP keys: nothing to send before a key");
+            avrcp_input(&k, prev, sizeof prev, r, sizeof r);
+            CHECK(k.volume == 105 && k.key_pending && avrcp_key_due(&k), "AVRCP keys: previous key -> 105, SetAbsoluteVolume due");
+            n = avrcp_build_set_volume(&k, k.volume, r, sizeof r);
+            CHECK(n == 14 && r[9] == 0x50 && r[13] == 105 && !k.key_pending, "AVRCP keys: SetAbsoluteVolume 105 sent to the headset");
+            /* fast presses: coalesced, at most one send per 150 ms, latest level */
+            for (i = 0; i < 6; i++) {
+                k.now_ms += 40;
+                avrcp_input(&k, i % 2 ? vdn : prev, i % 2 ? sizeof vdn : sizeof prev, r, sizeof r);
+                if (avrcp_key_due(&k)) { avrcp_build_set_volume(&k, k.volume, r, sizeof r); sends++; }
+            }
+            CHECK(sends == 1 && k.key_pending && k.volume == 105 - 48, "AVRCP keys: 6 presses in 240 ms -> one send so far, the rest pending");
+            k.now_ms += 150;
+            CHECK(avrcp_key_due(&k), "AVRCP keys: the latest level goes out 150 ms after the last send");
+            n = avrcp_build_set_volume(&k, k.volume, r, sizeof r);
+            CHECK(r[13] == 57, "AVRCP keys: ...with the latest level (57)");
+            /* the slow re-query answers with the old level: ignored */
+            k.now_ms += 300;
+            avrcp_input(&k, rep113, sizeof rep113, r, sizeof r);
+            CHECK(k.volume == 57, "AVRCP keys: a stale report (113) right after our set does not snap the slider back");
+            k.now_ms += 2000;
+            avrcp_input(&k, echo, sizeof echo, r, sizeof r);
+            CHECK(k.volume == 0x61, "AVRCP keys: after 1.5 s reports count again");
+            /* the echo ends the hold early */
+            avrcp_build_set_volume(&k, 0x40, r, sizeof r);
+            {
+                static const unsigned char e40[] = { 0x12, 0x11, 0x0E, 0x0D, 0x48, 0x00,
+                    0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x02, 0x0D, 0x40 };
+                k.now_ms += 100;
+                avrcp_input(&k, e40, sizeof e40, r, sizeof r);
+                k.now_ms += 100;
+                avrcp_input(&k, rep113, sizeof rep113, r, sizeof r);
+                CHECK(k.volume == 113, "AVRCP keys: once the headset echoed our level, its next report counts at once");
+            }
+            /* a headset without absolute volume: software gain only, nothing sent */
+            avrcp_init(&k, 64);
+            k.now_ms = 1000;
+            avrcp_input(&k, vdn, sizeof vdn, r, sizeof r);
+            CHECK(k.volume == 56 && k.changed && !avrcp_key_due(&k) && !k.key_pending,
+                  "AVRCP keys: no absolute volume: level changes (software gain), no SetAbsoluteVolume");
         }
         CHECK(a.vol_reports == 3 && !a.vol_refused, "AVRCP: volume reports counted (SetAbsoluteVolume, INTERIM, CHANGED)");
         {

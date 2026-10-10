@@ -2537,6 +2537,7 @@ void btlink_avrcp_set_volume(btlink *l, int vol)
     if (vol > 127) vol = 127;
     if (!avrcp_open(l)) {
         l->avrcp.volume = vol;
+        l->avrcp.key_pending = 0;
         return;
     }
     l->avrcp.now_ms = now_ms();
@@ -2545,6 +2546,14 @@ void btlink_avrcp_set_volume(btlink *l, int vol)
     n = avrcp_build_volume_changed(&l->avrcp, r, (int)sizeof r);
     avrcp_send(l, r, n);                       /* we as target */
     log_line("avrcp: SetAbsoluteVolume %d/127 sent", vol);
+}
+
+void btlink_avrcp_key_flush(btlink *l)
+{
+    if (!l) return;
+    l->avrcp.now_ms = now_ms();
+    if (!avrcp_key_due(&l->avrcp)) return;
+    btlink_avrcp_set_volume(l, l->avrcp.volume);
 }
 
 int btlink_avrcp_volume(btlink *l, int *changed)

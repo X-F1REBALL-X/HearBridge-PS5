@@ -126,6 +126,9 @@ int  btlink_hfp_battery(const btlink *l);
 int  btlink_avrcp_headset_moves(const btlink *l);
 /* Earbud next / previous track keys step the volume (setting, default on). */
 void btlink_avrcp_seek_volume(btlink *l, int on);
+/* A volume key changed the level: send SetAbsoluteVolume with the latest
+ * level, at most every AVRCP_KEY_SEND_MS. Call every loop turn. */
+void btlink_avrcp_key_flush(btlink *l);
 /* Last HCI Read RSSI (signed, 127 unknown) and Read Link Quality (0..255,
  * -1 unknown) for this link; polled about once a second while it is up. */
 void btlink_link_quality(const btlink *l, int *rssi, int *lq);
