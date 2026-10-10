@@ -176,7 +176,7 @@ static int accept_one(btlink *link, const headset_ini *ini, int ms)
  * still finishes, short enough that we do not sit for half a minute. */
 #define HB_PAGE_MS 5000
 #define HB_DROPPED_LISTEN_MS 10000   /* page to a just-left headset failed: listen this long */
-#define HB_VOLQ_MS      3000   /* page open, no volume report this long: ask the headset again */
+#define HB_VOLQ_MS     15000   /* page open, no volume report this long: ask the headset again */
 #define HB_VOLQ_PAGE_MS 5000   /* page counts as open while it polled within this */
 #define HB_BATT_WAIT_MS 8000   /* no battery report by then: "Not shown by this headset" */
 /* After a hang-up right after encryption: wait this long for its own call. */

@@ -541,6 +541,30 @@ int main(int argc, char **argv)
         avrcp_input(&a, chg, sizeof chg, r, sizeof r);
         CHECK(a.volume == 0x20 && a.changed && a.need_register, "AVRCP: CHANGED -> re-register");
         CHECK(avrcp_reported(&a), "AVRCP: a volume report counts as connected for the page");
+        {
+            /* one way unless proven: our own SetAbsoluteVolume coming back is not a headset move */
+            avrcp_state e;
+            static const unsigned char chg2[] = { 0x12, 0x11, 0x0E, 0x0D, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x02, 0x0D, 0x3E };
+            static const unsigned char chg3[] = { 0x12, 0x11, 0x0E, 0x0D, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x02, 0x0D, 0x30 };
+            static const unsigned char hsset[] = { 0x50, 0x11, 0x0E, 0x00, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x50, 0x00, 0x00, 0x01, 0x28 };
+            avrcp_init(&e, 64);
+            e.now_ms = 50000;
+            avrcp_build_set_volume(&e, 64, r, sizeof r);
+            e.now_ms = 50400;
+            avrcp_input(&e, chg2, sizeof chg2, r, sizeof r);     /* 62: the headset rounded ours */
+            CHECK(e.volume == 0x3E && e.changed && e.vol_from_headset == 0,
+                  "AVRCP: volume report within 1 s of our SetAbsoluteVolume is our own change");
+            avrcp_input(&e, hsset, sizeof hsset, r, sizeof r);
+            CHECK(e.volume == 0x28 && e.vol_from_headset == 0, "AVRCP: headset SetAbsoluteVolume echo ignored too");
+            e.now_ms = 52000;
+            avrcp_input(&e, chg3, sizeof chg3, r, sizeof r);
+            CHECK(e.volume == 0x30 && e.vol_from_headset == 1, "AVRCP: a later change we did not make proves the headset reports its volume");
+            avrcp_input(&e, chg3, sizeof chg3, r, sizeof r);
+            CHECK(e.vol_from_headset == 1, "AVRCP: the same level again is not a move");
+        }
         CHECK(a.vol_reports == 3 && !a.vol_refused, "AVRCP: volume reports counted (SetAbsoluteVolume, INTERIM, CHANGED)");
         {
             /* PASS THROUGH: play press is logged, not a volume change; vol up is */
