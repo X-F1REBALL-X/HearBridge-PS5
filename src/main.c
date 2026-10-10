@@ -1790,7 +1790,7 @@ static void game_tick(void)
     char id[16], name[HB_GAME_NAME], drop[16], dname[HB_GAME_NAME], hsg[16], hsn[40], from[32];
     unsigned char hsa[6];
     const unsigned char *cur;
-    int req, act, gi, exact = 0, dropped = 0, hsdo, hs_dropped = 0, picked = 0, save;
+    int req, act, gi, exact = 0, dropped = 0, hsdo, hs_dropped = 0, picked = 0, own_dropped = 0, save;
     CTL_LOCK(&g_ctl);
     cur = g_prefs_have ? g_prefs_addr : NULL;
     snprintf(drop, sizeof drop, "%s", g_ctl.req_game_drop);
@@ -1843,11 +1843,13 @@ static void game_tick(void)
         g_game_on = g;
         snprintf(g_game_applied, sizeof g_game_applied, "%s", id);
     } else if (req == 2 && id[0]) {
-        /* Remove: this headset's profile (all of them when it has none) */
+        /* Remove: only this headset's own profile. A headset borrowing
+         * another headset's profile has nothing to remove here, and the
+         * other headsets keep theirs (the per-headset chips delete those). */
         int was = !strcmp(g_game_applied, id);
-        if (!(cur && hb_games_drop_hs(&g_games, id, cur))) hb_games_drop(&g_games, id);
-        if (was) g_game_applied[0] = 0;
-        if (was && hb_games_find(&g_games, id) < 0) game_restore_locked();
+        own_dropped = cur && hb_games_drop_hs(&g_games, id, cur);
+        if (own_dropped && was) g_game_applied[0] = 0;
+        if (own_dropped && was && hb_games_find(&g_games, id) < 0) game_restore_locked();
     }
     gi = hb_games_pick(&g_games, id, cur, &exact);
     act = picked ? HB_GAME_KEEP : hb_game_decide(g_game_applied, id, gi >= 0);
@@ -1880,7 +1882,7 @@ static void game_tick(void)
     if (hs_dropped) note_event("Game profile removed (%s on %s)", dname[0] ? dname : hsg, hsn);
     if (picked) note_event("Using the %s profile of this game", hsn);
     if (req == 1) note_event("Saved for %s", name[0] ? name : id);
-    if (req == 2) note_event("Game profile removed (%s)", name[0] ? name : id);
+    if (req == 2 && own_dropped) note_event("Game profile removed (%s)", name[0] ? name : id);
     if (act == HB_GAME_APPLY && !req) {
         if (from[0]) note_event("Game sound on for %s (from %s)", name[0] ? name : id, from);
         else note_event("Game sound on for %s", name[0] ? name : id);
