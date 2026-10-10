@@ -214,7 +214,8 @@
    "why_rest": "rest mode",
    "savedGames": "Saved games",
    "noSavedGames": "No games saved yet. Start a game, set the sound, then press Save for this game.",
-   "tabDetails": "Details"
+   "tabDetails": "Details",
+   "tabSound": "Sound & games"
   },
   "ar": {
    "language": "اللغة",
@@ -378,7 +379,8 @@
    "why_rest": "وضع الراحة",
    "savedGames": "الألعاب المحفوظة",
    "noSavedGames": "لا توجد ألعاب محفوظة بعد. شغّل لعبة واضبط الصوت ثم اضغط حفظ لهذه اللعبة.",
-   "tabDetails": "التفاصيل"
+   "tabDetails": "التفاصيل",
+   "tabSound": "الصوت والألعاب"
   },
   "es": {
    "language": "Idioma",
@@ -542,7 +544,8 @@
    "why_rest": "modo reposo",
    "savedGames": "Juegos guardados",
    "noSavedGames": "Aún no hay juegos guardados. Abre un juego, ajusta el sonido y pulsa Guardar para este juego.",
-   "tabDetails": "Detalles"
+   "tabDetails": "Detalles",
+   "tabSound": "Sonido y juegos"
   },
   "fr": {
    "language": "Langue",
@@ -706,7 +709,8 @@
    "why_rest": "mode repos",
    "savedGames": "Jeux enregistrés",
    "noSavedGames": "Aucun jeu enregistré. Lancez un jeu, réglez le son, puis appuyez sur Enregistrer pour ce jeu.",
-   "tabDetails": "Détails"
+   "tabDetails": "Détails",
+   "tabSound": "Son et jeux"
   },
   "de": {
    "language": "Sprache",
@@ -870,7 +874,8 @@
    "why_rest": "Ruhemodus",
    "savedGames": "Gespeicherte Spiele",
    "noSavedGames": "Noch keine Spiele gespeichert. Starte ein Spiel, stelle den Klang ein und drücke Für dieses Spiel speichern.",
-   "tabDetails": "Details"
+   "tabDetails": "Details",
+   "tabSound": "Klang und Spiele"
   },
   "pt": {
    "language": "Idioma",
@@ -1034,7 +1039,8 @@
    "why_rest": "modo de repouso",
    "savedGames": "Jogos salvos",
    "noSavedGames": "Nenhum jogo salvo ainda. Abra um jogo, ajuste o som e toque em Salvar para este jogo.",
-   "tabDetails": "Detalhes"
+   "tabDetails": "Detalhes",
+   "tabSound": "Som e jogos"
   },
   "ru": {
    "language": "Язык",
@@ -1198,7 +1204,8 @@
    "why_rest": "режим покоя",
    "savedGames": "Сохранённые игры",
    "noSavedGames": "Пока нет сохранённых игр. Запустите игру, настройте звук и нажмите «Сохранить для этой игры».",
-   "tabDetails": "Подробности"
+   "tabDetails": "Подробности",
+   "tabSound": "Звук и игры"
   },
   "ja": {
    "language": "言語",
@@ -1362,7 +1369,8 @@
    "why_rest": "レストモード",
    "savedGames": "保存したゲーム",
    "noSavedGames": "保存したゲームはまだありません。ゲームを起動して音を調整し、「このゲーム用に保存」を押してください。",
-   "tabDetails": "詳細"
+   "tabDetails": "詳細",
+   "tabSound": "サウンドとゲーム"
   },
   "zh": {
    "language": "语言",
@@ -1526,7 +1534,8 @@
    "why_rest": "待机模式",
    "savedGames": "已保存的游戏",
    "noSavedGames": "还没有保存的游戏。启动游戏，调好声音，然后按“为此游戏保存”。",
-   "tabDetails": "详细信息"
+   "tabDetails": "详细信息",
+   "tabSound": "声音与游戏"
   },
   "it": {
    "language": "Lingua",
@@ -1690,7 +1699,8 @@
    "why_rest": "modalità riposo",
    "savedGames": "Giochi salvati",
    "noSavedGames": "Nessun gioco salvato. Avvia un gioco, regola il suono e premi Salva per questo gioco.",
-   "tabDetails": "Dettagli"
+   "tabDetails": "Dettagli",
+   "tabSound": "Suono e giochi"
   }
  }
 }

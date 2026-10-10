@@ -61,8 +61,9 @@ calls.length = 0; el('lat').value = 150; el('lat').oninput.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150', 'page: moving the slider posts the buffer target');
 {
   const main0 = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
-  check(main0.indexOf('class="panel logp"') > 0 && main0.indexOf('id="evlog"') > 0 && main0.indexOf('class="panel status"') > 0 &&
-    html.indexOf('data-i18n="logEmpty"') > 0, 'page: status and log are on the main screen');
+  check(main0.indexOf('class="panel logp"') > 0 && main0.indexOf('id="evlog"') > 0 && main0.indexOf('class="panel status"') < 0 &&
+    main0.slice(main0.indexOf('id="hspanel"')).indexOf('id="fmt"') > 0 &&
+    html.indexOf('data-i18n="logEmpty"') > 0, 'page: status merged into the Headset panel, log on the main screen');
   check(main0.indexOf('class="panel conn"') > 0 && main0.indexOf('id="codecs"') > 0 && main0.indexOf('id="stop"') > 0,
     'page: connection (codec, chip, stop) is on the main screen');
   const hdr = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
@@ -81,19 +82,21 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150',
   check(c1.indexOf('class="panel conn"') > 0 && c1.indexOf('id="codecnote"') < 0 && /id="stop" class="red sm"/.test(c1),
         'page: connection is compact (codec, chip, small stop button)');
   const c2 = main.slice(main.indexOf('class="col c2"'), main.indexOf('class="col c3"'));
-  check(c3.indexOf('class="panel status"') < c3.indexOf('id="hspanel"') && c2.indexOf('id="eqp"') < c2.indexOf('class="panel logp"') && c2.indexOf('id="eqp"') >= 0,
-        'page: status + headset in one column, sound then log in the middle');
+  check(c3.indexOf('id="hspanel"') > 0 && c2.indexOf('id="eqp"') >= 0 && c2.indexOf('id="gain"') > c2.indexOf('id="eqp"') &&
+        c1.indexOf('class="panel conn"') < c1.indexOf('class="panel logp"') && c1.indexOf('id="lat"') > c1.indexOf('class="panel conn"'),
+        'page: 4 panels: headset (with status) | sound (with volume) | connection (with latency), log');
+  check((main.match(/<section class="panel/g) || []).length === 4, 'page: main screen has 4 panels');
   check(/class="side"><p class="navgrp"/.test(html) && /class="dmain"/.test(html) && /id="pgtitle"/.test(html),
         'page: settings side menu (categories left, page right)');
   check(main.indexOf('id="qs"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="gain"') > 0 && main.indexOf('id="hs"') > 0 &&
         main.indexOf('id="lat"') > 0 && main.indexOf('id="latv"') > 0 && main.indexOf('id="pr0"') > 0 && main.indexOf('id="night"') > 0,
         'page: main screen has headset switch, battery, volume, latency + estimate, EQ presets and night mode');
   check(main.indexOf('id="pk"') < 0 && main.indexOf('id="av"') < 0 && main.indexOf('id="m1"') < 0 && main.indexOf('id="lbar"') < 0 &&
-        main.indexOf('id="fmt"') > 0 && main.indexOf('id="batv"') > 0 && main.indexOf('id="lqv"') > 0,
-        'page: status shows format, battery, link; counters, AVRCP, peaks and latency breakdown are in Settings');
+        main.indexOf('id="fmt"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="lqv"') > 0,
+        'page: headset shows format, battery, link; counters, AVRCP, peaks and latency breakdown are in Settings');
   {
-    const pg4 = html.slice(html.indexOf('id="pg4"'));
-    check(/id="tb4"/.test(html) && pg4.indexOf('id="pk"') > 0 && pg4.indexOf('id="av"') > 0 && pg4.indexOf('id="m2"') > 0 && pg4.indexOf('id="lkeys"') > 0,
+    const pg4 = html.slice(html.indexOf('id="pg2"'));
+    check(/id="tb2"[^>]*><svg[\s\S]*?data-i18n="tabDetails"/.test(html) && !/id="tb4"/.test(html) && pg4.indexOf('id="pk"') > 0 && pg4.indexOf('id="av"') > 0 && pg4.indexOf('id="m2"') > 0 && pg4.indexOf('id="lkeys"') > 0,
           'page: Settings > Details has the counters, AVRCP, peaks and latency breakdown');
     check(pg4.indexOf('id="chipv"') > 0 && pg4.indexOf('id="latnote"') > 0 && pg4.indexOf('id="fmtd"') > 0 && main.indexOf('id="chipv"') < 0,
           'page: chip, latency hint and full format details live in Settings > Details');
@@ -206,9 +209,9 @@ check(/toast\(t\('battToast'\)\.replace\('%s',ba\.level\)\)/.test(html) && /hb_b
 // merged latency slider: "Latency" label, ms value next to it, meter under it
 {
   const m = html.match(/<div class="latm">([\s\S]*?)<div class="lkeys"/)[1];
-  const lp = html.slice(html.indexOf('class="panel latp"'), html.indexOf('class="panel eqp"'));
+  const lp = html.slice(html.indexOf('class="latp latin"'));
   check(lp.indexOf('data-i18n="latency"') > 0 && m.indexOf('id="lat"') < m.indexOf('id="latv"') && m.indexOf('id="latt"') > m.indexOf('id="lat"'),
-    'page: "Latency" panel, slider with its ms value, live meter under it');
+    'page: Latency (in Connection), slider with its ms value, live meter under it');
   check(!/llseg|latMode|\/api\/lowlat/.test(html), 'page: no separate low latency mode');
 }
 {
@@ -235,6 +238,11 @@ check(/act\('\/api\/game\?do=3&id='\+encodeURIComponent\(id\)\)/.test(html) && /
   check(bc.length === 5 && new Set(bc).size === 5 && /EQCOL=\['#ff6a2b','#ffb23d','#c8ff3d','#3dd8ff','#ff7ad9'\]/.test(html),
     'page: each EQ band has its own color (slider, fill, value)');
   check(/\.c3\{order:1\}\.c2\{order:2\}\.c1\{order:3\}/.test(html), 'page: TV columns: status/headset/log left, sound middle, volume/latency/connection right');
+}
+{
+  const pg1 = html.slice(html.indexOf('id="pg1"'), html.indexOf('id="pg3"'));
+  check((html.match(/id="tb\d"/g) || []).length === 4 && pg1.indexOf('id="gsave"') > 0 && pg1.indexOf('id="tone"') > 0,
+    'page: settings has 4 categories, games live in Sound & games');
 }
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);

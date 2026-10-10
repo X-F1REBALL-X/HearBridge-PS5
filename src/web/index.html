@@ -284,7 +284,7 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 .qs p{grid-column:1/-1;margin:0;padding:var(--s2) var(--s3);font-size:.9rem;color:var(--mute);border:1px dashed var(--edge2)}
 .hsb{margin-top:auto}
 .btns.one{grid-template-columns:1fr}
-.vol button.act:before,.latp button.act:before,.eqp button.act:before,#pg1 button.act:before,#pg2 button.act:before{background:var(--acc);border-color:var(--acc)}
+.vol button.act:before,.latp button.act:before,.eqp button.act:before,#pg1 button.act:before{background:var(--acc);border-color:var(--acc)}
 #pg1{--acc:var(--violet)}
 /* sound panel */
 .eqhead .cl{font-size:.82rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
@@ -355,8 +355,10 @@ button.sm{min-height:2.2rem;padding:.15rem .9rem;font-size:.85rem}
 .pg .game{padding:var(--s2) var(--s3);margin:0}
 .game.none{background:none;border-style:dashed;border-color:var(--edge2)}.game.none b{color:var(--mute);font-weight:700}
 .latd{margin-top:var(--s2)}.latd .lbar{height:.9rem}
-#pg4 .kv{margin-bottom:var(--s3)}
-#pg0{--acc:var(--lime)}#pg2{--acc:var(--rose)}#pg3{--acc:var(--warn)}
+#pg2 .kv{margin-bottom:var(--s3)}
+.gsec{margin-top:var(--s5);padding-top:var(--s3);border-top:1px solid var(--edge);--acc:var(--rose)}
+.gsec button.act:before{background:var(--rose);border-color:var(--rose)}
+#pg0{--acc:var(--lime)}#pg2{--acc:var(--cyan)}#pg3{--acc:var(--warn)}
 #pg3 .seg button.act:before,#pg3 .bkgo button.act:before{background:var(--warn);border-color:var(--warn)}
 .tabs button:focus,.qs button:focus{transform:scale(1.02)}
 /* volume: compact, Mute in the header */
@@ -368,10 +370,15 @@ button.sm{min-height:2.2rem;padding:.15rem .9rem;font-size:.85rem}
 .conn .seg{margin-bottom:var(--s1)}
 .conn .note{margin:0 0 var(--s1);font-size:.78rem;line-height:1.3}
 .conn .note:empty{display:none}
-#pg4 .chiprow{display:flex;align-items:baseline;gap:var(--s3);font-size:.9rem}#pg4 .chiprow .diag{margin-inline-start:auto}
+#pg2 .chiprow{display:flex;align-items:baseline;gap:var(--s3);font-size:.9rem}#pg2 .chiprow .diag{margin-inline-start:auto}
 .conn .chiprow{display:flex;align-items:baseline;gap:var(--s3);margin:var(--s2) 0 0;padding-top:var(--s2);border-top:1px solid var(--edge);font-size:.8rem}
 .conn .chiprow .diag{margin-inline-start:auto}
 /* equalizer on the main screen, under the presets */
+/* merged panels: volume inside Sound, latency inside Connection */
+.volin{margin:0 0 var(--s3);padding-bottom:var(--s3);border-bottom:1px solid var(--edge)}
+.latin{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--edge)}.latin .sub{margin-top:0;color:var(--rose)}
+.hskv{margin:var(--s2) 0 var(--s1)}
+.eqp .phead .label{margin:0}
 /* status + log (main): the old colourful look */
 .status .kv>*{min-height:2rem}
 .status .meters{margin-top:var(--s3)}
@@ -390,15 +397,15 @@ button.night{min-height:3.4rem}
 /* tablet: two columns; phone: one. Panels keep a sensible order. */
 @media(max-width:1179px),(max-height:599px){
 .col{display:contents}
-.hs{order:1}.vol{order:2}.latp{order:3}.eqp{order:4}.conn{order:5}.status{order:6}.logp{order:7}
+.panel.hs{order:1}.panel.eqp{order:2}.panel.conn{order:3}.panel.logp{order:4}
 }
 @media(min-width:760px) and (max-width:1179px){
 .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.eqp,.logp{grid-column:1/-1}
+.panel.eqp{grid-column:1/-1}
 }
 /* TV: three columns on one screen.
-   left: status, headset; middle: sound with a compact equalizer, then the log;
-   right: volume, latency, connection */
+   left: headset (with its status); middle: sound (volume, equalizer, night mode);
+   right: connection (codec + latency), then a small log */
 @media(min-width:1180px) and (min-height:600px){
 html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 .wrap{height:100vh}
@@ -409,14 +416,11 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 .c3{order:1}.c2{order:2}.c1{order:3}
 .col{min-height:0}
 .panel{flex:0 0 auto}
-.c1>.panel{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-evenly}
-.c1 .phead{margin-bottom:0}.c1 .latp>.label{margin-bottom:0}
-.c2 .eqp{flex:0 0 auto}
-.c2 .logp{flex:1 1 0;min-height:6rem}
-.c3>.panel{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-evenly}
-.c3 .status>.label,.c3 .hs>.label{margin-bottom:0}
-.c3 .status .kv{font-size:1.08rem}.c3 .status .kv>.k{font-size:.98rem}.c3 .status .kv>.v{font-size:1.2rem}.c3 .status .chips span{font-size:.95rem}.c3 .status .kv>*{min-height:2.9rem}
-.c3 .hs .hsb{margin-top:0}
+.c1 .conn{flex:0 0 auto}.c1 .logp{flex:1 1 0;min-height:6rem}
+.c2 .eqp{flex:1 1 auto;justify-content:space-between}
+.c3 .hs{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-between}
+.c3 .hs .hskv{font-size:1.08rem}.c3 .hs .hskv>.k{font-size:.98rem}.c3 .hs .hskv>.v{font-size:1.2rem}.c3 .hs .hskv .chips span{font-size:.95rem}.c3 .hs .hskv>*{min-height:2.9rem}
+.c3 .hs .hsb{margin-top:var(--s3)}
 .c3 .hs .qs button{min-height:3.4rem}
 
 .big{font-size:2rem}.vrow .big{font-size:1.7rem}
@@ -426,7 +430,6 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 .latp input[type=range],.latp input[type=range]::-webkit-slider-runnable-track,.latp input[type=range]::-webkit-slider-thumb,.latp input[type=range]::-moz-range-track,.latp input[type=range]::-moz-range-progress,.latp input[type=range]::-moz-range-thumb{height:1.7rem}
 .qs{overflow-y:auto;padding:4px;margin:-4px -4px var(--s2)}
 .status .kv>*{min-height:2.4rem}
-.c1>.panel{justify-content:space-evenly}
 .c3 .hs .qs{max-height:none}
 .logp .evlog{font-size:.95rem}
 .logp .evlog div{padding:.15rem 0}
@@ -462,25 +465,26 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="msg" id="msg"></div><div class="toast" id="toast"></div>
 <main class="grid">
 <div class="col c1">
-<section class="panel vol"><div class="phead"><p class="label" data-i18n="volume">Volume</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div>
-<div class="vrow"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
-<input type="range" id="gain" min="0" max="500" step="10"></div>
-<div class="vrow"><div class="row"><span class="cl"><span data-i18n="headset">Headset volume (AVRCP)</span><span class="sync" id="hsync" data-i18n="fromHeadset">from headset</span></span><span class="big" id="hv">-</span></div>
-<input type="range" id="hs" min="0" max="127" step="1"></div>
-</section>
-<section class="panel latp"><p class="label" data-i18n="latency">Latency</p>
-<div class="latm"><div class="lt lt1"><input type="range" id="lat" min="40" max="200" step="1"><span class="v" id="latt">-</span></div>
-<div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big"><span id="latv">-</span><span class="llsave" id="llsave"></span></span></div>
-</div>
-</section>
 <section class="panel conn"><div class="phead"><p class="label" data-i18n="connection">Connection</p><button id="stop" class="red sm" data-i18n="stop">Stop HearBridge</button></div>
 <div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
 <p class="k note cno" id="codecno"></p>
 <p class="k note cno" id="xqnote"></p>
+<div class="latp latin"><p class="sub" data-i18n="latency">Latency</p>
+<div class="latm"><div class="lt lt1"><input type="range" id="lat" min="40" max="200" step="1"><span class="v" id="latt">-</span></div>
+<div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big"><span id="latv">-</span><span class="llsave" id="llsave"></span></span></div>
+</div>
+</div>
 </section>
+<section class="panel logp"><p class="label" data-i18n="log">Log</p>
+<div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section>
 </div>
 <div class="col c2">
-<section class="panel eqp" id="eqp"><p class="label" data-i18n="sound">Sound</p>
+<section class="panel eqp" id="eqp"><div class="phead"><p class="label" data-i18n="sound">Sound</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div>
+<div class="vol volin"><div class="vrow"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
+<input type="range" id="gain" min="0" max="500" step="10"></div>
+<div class="vrow"><div class="row"><span class="cl"><span data-i18n="headset">Headset volume (AVRCP)</span><span class="sync" id="hsync" data-i18n="fromHeadset">from headset</span></span><span class="big" id="hv">-</span></div>
+<input type="range" id="hs" min="0" max="127" step="1"></div>
+</div>
 <div class="gline" id="gline" style="display:none"><span class="gic sm" id="glic"></span><span id="gltxt">-</span></div>
 <div class="eqhead" id="eqhead"><span class="cl" data-i18n="equalizer">Equalizer</span><button id="eqon" data-i18n="eqOff">Off</button></div>
 <div class="eqbox"><div class="curve"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eqg" x1="0" x2="1" y1="0" y2="0">
@@ -497,23 +501,16 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="presets"><button id="pr0" data-i18n="prFlat">Flat</button><button id="pr1" data-i18n="prBassBoost">Bass boost</button><button id="pr2" data-i18n="prBassCut">Bass cut</button><button id="pr3" data-i18n="prTreble">Treble boost</button><button id="pr4" data-i18n="prVoice">Voice / footsteps</button><button id="prc" data-i18n="eqCustom">Custom</button></div>
 <button type="button" class="night" id="night"><span class="nt"><b data-i18n="night">Night mode</b><small data-i18n="nightHint">Quieter explosions, clearer voices</small></span><span class="sw" id="nightsw"></span></button>
 </section>
-<section class="panel logp"><p class="label" data-i18n="log">Log</p>
-<div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section>
 </div>
 <div class="col c3">
-<section class="panel status"><p class="label" data-i18n="status">Status</p>
-<div id="stats" style="display:none">
-<div class="kv">
-<span class="k" data-i18n="format">Format</span><span class="chips" id="fmt">-</span>
-<span class="k" data-i18n="battery">Battery</span><span class="v" id="batv">-</span>
-<span class="k" data-i18n="link">Link quality</span><span class="v" id="lqv">-</span>
-</div>
-</div>
-<p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p>
-</section>
 <section class="panel hs" id="hspanel"><p class="label" data-i18n="headsetPanel">Headset</p>
 <div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
 <div class="hsinfo"><span class="hsi"><span class="k" data-i18n="battery">Battery</span><span class="v" id="batm">-</span></span><span class="hsi"><span class="k" data-i18n="signal">Signal</span><span class="v" id="lqm">-</span></span></div>
+<div id="stats" style="display:none"><div class="kv hskv">
+<span class="k" data-i18n="format">Format</span><span class="chips" id="fmt">-</span>
+<span class="k" data-i18n="link">Link quality</span><span class="v" id="lqv">-</span>
+</div></div>
+<p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p>
 <p class="sub" data-i18n="switchHs">Switch headset</p>
 <div class="qs" id="qs"></div>
 <div class="btns hsb"><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div>
@@ -526,10 +523,9 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="side"><p class="navgrp" data-i18n="settings">Settings</p>
 <nav class="tabs" id="tabs">
 <button type="button" id="tb0" style="--c:var(--lime)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg><span data-i18n="tabHeadsets">Headsets</span></button>
-<button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="sound">Sound</span></button>
-<button type="button" id="tb2" style="--c:var(--rose)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10a5 5 0 0 1 4.6 7l-1 2.3a2.5 2.5 0 0 1-4.2.6L14.6 15H9.4l-1.8 1.9a2.5 2.5 0 0 1-4.2-.6l-1-2.3A5 5 0 0 1 7 7z" fill="currentColor"/></svg><span data-i18n="tabGames">Games</span></button>
+<button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="tabSound">Sound &amp; games</span></button>
+<button type="button" id="tb2" style="--c:var(--cyan)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M6 16v-5M11 16V6M16 16v-8M21 16v-3" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="tabDetails">Details</span></button>
 <button type="button" id="tb3" style="--c:var(--warn)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 9l5 5 5-5M4 17v4h16v-4" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="bkTitle">Backup &amp; restore</span></button>
-<button type="button" id="tb4" style="--c:var(--cyan)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M6 16v-5M11 16V6M16 16v-8M21 16v-3" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="tabDetails">Details</span></button>
 </nav>
 <div class="menufoot"><b>HearBridge PS5</b><span data-i18n="footer">Closing this page leaves HearBridge running.</span></div>
 </div>
@@ -545,13 +541,12 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="pg" id="pg1" style="--acc:var(--violet)">
 <p class="k note" id="eqhint" data-i18n="eqHint">Saved for this headset.</p>
 <div class="btns"><button id="tone" data-i18n="tone">Test tone</button><button id="clean" data-i18n="clean">Clean sound</button></div>
-<p class="sub" data-i18n="codec">Codec</p><p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p>
-</div>
-<div class="pg" id="pg2" style="--acc:var(--rose)">
+<div class="gsec"><p class="sub" data-i18n="tabGames">Games</p>
 <p class="k note" data-i18n="gamesHint">Save the sound you like for a game. It turns on by itself when that game starts, and your usual sound comes back when it closes.</p>
 <div class="game" id="game"><span class="gic" id="gic"></span><b id="gname">-</b><span class="gchip" id="gon" data-i18n="gameOn">game profile</span></div>
 <div class="btns" id="gbtns"><button id="gsave" class="act" data-i18n="gameSave">Save for this game</button><button id="gdrop" class="red" data-i18n="gameRemove">Remove</button></div>
 <p class="sub" data-i18n="savedGames">Saved games</p><div class="glist" id="glist"></div>
+</div>
 </div>
 <div class="pg" id="pg3" style="--acc:var(--warn)">
 <p class="k note" data-i18n="bkHint">Saved headsets (with their pairing), their settings and game profiles in one file.</p>
@@ -561,10 +556,11 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <p class="bkmsg" id="bkmsg"></p><div class="bklist" id="bklist"></div>
 <input type="file" id="bkfile" accept=".json,application/json" style="display:none">
 </div>
-<div class="pg" id="pg4" style="--acc:var(--cyan)">
+<div class="pg" id="pg2" style="--acc:var(--cyan)">
 <p class="sub" data-i18n="status">Status</p>
 <div class="kv">
 <span class="k" data-i18n="format">Format</span><span class="chips" id="fmtd">-</span>
+<span class="k" data-i18n="battery">Battery</span><span class="v" id="batv">-</span>
 <span class="k" data-i18n="packets">Packets / SBC frames</span><span class="v" id="pk">-</span>
 <span class="k" data-i18n="avrcp">AVRCP</span><span class="chips" id="av">-</span>
 </div>
@@ -577,6 +573,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="latd"><div class="lbar" id="lbar"><i id="lb0" style="background:var(--b0)"></i><i id="lb1" style="background:var(--b1)"></i><i id="lb2" style="background:var(--b3)"></i><i id="lb3" style="background:var(--b4)"></i></div>
 <div class="lkeys" id="lkeys"></div></div>
 <p class="sub" data-i18n="connection">Connection</p>
+<p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p>
 <div class="chiprow"><span class="k" data-i18n="chip">Chip</span><span class="v" id="chipv">-</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div>
 </div>
 </div>
@@ -786,7 +783,7 @@ var toastT=0;function toast(m){$('toast').textContent=m;clearTimeout(toastT);toa
 $('gsave').onclick=function(){if(!this.disabled)act('/api/game?do=1')};
 $('night').onclick=function(){act('/api/night?on='+(S&&S.night&&S.night.on?0:1))};
 /* settings overlay */
-var TAB=0,NTAB=5;function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}var ts=$('tb'+n).getElementsByTagName?$('tb'+n).getElementsByTagName('span'):[];$('pgtitle').textContent=ts.length?ts[0].textContent:'';$('setm').style.setProperty&&$('setm').style.setProperty('--pgc',['var(--lime)','var(--violet)','var(--rose)','var(--warn)','var(--cyan)'][n])}
+var TAB=0,NTAB=4;function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}var ts=$('tb'+n).getElementsByTagName?$('tb'+n).getElementsByTagName('span'):[];$('pgtitle').textContent=ts.length?ts[0].textContent:'';$('setm').style.setProperty&&$('setm').style.setProperty('--pgc',['var(--lime)','var(--violet)','var(--cyan)','var(--warn)'][n])}
 function setOpen(n){$('setm').className='drawer show';$('scrim').className='scrim show';setTab(n==null?TAB:n);$('tb'+TAB).focus();if(TAB==3)bkCheck()}
 function setClose(){$('setm').className='drawer';$('scrim').className='scrim';$('setbtn').focus()}
 $('scrim').onclick=setClose;
