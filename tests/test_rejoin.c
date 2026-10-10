@@ -45,6 +45,24 @@ int main(void)
         CHECK(hb_rest_step(&r, 0, 0, 0, 2000 + HB_REST_GIVEUP_MS) == HB_REST_RESUME,
               "rest: cancelled rest (no sleep) reconnects after 30 s");
     }
+    /* DualSense regression: our own blocking page (5 s) and 5 s listen
+     * slices looked like a wake, so the headset was paged for ever. */
+    CHECK(HB_WAKE_GAP_MS >= 30000, "wake: gap is 30 s or more");
+    CHECK(!hb_resume_gap(1000, 1000 + 5200, 50000, 50000 + 5200, HB_WAKE_GAP_MS), "wake: a 5 s page is not a wake");
+    CHECK(!hb_resume_gap(1000, 1000 + 8100, 50000, 50000 + 8100, HB_WAKE_GAP_MS), "wake: an 8 s listen is not a wake");
+    CHECK(hb_resume_gap(1000, 1000 + 45000, 50000, 50000 + 45000, HB_WAKE_GAP_MS), "wake: 45 s asleep is a wake");
+    CHECK(hb_resume_gap(1000, 1500, 50000, 50000 + 600000, HB_WAKE_GAP_MS), "wake: wall clock 10 min ahead is a wake");
+    {
+        int done = 0, pages = 0;
+        while (hb_auto_page_ok(done) && pages < 100) { done++; pages++; }
+        CHECK(pages == HB_AUTO_PAGES && HB_AUTO_PAGES == 3, "auto: 3 background pages per window, then only listen");
+        CHECK(!hb_auto_page_ok(-1) && hb_auto_page_ok(0), "auto: counter bounds");
+    }
+    {
+        int pages = 0, n = 0;
+        while (hb_re_paging(pages) && n < 100) { pages++; n++; }
+        CHECK(n == 3 && hb_re_listen_ms(pages) == 0, "rejoin: 3 pages after a drop, then only listen");
+    }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

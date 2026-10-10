@@ -14,6 +14,11 @@ int hb_re_paging(int pages)
     return pages >= 0 && pages < HB_RE_PAGES;
 }
 
+int hb_auto_page_ok(int done)
+{
+    return done >= 0 && done < HB_AUTO_PAGES;
+}
+
 int hb_resume_gap(long mp, long mn, long rp, long rn, long gap)
 {
     long dm = mn - mp, dr = rn - rp;

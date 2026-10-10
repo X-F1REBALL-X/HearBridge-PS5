@@ -149,7 +149,7 @@ static long g_tick_mono, g_tick_wall;
 static int woke_up(void)
 {
     long m = now_ms(), w = wall_ms();
-    int gap = hb_resume_gap(g_tick_mono, m, g_tick_wall, w, 5000);
+    int gap = hb_resume_gap(g_tick_mono, m, g_tick_wall, w, HB_WAKE_GAP_MS);
     g_tick_mono = m;
     g_tick_wall = w;
     return gap;
@@ -1224,6 +1224,7 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
 
     if (scan_now) {
         seen_clear();
+        a2dp_scan_evmask_sent = 0;
         scan_until = now_ms() + SCAN_WINDOW_S * 1000L;
         a2dp_scan_deadline_ms = scan_until;
     } else {
@@ -1300,6 +1301,7 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
             t_end = now_ms() + SELECT_WAIT_S * 1000L;
             if (c.kind == CMD_SCAN) {
                 seen_clear();
+                a2dp_scan_evmask_sent = 0;
                 scan_until = now_ms() + SCAN_WINDOW_S * 1000L;
         a2dp_scan_deadline_ms = scan_until;
                 continue;
@@ -1681,7 +1683,7 @@ static void *rest_thread(void *arg)
     if (!g_ctl.rest_watch) return NULL;
     while (!g_game_quit && !hb_stop_requested()) {
         long m = now_ms(), w = wall_ms();
-        int woke = hb_resume_gap(pm, m, pw, w, 5000);
+        int woke = hb_resume_gap(pm, m, pw, w, HB_WAKE_GAP_MS);
         int a = hb_rest_step(&r, hb_rest_sys_going_down(), woke, g_stream_up, m);
         pm = m;
         pw = w;
@@ -2851,6 +2853,7 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
                 note_event("Headset reconnected");
                 return 1;
             }
+            (void)woke_up();                  /* our own wait is not a wake */
             if (hb_stop_requested() || cmd_waiting()) break;
             left -= slice;
             if (sit) break;
@@ -2864,6 +2867,7 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
         g_bg_page = 1;
         j = try_saved(hci, ini, &g_ready, &g_ready_psm, HB_PAGE_MS);
         g_bg_page = 0;
+        (void)woke_up();                      /* the page blocked up to 5 s */
         if (j) {
             note_event("Headset reconnected");
             return 1;
@@ -3145,7 +3149,7 @@ int main(void)
              * never after a manual Disconnect or a case close (it pages us
              * itself when it comes out), never while a page command waits. */
             long idle_t0 = now_ms(), next_auto = now_ms() + 12000, window = 600000;
-            int auto_ok = r != RUN_AWAY;
+            int auto_ok = r != RUN_AWAY, auto_pages = 0;
             (void)woke_up();
             for (;;) {
                 int go;
@@ -3170,6 +3174,7 @@ int main(void)
                     window = HB_RESUME_PAGE_WINDOW_MS;
                     next_auto = now_ms() + 1500;
                     auto_ok = 1;
+                    auto_pages = 0;
                 }
                 bg_tick(&ini);
                 CTL_LOCK(&g_ctl);
@@ -3220,6 +3225,8 @@ int main(void)
                         g_ready_psm = bpsm;
                         break;
                     }
+                    (void)woke_up();
+
                 } else {
                     idle_pump(hci, 100);
                 }
@@ -3227,6 +3234,7 @@ int main(void)
                 paused = g_ctl.paused;
                 CTL_UNLOCK(&g_ctl);
                 if (auto_ok && !paused && ini.ok && !held(ini.addr) && !cmd_waiting() &&
+                    hb_auto_page_ok(auto_pages) &&
                     now_ms() >= next_auto && now_ms() - idle_t0 < window) {
                     btlink *back = NULL;
                     unsigned bpsm = 0;
@@ -3237,6 +3245,10 @@ int main(void)
                     g_bg_page = 1;
                     got = try_saved(hci, &ini, &back, &bpsm, HB_PAGE_MS);
                     g_bg_page = 0;
+                    (void)woke_up();              /* the page blocked up to 5 s */
+                    auto_pages++;
+                    if (!got && !hb_auto_page_ok(auto_pages))
+                        log_line("auto: %d background pages done, now only listening", auto_pages);
                     if (got) {
                         note_event("%s turned on, connecting", ini.name[0] ? ini.name : "Headset");
                         g_ready = back;

@@ -89,5 +89,7 @@ extern int a2dp_pair_keep_acl;
 /* Nonzero: wall-clock end (now_ms) of a manual scan. Inquiries are shortened
  * or skipped and name lookups stop to finish by then. */
 extern long a2dp_scan_deadline_ms;
+/* Event mask re-sent during this scan (cleared when a scan starts). */
+extern int a2dp_scan_evmask_sent;
 
 #endif
