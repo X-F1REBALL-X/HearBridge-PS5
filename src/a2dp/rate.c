@@ -190,6 +190,7 @@ void hb_lat_auto_init(hb_lat_auto *a, int start_ms)
     if (start_ms > HB_LAT_AUTO_TRUST_MS) start_ms = 0;   /* not trusted: 200 ms */
     a->cur_ms = a->start_ms = hb_lat_auto_clamp(start_ms);
     a->ignore_s = HB_LAT_AUTO_START_S;
+    a->down_s = -1;
 }
 
 static int lat_auto_sum(const hb_lat_auto *a)
@@ -212,6 +213,33 @@ int hb_lat_auto_tick(hb_lat_auto *a, int d, int *changed)
     int sum, top;
     if (changed) *changed = 0;
     if (d < 0) d = 0;
+    if (a->down_s >= 0) {
+        /* Watching a step down: drops this soon mean the lower level caused
+         * them (the Coral CM835: 200 -> 190 ms, then 350 drops/min). Back to
+         * the level that held, at once, and never below it this stream.
+         * Not a link problem: the link was clean at the level above. */
+        int recent = d;
+        int i;
+        for (i = 0; i < HB_LAT_AUTO_WIN_S; i++) recent += a->win[i];
+        if (++a->down_s > HB_LAT_AUTO_DOWN_WATCH_S) {
+            a->down_s = -1;
+        } else if (d >= HB_LAT_AUTO_BAD_DROPS || recent >= HB_LAT_AUTO_BAD_DROPS) {
+            if (a->cur_ms > a->fail_ms) a->fail_ms = a->cur_ms;
+            a->cur_ms = a->prev_ms > a->cur_ms ? a->prev_ms : a->cur_ms + HB_LAT_AUTO_DOWN_MS;
+            if (a->cur_ms > HB_LAT_AUTO_MAX_MS) a->cur_ms = HB_LAT_AUTO_MAX_MS;
+            if (a->cur_ms > a->floor_ms) a->floor_ms = a->cur_ms;
+            if (a->start_ms < a->floor_ms) a->start_ms = a->floor_ms;
+            a->link_bad = 0;
+            a->had_drops = 1;
+            a->down_s = -1;
+            a->safe_ms = 0;
+            lat_auto_changed(a);
+            a->ignore_s = HB_LAT_AUTO_SETTLE_S + 2;   /* the trimmed queue refills */
+            a->recover = 1;
+            if (changed) *changed = 1;
+            return a->cur_ms;
+        }
+    }
     if (a->ignore_s > 0) {
         a->ignore_s--;
         return a->cur_ms;
@@ -219,6 +247,7 @@ int hb_lat_auto_tick(hb_lat_auto *a, int d, int *changed)
     a->win[a->wi] = d;
     a->wi = (a->wi + 1) % HB_LAT_AUTO_WIN_S;
     a->since_s++;
+    if (d > 0) a->had_drops = 1;
     sum = lat_auto_sum(a);
     if (sum >= HB_LAT_AUTO_LINK_DROPS) {
         /* Far more than a stall: the link cannot carry the stream. A
@@ -255,18 +284,21 @@ int hb_lat_auto_tick(hb_lat_auto *a, int d, int *changed)
     }
     a->good_s++;
     if (a->cur_ms <= HB_LAT_AUTO_MIN_MS) return a->cur_ms;
+    if (a->cur_ms - HB_LAT_AUTO_DOWN_MS < a->floor_ms) return a->cur_ms;   /* flooded below */
     if (a->cur_ms - HB_LAT_AUTO_DOWN_MS <= a->fail_ms) {
         /* At the floor: stay, but try below it after a long clean stretch. */
         if (a->good_s < HB_LAT_AUTO_REPROBE_S) return a->cur_ms;
         a->fail_ms = 0;
         a->safe_ms = a->cur_ms;
-    } else if (a->good_s < HB_LAT_AUTO_GOOD_S) {
+    } else if (a->good_s < (a->had_drops ? HB_LAT_AUTO_GOOD_DROP_S : HB_LAT_AUTO_GOOD_S)) {
         return a->cur_ms;
     }
+    a->prev_ms = a->cur_ms;
     a->cur_ms -= HB_LAT_AUTO_DOWN_MS;
     if (a->cur_ms < HB_LAT_AUTO_MIN_MS) a->cur_ms = HB_LAT_AUTO_MIN_MS;
     if (a->cur_ms < a->start_ms) a->start_ms = a->cur_ms;   /* raises count from the lowest held */
     lat_auto_changed(a);
+    a->down_s = 0;
     if (changed) *changed = -1;
     return a->cur_ms;
 }

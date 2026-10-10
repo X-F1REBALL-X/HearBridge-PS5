@@ -2562,6 +2562,21 @@ int btlink_tx_backlog(const btlink *l)
     return l ? l->txq_n : 0;
 }
 
+int btlink_media_trim(btlink *l, int keep)
+{
+    int n = 0, k;
+    if (!l) return 0;
+    if (keep < 0) keep = 0;
+    while (l->txq_media > keep) {
+        for (k = 0; k < l->txq_n; k++)
+            if (l->txq[(l->txq_head + k) % TXQ_MAX].media) break;
+        if (k == l->txq_n) break;
+        txq_remove(l, k);          /* not counted in media_dropped: on purpose */
+        n++;
+    }
+    return n;
+}
+
 /* ---- AVRCP absolute volume API ------------------------------------- */
 
 static int avrcp_open(const btlink *l)
@@ -2630,6 +2645,11 @@ int btlink_avrcp_state(const btlink *l)
 int btlink_avrcp_battery(const btlink *l)
 {
     return l ? l->avrcp.battery : -1;
+}
+
+int btlink_hfp_battery_src(const btlink *l)
+{
+    return l && l->hfp.battery >= 0 ? l->hfp.battery_src : 0;
 }
 
 int btlink_hfp_battery(const btlink *l)

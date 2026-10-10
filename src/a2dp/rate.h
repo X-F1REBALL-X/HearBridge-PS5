@@ -135,6 +135,8 @@ int  hb_lat_effective(const hb_lat_backoff *b, int target_ms);
 #define HB_LAT_AUTO_BAD_DROPS   3   /* ... this many: a stall the buffer can cover */
 #define HB_LAT_AUTO_LINK_DROPS 15   /* ... this many (90/min): the link, not the buffer */
 #define HB_LAT_AUTO_GOOD_S     45   /* clean seconds before each step down */
+#define HB_LAT_AUTO_GOOD_DROP_S 90  /* ... once this stream has dropped at all */
+#define HB_LAT_AUTO_DOWN_WATCH_S 20 /* drops this soon after a step down: it caused them */
 #define HB_LAT_AUTO_REPROBE_S 1800  /* clean at the floor this long: try below it */
 #define HB_LAT_AUTO_SETTLE_S    3   /* after a change: the queue drains to the new cap */
 #define HB_LAT_AUTO_START_S    10   /* stream start: link setup drops do not count */
@@ -148,6 +150,11 @@ typedef struct {
     int safe_ms;      /* level held clean before a probe below the floor (0 none) */
     int link_bad;     /* drop rate too high for a buffer to help */
     int since_s;      /* counted seconds since the last change */
+    int prev_ms;      /* level before the last step down */
+    int down_s;       /* seconds since that step down (-1: none being watched) */
+    int floor_ms;     /* a step down to below this flooded: not again this stream */
+    int had_drops;    /* this stream dropped (after its start): slower steps down */
+    int recover;      /* set with a revert: the caller trims the queue, then clears it */
 } hb_lat_auto;
 /* start_ms: the level learned last time for this headset (0 = 200 ms). */
 void hb_lat_auto_init(hb_lat_auto *a, int start_ms);

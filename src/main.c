@@ -1849,14 +1849,13 @@ static void hs_label(const unsigned char a[6], char *out, int max)
 
 /* Running game changed, or Save / Update / Remove on the page. Once a
  * second. Profiles are per game and per headset: the headset in use gets
- * its own, else the game's newest from another headset (used, not copied:
- * Update Game Profile saves it for this one). */
+ * its own and nothing else (no profile from another headset). */
 static void game_tick(void)
 {
     char id[16], name[HB_GAME_NAME], drop[16], dname[HB_GAME_NAME], hsg[16], hsn[40], from[32];
     unsigned char hsa[6];
     const unsigned char *cur;
-    int req, act, gi, exact = 0, dropped = 0, hsdo, hs_dropped = 0, picked = 0, own_dropped = 0, save;
+    int req, act, gi, dropped = 0, hsdo, hs_dropped = 0, picked = 0, own_dropped = 0, save;
     CTL_LOCK(&g_ctl);
     cur = g_prefs_have ? g_prefs_addr : NULL;
     snprintf(drop, sizeof drop, "%s", g_ctl.req_game_drop);
@@ -1882,7 +1881,7 @@ static void game_tick(void)
         snprintf(dname, sizeof dname, "%s", g_games.g[gi].name);
         hb_games_drop_hs(&g_games, hsg, hsa);
         if (was_on) g_game_applied[0] = 0;   /* the next one (or the usual sound) below */
-        if (was_on && hb_games_find(&g_games, hsg) < 0) game_restore_locked();
+        if (was_on) game_restore_locked();       /* no borrowing: own sound back */
         hs_dropped = 1;
     } else if (hsdo == 2 && hsg[0] && !strcmp(hsg, g_ctl.game_id) &&
                (gi = hb_games_find_hs(&g_games, hsg, hsa)) >= 0) {
@@ -1915,9 +1914,12 @@ static void game_tick(void)
         int was = !strcmp(g_game_applied, id);
         own_dropped = cur && hb_games_drop_hs(&g_games, id, cur);
         if (own_dropped && was) g_game_applied[0] = 0;
-        if (own_dropped && was && hb_games_find(&g_games, id) < 0) game_restore_locked();
+        if (own_dropped && was) game_restore_locked();
     }
-    gi = hb_games_pick(&g_games, id, cur, &exact);
+    /* Only this headset's own profile. A headset without one for this
+     * game keeps its own settings: nothing is borrowed from another
+     * headset (the Coral CM835 got the WF-1000XM6's Sonic profile). */
+    gi = cur && id[0] ? hb_games_find_hs(&g_games, id, cur) : -1;
     act = picked ? HB_GAME_KEEP : hb_game_decide(g_game_applied, id, gi >= 0);
     if (act == HB_GAME_APPLY) {
         hb_game g = g_games.g[gi];
@@ -2316,6 +2318,8 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     hb_lat_auto la;                      /* adaptive latency (Auto): lowest drop-free buffer */
     int la_on = 0;
     long la_drops = 0;
+    int la_full_s = 0;                   /* seconds the queue sat full while dropping */
+    int fl_s = 0, fl_stage = 0, fl_restarts = 0;   /* flood self-recovery (any latency mode) */
     int hs_dirty = 0, lat_n = 0;
     long lat_sum = 0;
 
@@ -2899,6 +2903,7 @@ stream_setup:
                 btlink_link_quality(link, &rssi, &lqv);
                 g_ctl.battery = btlink_avrcp_battery(link);
                 g_ctl.batt_pct = btlink_hfp_battery(link);
+                g_ctl.batt_src = btlink_hfp_battery_src(link);
                 {
                     /* Volume fallback: while the page is open (it polls
                      * /api/status) and the headset has sent no volume report
@@ -2953,7 +2958,19 @@ stream_setup:
                     /* Auto: one step per status second, from the packets
                      * dropped since the last one. */
                     long dr = btlink_tx_dropped(link);
-                    int ch, was = la.cur_ms, was_bad = la.link_bad;
+                    int ch, was = la.cur_ms, was_bad = la.link_bad, reverted = 0;
+                    /* Full queue and still dropping for 5 s: every packet
+                     * waits the whole buffer and the stall never clears. Start
+                     * the queue fresh (half full) so it recovers quickly. */
+                    if (dr > la_drops && btlink_tx_backlog(link) >= btlink_media_cap(link) - 1) {
+                        if (++la_full_s >= 5) {
+                            int gone = btlink_media_trim(link, btlink_media_cap(link) / 2);
+                            log_line("latency: queue full and dropping for 5 s - %d old packets dropped to recover", gone);
+                            la_full_s = 0;
+                        }
+                    } else {
+                        la_full_s = 0;
+                    }
                     (void)hb_lat_auto_tick(&la, dr >= la_drops ? (int)(dr - la_drops) : 0, &ch);
                     la_drops = dr;
                     g_ctl.lat_auto_ms = la.cur_ms;
@@ -2966,11 +2983,25 @@ stream_setup:
                                  dpm, rssi, lqv, lcred, lsent, llim, la.cur_ms);
                         ctl_event_locked(&g_ctl, "Dropouts come from the link, not the buffer");
                     }
+                    if (la.recover) {
+                        /* A step down flooded: back up at once and start the
+                         * queue fresh so it is clean in seconds, not minutes. */
+                        int gone = btlink_media_trim(link, btlink_media_cap(link) / 2);
+                        char evl[HB_EVENT_LEN];
+                        la.recover = 0;
+                        la_full_s = 0;
+                        reverted = 1;
+                        log_line("latency: auto: drops right after stepping down to %d ms - back to %d ms, "
+                                 "not below it again this stream (%d queued packets dropped to recover)",
+                                 was, la.cur_ms, gone);
+                        snprintf(evl, sizeof evl, "Audio dropped at %d ms, back to %d ms (Auto)", was, la.cur_ms);
+                        ctl_event_locked(&g_ctl, evl);
+                    }
                     if (ch) {
                         log_line("latency: auto %d -> %d ms (%s)", was, la.cur_ms,
                                  ch > 0 ? "drops" : la.link_bad ? "link problem, a bigger buffer does not help"
                                                     : "clean link, trying lower");
-                        if (ch > 0) {
+                        if (ch > 0 && !reverted) {
                             char evl[HB_EVENT_LEN];
                             snprintf(evl, sizeof evl, "Audio dropped, latency raised to %d ms (Auto)", la.cur_ms);
                             ctl_event_locked(&g_ctl, evl);
@@ -2983,6 +3014,41 @@ stream_setup:
                                 g_prefs.lat_learned = keep;
                                 hs_dirty = 1;
                             }
+                        }
+                    }
+                }
+                {
+                    /* Self-recovery from a flood the buffer cannot fix (the
+                     * Coral CM835 on 9317a4b: clean for a minute, then 350 to
+                     * 650 drops/min at RSSI -28 whatever the buffer, Auto off
+                     * at 253 ms too). The sender, not the radio range:
+                     * 1) after 10 s: fresh queue and packet tuner;
+                     * 2) 20 s later still flooding: the stream is set up
+                     *    again on the open link (as for a codec change),
+                     *    at most twice per connection. */
+                    int flood = dpm >= 180 && (rssi == 0 || rssi > -70);
+                    if (!flood) {
+                        fl_s = 0;
+                        fl_stage = 0;
+                    } else if (++fl_s == 10 && fl_stage == 0) {
+                        int gone = btlink_media_trim(link, btlink_media_cap(link) / 2);
+                        hb_tune_init(&pk.tune);
+                        packer_size(&pk);
+                        fl_stage = 1;
+                        log_line("stream: %d drops/min for 10 s at RSSI %d - fresh queue (%d dropped) and packet tuner, "
+                                 "%d frames/packet, bitpool %d", dpm, rssi, gone, pk.per_pkt, sbc_encoder_bitpool(enc));
+                        ctl_event_locked(&g_ctl, "Audio keeps dropping, resetting the audio queue");
+                    } else if (fl_s >= 30 && fl_stage == 1) {
+                        fl_stage = 2;
+                        if (fl_restarts < 2 && cs_want < 0) {
+                            fl_restarts++;
+                            cs_want = av.codec.codec;     /* set up again in place on the next pass */
+                            cs_no_xq = g_prefs.auto_no_xq;
+                            log_line("stream: still %d drops/min 20 s later - setting the stream up again (%d of 2)",
+                                     dpm, fl_restarts);
+                            ctl_event_locked(&g_ctl, "Audio keeps dropping, restarting the stream");
+                        } else {
+                            log_line("stream: still %d drops/min - no more restarts this connection", dpm);
                         }
                     }
                 }

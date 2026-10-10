@@ -125,6 +125,9 @@ void btlink_avrcp_stats(const btlink *l, unsigned long *cmds, unsigned long *rsp
                         unsigned long *reports, int *refused);
 /* Battery percent the headset reported over HFP (0..100), -1 none yet. */
 int  btlink_hfp_battery(const btlink *l);
+/* Where that value came from: 0 none, 1 HF indicator (exact 0-100),
+ * 2 Apple AT+IPHONEACCEV (10 % steps). */
+int  btlink_hfp_battery_src(const btlink *l);
 /* Bumped each time the headset itself changed the volume (its buttons/app). */
 int  btlink_avrcp_headset_moves(const btlink *l);
 /* Earbud next / previous track keys step the volume (setting, default on). */
@@ -169,6 +172,10 @@ void     btlink_set_media_pace(btlink *l, long ms_per_packet);
 void     btlink_tx_counters(const btlink *l, unsigned long *sent, unsigned long *credits,
                             int *limit);
 int      btlink_tx_backlog(const btlink *l);
+/* Drops the oldest queued media packets until at most `keep` are left
+ * (recovering from a flood: the queue starts fresh instead of lingering
+ * full). Not counted as media drops. Returns how many went. */
+int      btlink_media_trim(btlink *l, int keep);
 
 /* scid of an OPEN channel the remote opened to us on psm, 0 if none. */
 unsigned btlink_chan_find_inbound(const btlink *l, unsigned psm);

@@ -174,7 +174,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,"
         "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},"
         "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d,\"auto\":%d,\"auto_ms\":%d},"
-        "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"none\":%d},\"hs_moves\":%d,"
+        "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"src\":\"%s\",\"none\":%d},\"hs_moves\":%d,"
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
         "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,\"key_vol\":%d,"
         "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d,\"exact\":%d,\"from\":\"%s\",\"dirty\":%d,\"saved\":%s},\"events\":%s}",
@@ -193,7 +193,8 @@ static int status_json(hb_ctl *c, char *o, int max)
         chip_ok && btchip_is_mediatek(c->chip_vid),
         chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "",
         c->lat_backoff_ms, c->lat_normal_ms, c->latency_auto != 0, c->lat_auto_ms,
-        avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->batt_pct, c->batt_none, c->hs_moves,
+        avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->batt_pct,
+        c->batt_pct < 0 ? "" : c->batt_src == 1 ? "hf" : c->batt_src == 2 ? "apple" : "", c->batt_none, c->hs_moves,
         c->link_score, c->link_rssi == 127 ? 0 : c->link_rssi, c->link_lq, c->drops_min,
         c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch, c->key_vol,
         c->game_avail, c->game_id, gname, c->game_profile, c->game_active, c->game_exact, gfrom, c->game_dirty, gl, ev);
