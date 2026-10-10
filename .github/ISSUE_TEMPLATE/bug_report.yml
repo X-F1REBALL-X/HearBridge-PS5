@@ -50,6 +50,7 @@ body:
     attributes:
       label: Which HearBridge file did you run?
       options:
+        - HearBridge-PS5-1.3.0.elf
         - HearBridge-PS5-1.2.0.elf
         - HearBridge-PS5-1.1.0.elf
         - HearBridge-PS5-1.1.0-mtk-test.elf (MediaTek test build)
