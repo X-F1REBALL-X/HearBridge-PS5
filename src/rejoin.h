@@ -52,4 +52,17 @@ typedef struct {
 void hb_rest_init(hb_rest *r);
 int  hb_rest_step(hb_rest *r, int going_down, int woke, int streaming, long now_ms);
 
+/* Scan window: inquiries (1.28 s units) are chained until the deadline.
+ * How many still fit before it (500 ms margin); 0 = the scan is over.
+ * The scan loop ends on the same rule, so it never spins re-asking for an
+ * inquiry that will not start (hb10.log: every ~130 ms for ~1.2 s). */
+int hb_scan_slots_left(long deadline, long now);
+
+/* The headset hung up the fresh pairing link (Xbox Wireless Headset after
+ * its SDP Device ID query, 0x13): it calls back on its own, sometimes a few
+ * seconds later. Listen (page scan, accept it as the target) this long
+ * before paging it: a page in that window keeps the radio busy and its call
+ * is missed. */
+#define HB_PAIR_CALLBACK_MS 9000
+
 #endif
