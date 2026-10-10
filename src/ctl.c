@@ -75,6 +75,7 @@ void ctl_init(hb_ctl *c, const char *version)
     strcpy(c->state_dir, "/data/hearbridge");
     strcpy(c->mnt_root, "/mnt");
     c->latency_ms = HB_QUEUE_LOW_MS;
+    c->latency_auto = 1;
     strncpy(c->version, version, sizeof c->version - 1);
     strcpy(c->state, "starting");
     c->t0_s = mono_s();

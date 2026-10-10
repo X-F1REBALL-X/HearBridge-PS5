@@ -27,6 +27,8 @@ typedef struct {
     int held_codec;          /* codec that actually held last time, 0 = none */
     int held_bp;             /* bitpool that held with it, 0 = none */
     int night;               /* night mode (dynamic range compression) */
+    int lat_auto;            /* adaptive latency: 1 on, 0 the slider, -1 not in the file */
+    int lat_learned;         /* adaptive latency: level that held last time, ms (0 none) */
 } hb_prefs;
 
 /* Start values for a headset the user has not set: software gain in the
@@ -35,6 +37,9 @@ typedef struct {
 #define HB_PREFS_HS_VOL_DEFAULT 64
 
 void hb_prefs_default(hb_prefs *p);
+/* Adaptive latency on? Files from before it: on unless the user moved the
+ * slider off the 200 ms default (their own value is kept). */
+int  hb_prefs_lat_auto(const hb_prefs *p);
 /* Gain to use: the user's own for this headset, else HB_PREFS_GAIN_DEFAULT.
  * Old files carry an automatically saved gain= with no gain_user=1: ignored. */
 int  hb_prefs_gain(const hb_prefs *p);

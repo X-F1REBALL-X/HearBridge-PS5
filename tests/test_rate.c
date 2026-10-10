@@ -247,6 +247,60 @@ int main(int argc, char **argv)
         hb_latency_estimate(&L, 29, 10, 4000, 0);
         CHECK(L.radio_ms == 500, "estimate: a stalled radio counts at most 500 ms");
     }
+    {
+        /* Adaptive latency (Auto). Simulated link: stalls longer than
+         * `need` ms come every few seconds, so a target below it drops
+         * about one packet every 4 s (the Coral CM835 log: ~15 drops/min at
+         * 200 ms), a target at or above it never drops. */
+        static const int needs[] = { 250, 120, 0, 390 };
+        unsigned k;
+        for (k = 0; k < sizeof needs / sizeof *needs; k++) {
+            hb_lat_auto a;
+            int t, need = needs[k], late_drops = 0, swings = 0, ch, minv = 1000, maxv = 0;
+            char what[128];
+            hb_lat_auto_init(&a, 200);
+            for (t = 0; t < 2 * 3600; t++) {
+                int d = a.cur_ms < need && t % 4 == 0;
+                (void)hb_lat_auto_tick(&a, d, &ch);
+                if (t >= 600) {
+                    late_drops += d;
+                    if (ch) swings++;
+                    if (a.cur_ms < minv) minv = a.cur_ms;
+                    if (a.cur_ms > maxv) maxv = a.cur_ms;
+                }
+            }
+            if (need <= HB_LAT_AUTO_MIN_MS) {
+                snprintf(what, sizeof what, "auto: a clean link goes down to %d ms and stays (%d ms)",
+                         HB_LAT_AUTO_MIN_MS, a.cur_ms);
+                CHECK(a.cur_ms == HB_LAT_AUTO_MIN_MS && late_drops == 0, what);
+            } else {
+                snprintf(what, sizeof what,
+                         "auto: link needing %d ms settles at %d ms (range %d-%d), %d drops in the last 110 min",
+                         need, a.cur_ms, minv, maxv, late_drops);
+                CHECK(a.cur_ms >= need && a.cur_ms <= need + HB_LAT_AUTO_UP_MS &&
+                      late_drops <= 3 * 4 && swings <= 12, what);
+            }
+        }
+        {
+            hb_lat_auto a;
+            int ch, i, r = 0;
+            hb_lat_auto_init(&a, 0);
+            CHECK(a.cur_ms == 200, "auto: nothing learned yet starts at 200 ms");
+            hb_lat_auto_init(&a, 130);
+            for (i = 0; i < HB_LAT_AUTO_START_S; i++) r = hb_lat_auto_tick(&a, 5, &ch);
+            CHECK(r == 130 && !ch, "auto: drops while the stream starts do not count");
+            r = hb_lat_auto_tick(&a, 1, &ch);
+            r = hb_lat_auto_tick(&a, 0, &ch);
+            for (i = 0; i < HB_LAT_AUTO_BAD_WIN_S; i++) r = hb_lat_auto_tick(&a, 0, &ch);
+            r = hb_lat_auto_tick(&a, 1, &ch);
+            CHECK(r == 130, "auto: an odd drop now and then is forgiven");
+            r = hb_lat_auto_tick(&a, 3, &ch);
+            CHECK(r == 130 + HB_LAT_AUTO_UP_MS && ch == 1, "auto: a burst of drops raises the target at once");
+            hb_lat_auto_init(&a, 9999);
+            CHECK(a.cur_ms == HB_LAT_AUTO_MAX_MS && hb_lat_auto_clamp(10) == HB_LAT_AUTO_MIN_MS,
+                  "auto: learned values stay within 60 to 400 ms");
+        }
+    }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

@@ -173,7 +173,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,"
         "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},"
-        "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d},"
+        "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d,\"auto\":%d,\"auto_ms\":%d},"
         "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"none\":%d},\"hs_moves\":%d,"
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
         "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,\"key_vol\":%d,"
@@ -191,7 +191,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->xq_low, cid[0], cid[1], chip_ok && cven ? cven : "",
         chip_ok && btchip_is_mediatek(c->chip_vid),
         chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "",
-        c->lat_backoff_ms, c->lat_normal_ms,
+        c->lat_backoff_ms, c->lat_normal_ms, c->latency_auto != 0, c->lat_auto_ms,
         avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->batt_pct, c->batt_none, c->hs_moves,
         c->link_score, c->link_rssi == 127 ? 0 : c->link_rssi, c->link_lq, c->drops_min,
         c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch, c->key_vol,
@@ -566,13 +566,21 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->req_hs_volume = v;
         c->hs_volume = v;
     } else if (!strcmp(path, "/api/latency")) {
-        /* ms=40..200: media queue target, saved per headset.
+        /* ms=40..200: media queue target by hand (adaptive off), saved per
+         * headset. auto=1: adaptive (lowest drop-free buffer, learned per
+         * headset), auto=0: back to the slider value.
          * stable=0|1 (older pages): both land on 200 ms now. */
-        if (query_int(q, "ms", &v)) { }
-        else if (query_int(q, "stable", &v)) v = v ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
-        else goto bad;
-        c->latency_ms = hb_latency_clamp(v);
-        c->prefs_dirty = 1;
+        if (query_int(q, "auto", &v)) {
+            c->latency_auto = v != 0;
+            c->prefs_dirty = 1;
+        } else {
+            if (query_int(q, "ms", &v)) { }
+            else if (query_int(q, "stable", &v)) v = v ? HB_QUEUE_STABLE_MS : HB_QUEUE_LOW_MS;
+            else goto bad;
+            c->latency_ms = hb_latency_clamp(v);
+            c->latency_auto = 0;
+            c->prefs_dirty = 1;
+        }
     } else if (!strcmp(path, "/api/codec")) {
         /* mode=0 auto, 1 SBC, 2 SBC HQ, 3 SBC-XQ (hsprefs.h); the stream
          * loop switches the headset to it. HQ / XQ only when the connected
@@ -607,6 +615,7 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->gain_pct = HB_GAIN_DEFAULT_PCT;
         c->gain_dirty = 1;
         c->latency_ms = HB_QUEUE_LOW_MS;
+        c->latency_auto = 1;
         c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/eq")) {
         /* on=0|1 and/or b0..b4=-12..12 (dB); saved per headset. */

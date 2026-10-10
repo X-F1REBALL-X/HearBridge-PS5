@@ -121,6 +121,17 @@ int main(int argc, char **argv)
     CHECK(strstr(out, "\"estimate_ms\":187") && strstr(out, "\"sink_ms\":130,\"sink_reported\":1"), "latency: estimate in status");
     post(&c, "/api/latency");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "latency without ms= -> 400");
+    c.latency_auto = 0;
+    c.prefs_dirty = 0;
+    post(&c, "/api/latency?auto=1");
+    CHECK(c.latency_auto == 1 && c.prefs_dirty, "latency: Auto on, saved per headset");
+    c.lat_auto_ms = 250;
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"auto\":1,\"auto_ms\":250}") != NULL, "latency: Auto and its learned buffer in the status (may be above 200)");
+    post(&c, "/api/latency?ms=150");
+    CHECK(c.latency_auto == 0 && c.latency_ms == 150, "latency: moving the slider turns Auto off");
+    post(&c, "/api/clean");
+    CHECK(c.latency_auto == 1, "latency: Clean sound turns Auto back on");
     c.codec_avail = (1 << 1);                 /* plain SBC sink */
     c.codec_pref = 0;
     post(&c, "/api/codec?mode=3");

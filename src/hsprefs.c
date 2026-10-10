@@ -27,6 +27,13 @@ void hb_prefs_default(hb_prefs *p)
     p->latency_ms = HB_LAT_DEFAULT_MS;
     p->gain_pct = -1;
     p->hs_vol = -1;
+    p->lat_auto = -1;
+}
+
+int hb_prefs_lat_auto(const hb_prefs *p)
+{
+    if (!p) return 1;
+    return p->lat_auto >= 0 ? p->lat_auto != 0 : p->latency_ms == HB_LAT_DEFAULT_MS;
 }
 
 int hb_prefs_gain(const hb_prefs *p)
@@ -87,6 +94,12 @@ void hb_prefs_parse(hb_prefs *p, const char *t)
             const char *end;
             long ms = parse_long(v, &end);
             if (end != v) p->latency_ms = clampi((int)ms, HB_LAT_MIN_MS, HB_LAT_MAX_MS);
+        } else if (!strcmp(line, "lat_auto")) {
+            p->lat_auto = !strcmp(v, "on");
+        } else if (!strcmp(line, "lat_learned")) {
+            const char *end;
+            long ms = parse_long(v, &end);
+            if (end != v) p->lat_learned = ms <= 0 ? 0 : clampi((int)ms, 60, 400);
         } else if (!strcmp(line, "eq")) {
             p->eq_on = !strcmp(v, "on");
         } else if (!strcmp(line, "night")) {
@@ -145,6 +158,10 @@ int hb_prefs_format(const hb_prefs *p, char *out, int max)
         n += snprintf(out + n, (size_t)(max - n), "night=on\n");
     if (p->hs_vol >= 0 && n > 0 && n < max)
         n += snprintf(out + n, (size_t)(max - n), "hs_vol=%d\n", p->hs_vol);
+    if (p->lat_auto >= 0 && n > 0 && n < max)
+        n += snprintf(out + n, (size_t)(max - n), "lat_auto=%s\n", p->lat_auto ? "on" : "off");
+    if (p->lat_learned > 0 && n > 0 && n < max)
+        n += snprintf(out + n, (size_t)(max - n), "lat_learned=%d\n", p->lat_learned);
     if (p->held_codec >= HB_CODEC_SBC && p->held_bp > 0 && n > 0 && n < max)
         n += snprintf(out + n, (size_t)(max - n), "held=%s:%d\n",
                       hb_codec_key(p->held_codec), p->held_bp);
