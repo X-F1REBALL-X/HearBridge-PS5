@@ -22,12 +22,6 @@ int hb_auto_page_ok(int done);
  * 0 = none left. */
 int hb_auto_gap_ms(int done);
 
-/* Nothing playing or connecting: the radio listens this long (a saved
- * headset calling in is seen), then rests this long with every read of
- * ours cancelled so the console's own stack gets every packet (a DualSense
- * that wakes up must see its Connection Request), see hci_usb_duty(). */
-#define HB_IDLE_LISTEN_MS 4000
-#define HB_IDLE_REST_MS   8000
 
 /* How long to listen before page number `pages` (0 = the first one).
  * 0 means no more pages: sit and accept an incoming connection. */
