@@ -270,6 +270,7 @@ global.hbTest.req('/api/status');
 check(/Turn the headset off and on to reconnect/.test(el('state').textContent), 'page: power cycle hint when a just-left headset does not answer');
 STATUS.why = ''; STATUS.state = 'streaming';
 global.hbTest.req('/api/status');
+check(/\.by\{color:#fff;/.test(html), 'page: credit line under the name is white');
 // Home category replaces the Close button
 check(!/id="setclose"/.test(html) && /<nav class="tabs" id="tabs">\n<button type="button" id="tbhome"/.test(html) && /\$\('tbhome'\)\.onclick=setClose/.test(html),
     'page: Home at the top of the settings menu closes it, no Close button');

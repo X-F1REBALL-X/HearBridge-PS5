@@ -36,7 +36,7 @@ static const char HB_WEBPAGE[] =
     ".brand h1 b{color:var(--lime)}\n"
     ".meta{display:flex;align-items:center;margin-top:.2rem}\n"
     ".ver{color:var(--void);background:var(--ember);font-size:.72rem;font-weight:800;padding:0 .5em;margin-inline-end:.6em;letter-spacing:.06em;transform:skewX(var(--sk))}\n"
-    ".by{color:var(--lime);font-size:.95rem;font-weight:800;letter-spacing:.08em;direction:ltr;unicode-bidi:isolate;white-space:nowrap;text-shadow:0 0 .6rem rgba(200,255,61,.35)}\n"
+    ".by{color:#fff;font-size:.95rem;font-weight:800;letter-spacing:.08em;direction:ltr;unicode-bidi:isolate;white-space:nowrap;text-shadow:0 0 .6rem rgba(255,255,255,.25)}\n"
     ".diag{color:var(--mute);font-size:.7rem;margin-inline-start:.8em;direction:ltr;unicode-bidi:isolate;white-space:nowrap;text-decoration:underline;opacity:.75}\n"
     ".diag:hover,.diag:focus{color:var(--ember);opacity:1}\n"
     ".live{display:flex;align-items:center;padding:.45rem 1.1rem;background:var(--deck);border:2px solid var(--edge);font-size:.9rem;font-weight:800;\n"
