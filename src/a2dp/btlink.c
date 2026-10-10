@@ -12,6 +12,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* RSSI / link quality poll period (alternating reads). */
+#ifndef BTLINK_LQ_POLL_MS
+#define BTLINK_LQ_POLL_MS 10000
+#endif
+
 /* L2CAP signaling command codes (Core Vol 3 Part A, 4). */
 enum {
     L2SIG_REJECT = 0x01, L2SIG_CONN_REQ, L2SIG_CONN_RSP,
@@ -1609,13 +1614,14 @@ int btlink_pump(btlink *l, int timeout_ms)
     drive_auth(l);
     now = now_ms();
     if (l->connected && l->enc_on && now >= l->lq_next) {
-        /* One small read every second (RSSI, then link quality): cheap,
-         * answered by the controller itself, never sent to the headset. */
+        /* One small read every 10 s (RSSI, then link quality): answered
+         * by the controller itself, never sent to the headset. Kept slow
+         * so the radio stays free for the DualSense. */
         unsigned char hp[2];
         put16(hp, l->handle);
         (void)fire_cmd(l->hci, l->lq_turn ? 0x1403 : 0x1405, hp, 2);
         l->lq_turn = !l->lq_turn;
-        l->lq_next = now + 1000;
+        l->lq_next = now + BTLINK_LQ_POLL_MS;
     }
     for (i = 0; i < BTLINK_CHAN_MAX; i++) {
         if (l->ch[i].st != CH_CLOSED)

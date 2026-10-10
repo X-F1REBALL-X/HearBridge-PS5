@@ -7,6 +7,17 @@
 
 #define HB_RE_PAGES 3
 
+/* A clock gap counts as "the console slept" only past this: our own
+ * blocking page (5 s) and listen slices must never look like a wake (they
+ * did, so the headset was paged for ever and the DualSense dropped). */
+#define HB_WAKE_GAP_MS 30000
+
+/* Background pages of the saved headset per idle window (then only listen
+ * for it). A wake or a Connect press starts a new window. */
+#define HB_AUTO_PAGES 3
+/* 1 while another background page is allowed (pages done so far). */
+int hb_auto_page_ok(int done);
+
 /* How long to listen before page number `pages` (0 = the first one).
  * 0 means no more pages: sit and accept an incoming connection. */
 int hb_re_listen_ms(int pages);
