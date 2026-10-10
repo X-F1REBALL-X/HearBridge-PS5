@@ -43,7 +43,7 @@ text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;transform:skewX(
 .live.bad{border-color:rgba(255,61,90,.5)}.live.bad i{background:var(--bad)}
 @keyframes blink{50%{opacity:.25}}
 /* toast for errors: never pushes the layout */
-.msg{position:fixed;z-index:80;top:4.2rem;left:50%;transform:translateX(-50%);max-width:90vw;padding:.5rem 1.2rem;background:var(--bad);color:var(--void);font-weight:800;box-shadow:0 .6rem 2rem rgba(0,0,0,.6)}
+.msg{position:fixed;z-index:95;top:4.2rem;left:50%;transform:translateX(-50%);max-width:90vw;padding:.5rem 1.2rem;background:var(--bad);color:var(--void);font-weight:800;box-shadow:0 .6rem 2rem rgba(0,0,0,.6)}
 .msg:empty{display:none}
 /* main screen: only the essentials. phone = one column */
 .grid{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:var(--gap)}
@@ -320,7 +320,7 @@ button.night.on:before{background:linear-gradient(90deg,rgba(177,140,255,.28),rg
 [dir=rtl] .night.on .sw:after{left:auto;right:1.85rem}
 .night.on small{color:var(--ink2)}
 /* info toast (battery): amber, goes away by itself */
-.toast{position:fixed;z-index:85;top:4.2rem;left:50%;transform:translateX(-50%);max-width:90vw;padding:.6rem 1.4rem;background:var(--warn);color:var(--void);font-weight:900;font-size:1.05rem;box-shadow:0 .6rem 2rem rgba(0,0,0,.6)}
+.toast{position:fixed;z-index:96;top:4.2rem;left:50%;transform:translateX(-50%);max-width:90vw;padding:.6rem 1.4rem;background:var(--warn);color:var(--void);font-weight:900;font-size:1.05rem;box-shadow:0 .6rem 2rem rgba(0,0,0,.6)}
 .toast:empty{display:none}
 /* settings: drawer from the left (like Elf Launcher's menu), categories inside */
 #setbtn{flex:0 0 auto;min-height:2.6rem;margin-inline-end:var(--s4);font-size:.85rem;text-transform:uppercase}
@@ -617,8 +617,15 @@ h+='<button type="button" class="langopt" role="menuitem" data-code="'+L.code+'"
 $('langlist').innerHTML=h;var b=$('langlist').getElementsByTagName('button');
 for(i=0;i<b.length;i++)b[i].onclick=function(){setLang(this.getAttribute('data-code'))};
 $('langbtn').onclick=function(){$('langlist').className=$('langlist').className?'':'show'}}
-function xhr(m,p,cb){var x=new XMLHttpRequest();x.open(m,p,true);x.timeout=4000;if(m=='POST')x.setRequestHeader('X-HB-Token',TOKEN);
-x.onload=function(){if(x.status==200){try{S=JSON.parse(x.responseText);okT=Date.now();draw()}catch(e){}}else if(x.status==403)$('msg').textContent=t('reload');if(cb)cb()};
+/* POST token: the page carries it, /api/status repeats it. A page left open
+ * over a restart of HearBridge holds the old one: a 403 takes the new token
+ * from the status and sends the press once more; only then the hint stays. */
+var MSGK='';
+function takeTok(j){if(j&&typeof j.token=='string'&&/^[0-9a-f]{32}$/.test(j.token))TOKEN=j.token}
+function xhr(m,p,cb,again){var x=new XMLHttpRequest();x.open(m,p,true);x.timeout=4000;if(m=='POST')x.setRequestHeader('X-HB-Token',TOKEN);
+x.onload=function(){if(x.status==200){if(m=='POST'&&MSGK=='reload'){MSGK='';$('msg').textContent=''}try{var j=JSON.parse(x.responseText);if(j&&j.version!==undefined){S=j;takeTok(j);okT=Date.now();draw()}}catch(e){}}
+else if(x.status==403&&m=='POST'&&!again){xhr('GET','/api/status',function(){xhr(m,p,cb,1)});return}
+else if(x.status==403){MSGK='reload';$('msg').textContent=t('reload')}if(cb)cb()};
 x.onerror=x.ontimeout=function(){$('msg').textContent=t('unreachable');$('live').className='live bad';if(cb)cb()};
 x.send()}
 function req(p,cb){xhr('GET',p,cb)}
@@ -723,7 +730,7 @@ function evKind(s){return /could not|did not|didn't|busy|hung up|lost|not an aud
 /^(connecting|disconnecting|reconnecting|forgetting|scan started)/i.test(s)?'press':''}
 function setHtml(id,h){var e=$(id);if(e.hbHtml!==h){e.hbHtml=h;e.innerHTML=h}}
 function draw(){
-$('msg').textContent='';
+$('msg').textContent=MSGK?t(MSGK):'';
 $('ver').textContent=S.version;
 var st=S.paused?'paused':S.state;
 var det=st=='error'&&S.detail?S.detail.replace(/^error\s*/,''):'';if(/^unsupported-format/.test(det))det=t('unsupportedFmt');
@@ -827,12 +834,18 @@ if(o&&!q.o){if(setIsOpen())setClose();else setOpen()}if(c&&!q.c&&setIsOpen())set
 /* D-pad focus starts on Settings */
 setTimeout(function(){if(!document.activeElement||document.activeElement==document.body)try{$('setbtn').focus()}catch(e){}},300);
 $('prc').onclick=function(){setOpen(1)};
-$('addhs').onclick=function(){setOpen(0);act('/api/scan');armScan()};
+/* Scan / Add headset: never while a headset streams (the inquiry shares the
+ * radio with the DualSense). Say what to do instead. */
+function scanBlocked(){if(!S||S.paused||S.state!='streaming')return 0;
+toast(t('scanBusy').replace('%s',S.device||t('theHeadset')));return 1}
+function scanPress(){if(scanBlocked())return;act('/api/scan?user=1');armScan()}
+$('addhs').onclick=function(){setOpen(0);scanPress()};
 $('gdrop').onclick=function(){if(confirm(t('gameRemoveConfirm')))act('/api/game?do=2')};
 /* backup / restore: USB drive (default), the console, or this device (download / upload) */
 var BKW='usb',bkUsb=1;
-function postj(p,body,cb){var x=new XMLHttpRequest();x.open('POST',p,true);x.timeout=15000;x.setRequestHeader('X-HB-Token',TOKEN);
-x.onload=function(){var j=null;try{j=JSON.parse(x.responseText)}catch(e){}cb(x.status,j,x.responseText)};x.onerror=x.ontimeout=function(){cb(0,null,'')};x.send(body||null)}
+function postj(p,body,cb,again){var x=new XMLHttpRequest();x.open('POST',p,true);x.timeout=15000;x.setRequestHeader('X-HB-Token',TOKEN);
+x.onload=function(){var j=null;if(x.status==403&&!again){xhr('GET','/api/status',function(){postj(p,body,cb,1)});return}
+if(x.status==403){MSGK='reload';$('msg').textContent=t('reload')}try{j=JSON.parse(x.responseText)}catch(e){}cb(x.status,j,x.responseText)};x.onerror=x.ontimeout=function(){cb(0,null,'')};x.send(body||null)}
 function bkMsg(s,c){$('bkmsg').textContent=s;$('bkmsg').className='bkmsg'+(c?' '+c:'')}
 function bkSeg(){var ids={usb:'bkusb',internal:'bkint',device:'bkdev'};for(var k in ids){var b=$(ids[k]);b.className=k==BKW?'act':(k=='usb'&&!bkUsb?'no':'')}
 $('bkusb').textContent=bkUsb?t('bkUsb'):t('bkNoUsb')}
@@ -915,7 +928,7 @@ $('lat').oninput=markLat;$('lat').onchange=markLat;
 $('lat').onmouseup=markLat;$('lat').ontouchend=markLat;$('lat').onpointerup=markLat;
 for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!this.disabled)act('/api/codec?mode='+m)}})(cj);
 function armScan(){scanLive=Date.now()+12000;$('scanning').style.display='';devices()}
-$('scan').onclick=function(){act('/api/scan');armScan()};
+$('scan').onclick=scanPress;
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();
 (function(){var c=null,m=/[?&]lang=([a-z]{2})/.exec(location.search);if(m)c=m[1];else try{c=localStorage.getItem('hb_lang')}catch(e){}

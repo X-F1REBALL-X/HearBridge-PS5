@@ -145,7 +145,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         snprintf(cid[1], sizeof cid[1], "%04x", c->chip_pid);
     }
     return snprintf(o, (size_t)max,
-        "{\"version\":\"%s\",\"connected\":%d,\"detail\":\"%s\",\"why\":\"%s\",\"state\":\"%s\",\"device\":\"%s\",\"url\":\"%s\","
+        "{\"version\":\"%s\",\"token\":\"%s\",\"connected\":%d,\"detail\":\"%s\",\"why\":\"%s\",\"state\":\"%s\",\"device\":\"%s\",\"url\":\"%s\","
         "\"gain_pct\":%d,\"muted\":%d,\"tone\":%d,\"paused\":%d,"
         "\"headset_volume\":%d,\"avrcp\":{\"connected\":%d,\"absolute_volume\":%d,"
         "\"notifications\":%d,\"sink_volume\":%d},\"pkts\":%ld,\"frames\":%ld,\"empty_reads\":%ld,"
@@ -159,7 +159,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
         "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,"
         "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d,\"saved\":%s},\"events\":%s}",
-        c->version, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
+        c->version, c->token, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
         c->out_peak_milli / 1000.0, c->sample_rate, c->bitpool, c->backlog,
@@ -443,7 +443,13 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         const char *a = q ? strstr(q, "addr=") : NULL;
         FILE *f;
         line[0] = 0;
-        if (path[5] == 's' && path[6] == 'c') { strcpy(line, "scan"); a = NULL; q = NULL; }
+        if (path[5] == 's' && path[6] == 'c') {
+            /* "scanu": the Scan / Add headset button (stops a stream for it);
+             * "scan": the refresh scan a page load sends (never drops audio). */
+            strcpy(line, query_int(q, "user", &v) && v == 1 ? "scanu" : "scan");
+            a = NULL;
+            q = NULL;
+        }
         else if (path[5] == 'r') { strcpy(line, "reconnect"); a = NULL; q = NULL; }
         if (a) {
             int k;
@@ -471,8 +477,8 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         snprintf(sp, sizeof sp, "%s", c->select_path);
         CTL_UNLOCK(c);
         if (!strcmp(line, "scan") && sp[0]) {
-            /* A refresh starts a scan, but it must not erase a reconnect
-             * or a device pick that has not been read yet. */
+            /* A refresh starts a scan, but it must not erase a reconnect,
+             * a Scan press or a device pick that has not been read yet. */
             FILE *oldf = fopen(sp, "r");
             char prev[40];
             prev[0] = 0;
@@ -480,7 +486,7 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
                 if (!fgets(prev, sizeof prev, oldf)) prev[0] = 0;
                 fclose(oldf);
                 prev[strcspn(prev, "\r\n")] = 0;
-                if (!strcmp(prev, "reconnect") ||
+                if (!strcmp(prev, "reconnect") || !strcmp(prev, "scanu") ||
                     (strchr(prev, ':') && strncmp(prev, "forget ", 7)))
                     return respond(out, max, 200, "application/json", "{\"ok\":1}", 8);
             }
@@ -497,7 +503,7 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         }
         {
             char evl[64];
-            if (!strcmp(line, "scan")) snprintf(evl, sizeof evl, "Scan started");
+            if (!strncmp(line, "scan", 4)) snprintf(evl, sizeof evl, "Scan started");
             else if (!strcmp(line, "reconnect")) snprintf(evl, sizeof evl, "Reconnecting");
             else if (forget) snprintf(evl, sizeof evl, "Forgetting a headset");
             else if (strchr(line, ':')) snprintf(evl, sizeof evl, "Connecting");
@@ -507,9 +513,10 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
             ctl_event_locked(c, evl);
             CTL_UNLOCK(c);
         }
-        if (!forget) {                 /* any pick/scan/reconnect leaves "paused" */
+        if (!forget && strcmp(line, "scan")) {   /* a pick, Scan or Reconnect leaves "paused" */
             CTL_LOCK(c);
             c->paused = 0;
+            c->req_disconnect = 0;
             CTL_UNLOCK(c);
         }
         return respond(out, max, 200, "application/json", "{\"ok\":1}", 8);
@@ -608,6 +615,7 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
     } else if (!strcmp(path, "/api/connect")) {
         ctl_event_locked(c, "Connecting");
         c->req_connect = 1;
+        c->req_disconnect = 0;         /* a Disconnect pressed while idle is over */
         c->paused = 0;
     } else if (!strcmp(path, "/api/disconnect")) {
         ctl_event_locked(c, "Disconnecting");

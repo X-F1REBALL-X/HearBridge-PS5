@@ -108,7 +108,7 @@
    "forgetConfirm": "Forget this device?",
    "current": "In use",
    "connectTo": "Connect",
-   "scanHint": "Put the headphones in pairing mode and press Scan. The scan takes about 20 seconds.",
+   "scanHint": "Put the headphones in pairing mode and press Scan. The scan takes about 12 seconds.",
    "signal": "Signal",
    "perPkt": "frames/packet",
    "notConnected": "Not connected",
@@ -218,7 +218,9 @@
    "savedGames": "Saved games",
    "noSavedGames": "No games saved yet. Start a game, set the sound, then press Save for this game.",
    "tabDetails": "Details",
-   "tabSound": "Sound & games"
+   "tabSound": "Sound & games",
+   "scanBusy": "Disconnect %s first to add a new headset",
+   "theHeadset": "the headset"
   },
   "ar": {
    "language": "اللغة",
@@ -276,7 +278,7 @@
    "forgetConfirm": "هل تريد نسيان هذا الجهاز؟",
    "current": "قيد الاستخدام",
    "connectTo": "اتصال",
-   "scanHint": "ضع السماعات في وضع الإقران واضغط «البحث». يستغرق البحث نحو 20 ثانية.",
+   "scanHint": "ضع السماعات في وضع الإقران واضغط «البحث». يستغرق البحث نحو 12 ثانية.",
    "signal": "الإشارة",
    "perPkt": "إطار/حزمة",
    "notConnected": "غير متصل",
@@ -386,7 +388,9 @@
    "savedGames": "الألعاب المحفوظة",
    "noSavedGames": "لا توجد ألعاب محفوظة بعد. شغّل لعبة واضبط الصوت ثم اضغط حفظ لهذه اللعبة.",
    "tabDetails": "التفاصيل",
-   "tabSound": "الصوت والألعاب"
+   "tabSound": "الصوت والألعاب",
+   "scanBusy": "افصل %s أولا لإضافة سماعة جديدة",
+   "theHeadset": "السماعة"
   },
   "es": {
    "language": "Idioma",
@@ -444,7 +448,7 @@
    "forgetConfirm": "¿Olvidar este dispositivo?",
    "current": "En uso",
    "connectTo": "Conectar",
-   "scanHint": "Pon los auriculares en modo de emparejamiento y pulsa Buscar. La búsqueda dura unos 20 segundos.",
+   "scanHint": "Pon los auriculares en modo de emparejamiento y pulsa Buscar. La búsqueda dura unos 12 segundos.",
    "signal": "Señal",
    "perPkt": "tramas/paquete",
    "notConnected": "No conectado",
@@ -554,7 +558,9 @@
    "savedGames": "Juegos guardados",
    "noSavedGames": "Aún no hay juegos guardados. Abre un juego, ajusta el sonido y pulsa Guardar para este juego.",
    "tabDetails": "Detalles",
-   "tabSound": "Sonido y juegos"
+   "tabSound": "Sonido y juegos",
+   "scanBusy": "Desconecta %s primero para añadir unos auriculares nuevos",
+   "theHeadset": "los auriculares"
   },
   "fr": {
    "language": "Langue",
@@ -612,7 +618,7 @@
    "forgetConfirm": "Oublier cet appareil ?",
    "current": "Utilisé",
    "connectTo": "Connecter",
-   "scanHint": "Mettez le casque en mode appairage et appuyez sur Rechercher. La recherche dure environ 20 secondes.",
+   "scanHint": "Mettez le casque en mode appairage et appuyez sur Rechercher. La recherche dure environ 12 secondes.",
    "signal": "Signal",
    "perPkt": "trames/paquet",
    "notConnected": "Non connecté",
@@ -722,7 +728,9 @@
    "savedGames": "Jeux enregistrés",
    "noSavedGames": "Aucun jeu enregistré. Lancez un jeu, réglez le son, puis appuyez sur Enregistrer pour ce jeu.",
    "tabDetails": "Détails",
-   "tabSound": "Son et jeux"
+   "tabSound": "Son et jeux",
+   "scanBusy": "Déconnectez %s d'abord pour ajouter un nouveau casque",
+   "theHeadset": "le casque"
   },
   "de": {
    "language": "Sprache",
@@ -780,7 +788,7 @@
    "forgetConfirm": "Dieses Gerät entfernen?",
    "current": "In Verwendung",
    "connectTo": "Verbinden",
-   "scanHint": "Versetze die Kopfhörer in den Kopplungsmodus und drücke Suchen. Die Suche dauert etwa 20 Sekunden.",
+   "scanHint": "Versetze die Kopfhörer in den Kopplungsmodus und drücke Suchen. Die Suche dauert etwa 12 Sekunden.",
    "signal": "Signal",
    "perPkt": "Frames/Paket",
    "notConnected": "Nicht verbunden",
@@ -890,7 +898,9 @@
    "savedGames": "Gespeicherte Spiele",
    "noSavedGames": "Noch keine Spiele gespeichert. Starte ein Spiel, stelle den Klang ein und drücke Für dieses Spiel speichern.",
    "tabDetails": "Details",
-   "tabSound": "Klang und Spiele"
+   "tabSound": "Klang und Spiele",
+   "scanBusy": "Trenne zuerst %s, um ein neues Headset hinzuzufügen",
+   "theHeadset": "das Headset"
   },
   "pt": {
    "language": "Idioma",
@@ -948,7 +958,7 @@
    "forgetConfirm": "Esquecer este dispositivo?",
    "current": "Em uso",
    "connectTo": "Conectar",
-   "scanHint": "Coloque os fones no modo de pareamento e toque em Procurar. A busca leva cerca de 20 segundos.",
+   "scanHint": "Coloque os fones no modo de pareamento e toque em Procurar. A busca leva cerca de 12 segundos.",
    "signal": "Sinal",
    "perPkt": "quadros/pacote",
    "notConnected": "Não conectado",
@@ -1058,7 +1068,9 @@
    "savedGames": "Jogos salvos",
    "noSavedGames": "Nenhum jogo salvo ainda. Abra um jogo, ajuste o som e toque em Salvar para este jogo.",
    "tabDetails": "Detalhes",
-   "tabSound": "Som e jogos"
+   "tabSound": "Som e jogos",
+   "scanBusy": "Desconecte %s primeiro para adicionar um novo headset",
+   "theHeadset": "o headset"
   },
   "ru": {
    "language": "Язык",
@@ -1116,7 +1128,7 @@
    "forgetConfirm": "Забыть это устройство?",
    "current": "Используется",
    "connectTo": "Подключить",
-   "scanHint": "Переведите наушники в режим сопряжения и нажмите «Искать». Поиск занимает около 20 секунд.",
+   "scanHint": "Переведите наушники в режим сопряжения и нажмите «Искать». Поиск занимает около 12 секунд.",
    "signal": "Сигнал",
    "perPkt": "кадров/пакет",
    "notConnected": "Не подключено",
@@ -1226,7 +1238,9 @@
    "savedGames": "Сохранённые игры",
    "noSavedGames": "Пока нет сохранённых игр. Запустите игру, настройте звук и нажмите «Сохранить для этой игры».",
    "tabDetails": "Подробности",
-   "tabSound": "Звук и игры"
+   "tabSound": "Звук и игры",
+   "scanBusy": "Сначала отключите %s, чтобы добавить новую гарнитуру",
+   "theHeadset": "гарнитуру"
   },
   "ja": {
    "language": "言語",
@@ -1284,7 +1298,7 @@
    "forgetConfirm": "このデバイスを削除しますか？",
    "current": "使用中",
    "connectTo": "接続",
-   "scanHint": "ヘッドホンをペアリングモードにして「検索」を押してください。検索には約20秒かかります。",
+   "scanHint": "ヘッドホンをペアリングモードにして「検索」を押してください。検索には約12秒かかります。",
    "signal": "信号",
    "perPkt": "フレーム/パケット",
    "notConnected": "未接続",
@@ -1394,7 +1408,9 @@
    "savedGames": "保存したゲーム",
    "noSavedGames": "保存したゲームはまだありません。ゲームを起動して音を調整し、「このゲーム用に保存」を押してください。",
    "tabDetails": "詳細",
-   "tabSound": "サウンドとゲーム"
+   "tabSound": "サウンドとゲーム",
+   "scanBusy": "新しいヘッドセットを追加するには、先に%sを切断してください",
+   "theHeadset": "ヘッドセット"
   },
   "zh": {
    "language": "语言",
@@ -1452,7 +1468,7 @@
    "forgetConfirm": "忘记此设备？",
    "current": "使用中",
    "connectTo": "连接",
-   "scanHint": "让耳机进入配对模式，然后按“搜索”。搜索大约需要 20 秒。",
+   "scanHint": "让耳机进入配对模式，然后按“搜索”。搜索大约需要 12 秒。",
    "signal": "信号",
    "perPkt": "帧/包",
    "notConnected": "未连接",
@@ -1562,7 +1578,9 @@
    "savedGames": "已保存的游戏",
    "noSavedGames": "还没有保存的游戏。启动游戏，调好声音，然后按“为此游戏保存”。",
    "tabDetails": "详细信息",
-   "tabSound": "声音与游戏"
+   "tabSound": "声音与游戏",
+   "scanBusy": "请先断开 %s，再添加新耳机",
+   "theHeadset": "耳机"
   },
   "it": {
    "language": "Lingua",
@@ -1620,7 +1638,7 @@
    "forgetConfirm": "Dimenticare questo dispositivo?",
    "current": "In uso",
    "connectTo": "Connetti",
-   "scanHint": "Metti le cuffie in modalità di abbinamento e premi Cerca. La ricerca dura circa 20 secondi.",
+   "scanHint": "Metti le cuffie in modalità di abbinamento e premi Cerca. La ricerca dura circa 12 secondi.",
    "signal": "Segnale",
    "perPkt": "frame/pacchetto",
    "notConnected": "Non connesso",
@@ -1730,7 +1748,9 @@
    "savedGames": "Giochi salvati",
    "noSavedGames": "Nessun gioco salvato. Avvia un gioco, regola il suono e premi Salva per questo gioco.",
    "tabDetails": "Dettagli",
-   "tabSound": "Suono e giochi"
+   "tabSound": "Suono e giochi",
+   "scanBusy": "Disconnetti prima %s per aggiungere nuove cuffie",
+   "theHeadset": "le cuffie"
   }
  }
 }
