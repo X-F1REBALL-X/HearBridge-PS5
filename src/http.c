@@ -520,7 +520,7 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 
     CTL_LOCK(c);
     if (!strcmp(path, "/api/status")) {
-        /* read only */
+        c->status_polls++;   /* page open: main may re-query the headset volume */
     } else if (!strcmp(path, "/api/volume")) {
         if (!query_int(q, "pct", &v)) goto bad;
         if (v < 0) v = 0;

@@ -405,6 +405,7 @@ int main(int argc, char **argv)
         static const unsigned char ssa[] = { 0x06, 0, 2, 0, 15, 0x35, 3, 0x19, 0x11, 0x0E,
             0x02, 0x00, 0x35, 5, 0x0A, 0, 0, 0xFF, 0xFF, 0 };
         static const unsigned char feat2[] = { 0x09, 0x03, 0x11, 0x09, 0x00, 0x02 };
+        static const unsigned char feat1[] = { 0x09, 0x03, 0x11, 0x09, 0x00, 0x01 };
         static const unsigned char psm17[] = { 0x19, 0x01, 0x00, 0x09, 0x00, 0x17 };
         static const unsigned char tgcl[] = { 0x35, 0x03, 0x19, 0x11, 0x0C };
         static const unsigned char v15[] = { 0x19, 0x11, 0x0E, 0x09, 0x01, 0x05 };
@@ -414,7 +415,15 @@ int main(int argc, char **argv)
         n = sdp_server_handle(ssa, sizeof ssa, rsp, sizeof rsp);
         CHECK(n > 20 && rsp[0] == 0x07 && rsp[n - 1] == 0, "SDP: search+attributes, one PDU");
         CHECK(find(rsp, n, tgcl, 5) && find(rsp, n, feat2, 6) && find(rsp, n, psm17, 6) &&
-              find(rsp, n, v15, 6), "SDP: TG class, AVRCP 1.5, PSM 0x17, Category 2");
+              find(rsp, n, v15, 6), "SDP: TG class, AVRCP 1.5, PSM 0x17, Category 2 (controller)");
+        {
+            /* the target record alone: Category 1 (a normal player) */
+            static const unsigned char tgq[] = { 0x06, 0, 9, 0, 15, 0x35, 3, 0x19, 0x11, 0x0C,
+                0x02, 0x00, 0x35, 5, 0x0A, 0, 0, 0xFF, 0xFF, 0 };
+            unsigned char t2[700];
+            int m = sdp_server_handle(tgq, sizeof tgq, t2, sizeof t2);
+            CHECK(m > 11 && find(t2, m, feat1, 6) && !find(t2, m, feat2, 6), "SDP: AVRCP target is Category 1 (player), not 2");
+        }
         {
             /* Same request with max 32 bytes: continuation must reassemble. */
             unsigned char req[64], all[1024];
@@ -488,7 +497,7 @@ int main(int argc, char **argv)
         avrcp_init(&a, 64);
         n = avrcp_input(&a, caps, sizeof caps, r, sizeof r);
         CHECK(n == 16 && r[0] == 0x32 && r[3] == 0x0C && r[9] == 0x10 && r[13] == 0x03 &&
-              r[14] == 1 && r[15] == 0x0D, "AVRCP: GET_CAPABILITIES -> VOLUME_CHANGED");
+              r[14] == 1 && r[15] == 0x01, "AVRCP: GET_CAPABILITIES -> PLAYBACK_STATUS only (no VOLUME_CHANGED as target)");
         n = avrcp_input(&a, reg, sizeof reg, r, sizeof r);
         CHECK(n == 15 && r[0] == 0x42 && r[3] == 0x0F && r[13] == 0x0D && r[14] == 64 &&
               a.notify_label == 4, "AVRCP: REGISTER_NOTIFICATION -> INTERIM 64");
@@ -510,6 +519,37 @@ int main(int argc, char **argv)
         avrcp_input(&a, chg, sizeof chg, r, sizeof r);
         CHECK(a.volume == 0x20 && a.changed && a.need_register, "AVRCP: CHANGED -> re-register");
         CHECK(avrcp_reported(&a), "AVRCP: a volume report counts as connected for the page");
+        CHECK(a.vol_reports == 3 && !a.vol_refused, "AVRCP: volume reports counted (SetAbsoluteVolume, INTERIM, CHANGED)");
+        {
+            /* PASS THROUGH: play press is logged, not a volume change; vol up is */
+            static const unsigned char play[] = { 0x60, 0x11, 0x0E, 0x00, 0x48, 0x7C, 0x44, 0x00 };
+            static const unsigned char vup[] = { 0x70, 0x11, 0x0E, 0x00, 0x48, 0x7C, 0x41, 0x00 };
+            static const unsigned char gps[] = { 0x80, 0x11, 0x0E, 0x01, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x30, 0x00, 0x00, 0x00 };
+            static const unsigned char regp[] = { 0x90, 0x11, 0x0E, 0x03, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x05, 0x01, 0, 0, 0, 0 };
+            unsigned long rep = a.vol_reports;
+            int v = a.volume;
+            n = avrcp_input(&a, play, sizeof play, r, sizeof r);
+            CHECK(n == 8 && r[3] == 0x09 && a.volume == v && a.vol_reports == rep, "AVRCP: play key accepted, volume untouched");
+            n = avrcp_input(&a, vup, sizeof vup, r, sizeof r);
+            CHECK(a.volume == v + 8 && a.vol_reports == rep + 1, "AVRCP: volume up key steps the volume");
+            CHECK(!strcmp(avrcp_key_name(0x44), "play") && !strcmp(avrcp_key_name(0x46), "pause") && !avrcp_key_name(0x7E)[0],
+                  "AVRCP: key names for the log");
+            n = avrcp_input(&a, gps, sizeof gps, r, sizeof r);
+            CHECK(n == 22 && r[3] == 0x0C && r[9] == 0x30 && r[21] == 0x01, "AVRCP: GetPlayStatus -> playing");
+            n = avrcp_input(&a, regp, sizeof regp, r, sizeof r);
+            CHECK(n == 15 && r[3] == 0x0F && r[13] == 0x01 && r[14] == 0x01, "AVRCP: PLAYBACK_STATUS registration -> INTERIM playing");
+        }
+        {
+            /* the headset refuses our registration: no re-queries */
+            static const unsigned char rej[] = { 0x12, 0x11, 0x0E, 0x0A, 0x48, 0x00,
+                0x00, 0x19, 0x58, 0x31, 0x00, 0x00, 0x02, 0x0D, 0x00 };
+            avrcp_state b;
+            avrcp_init(&b, 64);
+            avrcp_input(&b, rej, sizeof rej, r, sizeof r);
+            CHECK(b.vol_refused && b.vol_reports == 0, "AVRCP: refused registration remembered (no re-query spam)");
+        }
         {
             avrcp_state quiet;
             avrcp_init(&quiet, 64);

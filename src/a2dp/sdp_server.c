@@ -52,14 +52,15 @@ static const sdp_attr src_a[] = {
 };
 static const unsigned src_u[] = { 0x110A, 0x0100, 0x0019, 0x110D, 0x1002 };
 
-/* AVRCP Target: AVRCP 1.5 over AVCTP 1.4, Category 2 (Monitor/Amplifier),
- * which is the category carrying absolute volume. */
+/* AVRCP Target: AVRCP 1.5 over AVCTP 1.4, Category 1 (Player/Recorder),
+ * so headsets see a normal player. Category 2 (Monitor/Amplifier, absolute
+ * volume) stays on our Controller record. */
 static const unsigned char tg_h[]  = { H32(0x00010002) };
 static const unsigned char tg_cl[] = { 0x35, 3, UU(0x110C) };
 static const unsigned char av_pd[] = { 0x35, 16, 0x35, 6, UU(0x0100), U16(0x0017),
                                        0x35, 6, UU(0x0017), U16(0x0104) };
 static const unsigned char av_pf[] = { 0x35, 8, 0x35, 6, UU(0x110E), U16(0x0105) };
-static const unsigned char tg_ft[] = { U16(0x0002) };             /* Category 2 */
+static const unsigned char tg_ft[] = { U16(0x0001) };             /* Category 1: player */
 static const sdp_attr tg_a[] = {
     { 0x0000, tg_h, sizeof tg_h }, { 0x0001, tg_cl, sizeof tg_cl },
     { 0x0004, av_pd, sizeof av_pd }, { 0x0005, browse, sizeof browse },

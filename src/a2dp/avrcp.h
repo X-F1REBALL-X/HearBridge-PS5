@@ -23,7 +23,12 @@ typedef struct {
     int need_batt;         /* send the battery registration (after volume worked) */
     int vol_from_headset;  /* bumped on every volume change the headset made */
     unsigned long rx_cmds, rx_rsps;
+    unsigned long vol_reports; /* every volume report / key / SetAbsoluteVolume from the headset */
+    int vol_refused;       /* headset refused (or does not implement) our VOLUME_CHANGED registration */
 } avrcp_state;
+
+/* Name of a PASS THROUGH operation id (play, pause, ...), "" unknown. */
+const char *avrcp_key_name(int key);
 
 /* AVRCP 1.6 battery status (InformBatteryStatusOfCT 0x18 and
  * EVENT_BATT_STATUS_CHANGED 0x06). There is no percentage in AVRCP. */
