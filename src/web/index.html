@@ -324,22 +324,23 @@ button.night.on:before{background:linear-gradient(90deg,rgba(177,140,255,.28),rg
 .toast:empty{display:none}
 /* settings: drawer from the left (like Elf Launcher's menu), categories inside */
 #setbtn{flex:0 0 auto;min-height:2.6rem;margin-inline-end:var(--s4);font-size:.85rem;text-transform:uppercase}
-#setbtn:before{background:var(--deck)}
+#setbtn:before{background:var(--deck);left:0;right:0}
 #setbtn .gear{width:1.05rem;height:1.05rem;margin-inline-end:.5rem;vertical-align:-.18rem}
 .brand{flex:1}
-.scrim{position:fixed;z-index:88;top:0;left:0;right:0;bottom:0;background:rgba(6,5,9,.6);display:none}.scrim.show{display:block}
+.scrim{position:fixed;z-index:88;top:0;left:0;right:0;bottom:0;background:rgba(6,5,9,.6);display:none;pointer-events:none}.scrim.show{display:block;pointer-events:auto}
 /* Elf Launcher style side menu: category list on the left, the page on the right */
 .drawer{position:fixed;z-index:90;top:0;bottom:0;left:0;width:min(66rem,100vw);display:grid;grid-template-columns:15rem minmax(0,1fr);
 background:var(--deck);border-inline-end:2px solid var(--edge2);box-shadow:1.5rem 0 3rem rgba(0,0,0,.6);
-transform:translateX(-105%);visibility:hidden;transition:transform .18s,visibility 0s .18s}
+transform:translateX(-105%);visibility:hidden;pointer-events:none;transition:transform .18s,visibility 0s .18s}
 [dir=rtl] .drawer{left:auto;right:0;transform:translateX(105%)}
-.drawer.show{transform:none;visibility:visible;transition:transform .18s}
+.drawer.show{transform:none;visibility:visible;pointer-events:auto;transition:transform .18s}
 .side{display:flex;flex-direction:column;padding:var(--s4) var(--s3);background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border-inline-end:1px solid var(--edge)}
 .navgrp{margin:.2rem .55rem .5rem;font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
 [dir=rtl] .navgrp{letter-spacing:0}
 .tabs{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:.3rem;align-content:start}
 .tabs button{display:flex;align-items:center;width:100%;min-height:2.9rem;padding:.2rem .75rem;text-align:start;font-size:.95rem;font-weight:700;color:var(--ink2);white-space:normal;line-height:1.15}
 .tabs button:before{background:transparent;border-color:transparent}
+.tabs .home{margin-bottom:.5rem;border-bottom:2px solid var(--edge)}
 .tabs .ti{flex:0 0 auto;width:1.25rem;height:1.25rem;margin-inline-end:.7rem;color:var(--c)}
 .tabs button.on{color:var(--ink)}
 .tabs button.on:before{background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(255,255,255,.02));border-color:var(--c);box-shadow:inset 3px 0 0 var(--c)}
@@ -441,7 +442,10 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 }
 /* TV: settings is a large overlay, controller-friendly: big categories, text and controls */
 @media(min-width:1180px) and (min-height:600px){
-.drawer{width:92vw;grid-template-columns:22rem minmax(0,1fr)}
+.bar{padding-top:1.6rem}
+#setbtn{min-height:3.6rem;min-width:13rem;padding:.4rem 1.8rem;margin-inline-start:2.6rem;margin-inline-end:2rem;font-size:1.1rem;letter-spacing:.08em}
+#setbtn .gear{width:1.35rem;height:1.35rem;margin-inline-end:.7rem;vertical-align:-.25rem}
+.drawer{width:100vw;grid-template-columns:22rem minmax(0,1fr)}
 .side{padding:var(--s5) var(--s4)}
 .navgrp{font-size:.9rem;margin:.3rem .7rem .9rem}
 .tabs{grid-gap:.6rem}
@@ -450,7 +454,6 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 .menufoot{font-size:.9rem}.menufoot b{font-size:.95rem}
 .dmain{padding:var(--s5) 2.2rem}
 .dhead .label{font-size:1.3rem}
-#setclose{min-height:2.9rem;padding:.2rem 1.4rem;font-size:1rem}
 .pages{zoom:1.35;padding-inline-end:var(--s3)}
 }
 @media(max-width:759px){
@@ -541,6 +544,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <aside class="drawer" id="setm" role="dialog" aria-modal="true" aria-label="Settings">
 <div class="side"><p class="navgrp" data-i18n="settings">Settings</p>
 <nav class="tabs" id="tabs">
+<button type="button" id="tbhome" class="home"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M6 10v10h4.5v-6h3v6H18V10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg><span data-i18n="home">Home</span></button>
 <button type="button" id="tb0" style="--c:var(--lime)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg><span data-i18n="tabHeadsets">Headsets</span></button>
 <button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="tabSound">Sound &amp; games</span></button>
 <button type="button" id="tb2" style="--c:var(--cyan)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M6 16v-5M11 16V6M16 16v-8M21 16v-3" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="tabDetails">Details</span></button>
@@ -549,7 +553,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="menufoot"><b>HearBridge PS5</b><span data-i18n="footer">Closing this page leaves HearBridge running.</span></div>
 </div>
 <div class="dmain">
-<div class="dhead"><p class="label" id="pgtitle">-</p><button type="button" id="setclose" class="sm" data-i18n="close">Close</button></div>
+<div class="dhead"><p class="label" id="pgtitle">-</p></div>
 <div class="pages">
 <div class="pg" id="pg0" style="--acc:var(--lime)">
 <button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
@@ -810,8 +814,18 @@ function setOpen(n){$('setm').className='drawer show';$('scrim').className='scri
 function setClose(){$('setm').className='drawer';$('scrim').className='scrim';$('setbtn').focus()}
 $('scrim').onclick=setClose;
 for(var ti=0;ti<NTAB;ti++)$('tb'+ti).onclick=(function(n){return function(){setTab(n);if(n==3)bkCheck()}})(ti);
-$('setbtn').onclick=function(){setOpen()};$('setclose').onclick=setClose;
-if(document.addEventListener)document.addEventListener('keydown',function(e){if((e.key=='Escape'||e.keyCode==27)&&$('setm').className.indexOf('show')>0)setClose()});
+$('setbtn').onclick=function(){setOpen()};$('tbhome').onclick=setClose;
+function setIsOpen(){return $('setm').className.indexOf('show')>0}
+if(document.addEventListener)document.addEventListener('keydown',function(e){var k=e.keyCode;
+if((e.key=='Escape'||k==27)&&setIsOpen()){setClose();return}
+/* menu / context key, F1 or Options on remotes: open Settings */
+if(!setIsOpen()&&(e.key=='ContextMenu'||k==93||k==112||k==114)){if(e.preventDefault)e.preventDefault();setOpen()}});
+/* PS5 controller via the Gamepad API when the browser exposes it: Options toggles Settings, Circle closes */
+var gpPrev={};if(navigator.getGamepads)setInterval(function(){if(document.hidden)return;var g=navigator.getGamepads()||[];for(var i=0;i<g.length;i++){var p=g[i];if(!p||!p.buttons)continue;
+var o=p.buttons[9]&&p.buttons[9].pressed,c=p.buttons[1]&&p.buttons[1].pressed,q=gpPrev[i]||{};
+if(o&&!q.o){if(setIsOpen())setClose();else setOpen()}if(c&&!q.c&&setIsOpen())setClose();gpPrev[i]={o:o,c:c}}},150);
+/* D-pad focus starts on Settings */
+setTimeout(function(){if(!document.activeElement||document.activeElement==document.body)try{$('setbtn').focus()}catch(e){}},300);
 $('prc').onclick=function(){setOpen(1)};
 $('addhs').onclick=function(){setOpen(0);act('/api/scan');armScan()};
 $('gdrop').onclick=function(){if(confirm(t('gameRemoveConfirm')))act('/api/game?do=2')};

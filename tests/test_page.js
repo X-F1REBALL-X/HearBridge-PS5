@@ -258,7 +258,16 @@ check(/act\('\/api\/game\?do=3&id='\+encodeURIComponent\(id\)\)/.test(html) && /
   check((html.match(/id="tb\d"/g) || []).length === 4 && pg1.indexOf('id="gsave"') > 0 && pg1.indexOf('id="tone"') > 0,
     'page: settings has 4 categories, games live in Sound & games');
 }
-check(/\.drawer\{width:92vw;grid-template-columns:22rem/.test(html) && /\.pages\{zoom:1\.35/.test(html), 'page: TV settings is a large overlay with bigger content');
+// settings button: inset from the corner, big hit area, closed drawer never takes clicks
+check(/#setbtn\{min-height:3\.6rem;min-width:13rem;[^}]*margin-inline-start:2\.6rem/.test(html) && /\.bar\{padding-top:1\.6rem\}/.test(html),
+    'page: TV settings button inset from the screen edge and bigger');
+check(/visibility:hidden;pointer-events:none/.test(html) && /\.drawer\.show\{[^}]*pointer-events:auto/.test(html) && /\.scrim\{[^}]*pointer-events:none/.test(html),
+    'page: closed drawer and scrim do not catch clicks');
+check(/getGamepads/.test(html) && /buttons\[9\]/.test(html) && /ContextMenu/.test(html), 'page: Options / menu key opens Settings');
+// Home category replaces the Close button
+check(!/id="setclose"/.test(html) && /<nav class="tabs" id="tabs">\n<button type="button" id="tbhome"/.test(html) && /\$\('tbhome'\)\.onclick=setClose/.test(html),
+    'page: Home at the top of the settings menu closes it, no Close button');
+check(/\.drawer\{width:100vw;grid-template-columns:22rem/.test(html) && /\.pages\{zoom:1\.35/.test(html), 'page: TV settings is a large overlay with bigger content');
 {
   const eq = html.slice(html.indexOf('id="eqp"'));
   check(eq.indexOf('id="eqon"') < eq.indexOf('id="gain"') && eq.indexOf('id="pr0"') < eq.indexOf('id="gain"') && eq.indexOf('id="hs"') < eq.indexOf('id="night"') &&
