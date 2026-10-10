@@ -105,18 +105,7 @@ struct usb_hci {
     /* counters for diag */
     unsigned long n_evt, n_acl_in, n_acl_out, n_cmd, n_err, n_switch, n_rearm;
     int    last_status;
-    int    quiet;                /* resting: no reads in flight (see hci_usb_duty) */
 };
-
-/* Idle duty cycle (hci_usb.h). The system stack reads the same pipes and
- * whoever has a read pending gets the packet, so while our reads are armed
- * a DualSense that wakes up may never see its Connection Request or Link
- * Key Request (#29). Off = reads always armed (streaming, connecting). */
-static int  g_duty_listen, g_duty_rest;    /* ms; 0 = off */
-static long g_duty_t0;                     /* current phase started */
-static int  g_duty_resting;
-static long g_awake_until;                 /* our command / ACL in flight: stay armed */
-static unsigned long g_duty_rests;
 
 /* The open transport, so it is released on any exit path (atexit). */
 static struct usb_hci *g_open;
@@ -317,10 +306,10 @@ static int reap(struct usb_hci *u)
                     memcpy(g_creq[g_ncreq++], s->buf, 12);
                 ring_put(&u->evq, s->buf, (int)s->len); u->n_evt++; got = 1;
             }
-            if (!u->quiet) arm_read(u, idx);
+            arm_read(u, idx);
         } else if (idx >= SLOT_ACL0 && idx < SLOT_OUT) {
             if (!st && s->len >= 4) { ring_put(&u->aclq, s->buf, (int)s->len); u->n_acl_in++; got = 1; }
-            if (!u->quiet) arm_read(u, idx);
+            arm_read(u, idx);
         } else if (idx == u->tx_slot) {
             if (!st) { ring_drop(&u->txq); u->n_acl_out++; hb_txpath_sent(&u->tp); }
             else ring_drop(&u->txq);       /* do not spin on a bad frame */
@@ -363,82 +352,6 @@ static void creq_flush(struct usb_hci *u)
     busy = 0;
 }
 
-/* Rest: cancel every read we have in flight so the system stack gets all
- * events and ACL data. Listen: arm them again. */
-static void set_quiet(struct usb_hci *u, int on)
-{
-    int k;
-    if (on == u->quiet) return;
-    u->quiet = on;
-    if (on) {
-        for (k = SLOT_EVT0; k < SLOT_OUT; k++) slot_abort(u, k);
-        (void)reap(u);                       /* the cancelled reads: not re-armed */
-        g_duty_rests++;
-    } else {
-        for (k = SLOT_EVT0; k < SLOT_OUT; k++)
-            if (u->sl[k].open && !u->sl[k].busy) arm_read(u, k);
-    }
-}
-
-/* Where the duty cycle is now; switches phase when its time is up. */
-static void duty_step(struct usb_hci *u)
-{
-    long now = now_ms();
-    if (!g_duty_listen || now < g_awake_until) {
-        set_quiet(u, 0);
-        return;
-    }
-    if (!g_duty_t0) { g_duty_t0 = now; g_duty_resting = 0; }
-    if (!g_duty_resting && now - g_duty_t0 >= g_duty_listen) {
-        g_duty_resting = 1;
-        g_duty_t0 = now;
-    } else if (g_duty_resting && now - g_duty_t0 >= g_duty_rest) {
-        g_duty_resting = 0;
-        g_duty_t0 = now;
-    }
-    set_quiet(u, g_duty_resting);
-}
-
-void hci_usb_duty(int listen_ms, int rest_ms)
-{
-    if (listen_ms <= 0 || rest_ms <= 0) listen_ms = rest_ms = 0;
-    if (listen_ms == g_duty_listen && rest_ms == g_duty_rest) return;
-    if (!g_duty_listen && listen_ms)
-        log_line("hci_usb: radio idle: listening %d ms, then resting %d ms (reads off)", listen_ms, rest_ms);
-    else if (g_duty_listen && !listen_ms)
-        log_line("hci_usb: radio active (reads armed)");
-    g_duty_listen = listen_ms;
-    g_duty_rest = rest_ms;
-    g_duty_t0 = 0;
-    g_duty_resting = 0;
-    if (g_open) duty_step(g_open);
-}
-
-void hci_usb_yield(void)
-{
-    if (!g_duty_listen || !g_open) return;
-    g_awake_until = 0;
-    if (!g_duty_resting) {
-        log_line("hci_usb: another device is calling the console - resting now so the system answers it");
-        g_duty_resting = 1;
-    }
-    g_duty_t0 = now_ms();
-    set_quiet(g_open, 1);
-}
-
-int hci_usb_resting(void)
-{
-    return g_open && g_open->quiet;
-}
-
-/* Our own command or ACL frame: its answer must be read. */
-static void stay_awake(struct usb_hci *u)
-{
-    if (!g_duty_listen) return;
-    g_awake_until = now_ms() + 4000;
-    set_quiet(u, 0);
-}
-
 static int op_pump(void *self, int wait_ms)
 {
     struct usb_hci *u = self;
@@ -447,26 +360,11 @@ static int op_pump(void *self, int wait_ms)
     /* Stop file / signal: report "transport gone" so every loop unwinds
      * to its cleanup path (links closed, USB released). */
     if (hb_stop_requested()) return -1;
-    duty_step(u);
-    while (u->quiet) {
-        /* Resting: nothing read, nothing armed. Still notice a device that
-         * went away (rest mode) and the end of the rest. */
-        long left;
-        (void)reap(u);
-        if (u->dead) return -1;
-        if (u->evq.count || u->aclq.count) return 1;
-        left = until - now_ms();
-        if (left <= 0) return 0;
-        usleep((useconds_t)(left > 50 ? 50 : left) * 1000);
-        if (hb_stop_requested()) return -1;
-        duty_step(u);
-    }
     for (;;) {
         struct pollfd pf;
         long left;
         int got = reap(u), k;
         creq_flush(u);
-        if (u->quiet) return got || u->evq.count || u->aclq.count;   /* a hook yielded */
         /* A read whose re-arm failed (EBUSY/transient error) would leave
          * the event or ACL pipe silent for good: re-arm idle readers. */
         for (k = SLOT_EVT0; k < SLOT_OUT; k++)
@@ -495,7 +393,6 @@ static int op_cmd(void *self, unsigned op, const void *args, int nargs)
     unsigned char pkt[3 + 255];
     struct usb_ctl_request rq;
     if (u->dead || nargs < 0 || nargs > 255) return 0;
-    stay_awake(u);
     hcidbg_cmd(op, args, nargs);
     put16(pkt, op);
     pkt[2] = (unsigned char)nargs;
@@ -531,7 +428,6 @@ static int op_acl_send(void *self, const unsigned char *frame, int nbytes)
 {
     struct usb_hci *u = self;
     if (u->dead || !frame || nbytes < 4 || nbytes > HCI_PKT_MAX) return 0;
-    stay_awake(u);
     ring_put(&u->txq, frame, nbytes);
     tx_kick(u);
     return 1;

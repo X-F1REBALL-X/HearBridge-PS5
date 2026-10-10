@@ -53,6 +53,7 @@
 #include "game_sys.h"
 #include "backup.h"
 #include "takeover.h"
+#include "utf8.h"
 
 #include <pthread.h>
 #include <time.h>
@@ -246,10 +247,27 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
                 /* No handle of ours. The page was cancelled in btlink.
                  * Do not guess a handle (that drops a pad) and do not sit. */
                 long age = acl_track_request_age(ini->addr, now_ms());
-                log_line("select: 0x0b, no headset ACL of ours — page cancelled");
+                log_line("select: 0x0b, no headset ACL of ours - page cancelled");
                 if (age >= 0 && age < ACL_REQ_PENDING_MS) {
-                    log_line("select: it is calling us (%ld ms ago) — accepting that instead", age);
+                    log_line("select: it is calling us (%ld ms ago) - accepting that instead", age);
                     ok = accept_one(link, ini, 2000);
+                } else {
+                    /* Held elsewhere: most likely the console's own stack
+                     * took it. Its Connection Complete may still be on its
+                     * way to us: watch for the handle a moment, and if it
+                     * shows up close that link (it is this headset's, not
+                     * a pad's) and page once more. */
+                    long w = now_ms() + 1500;
+                    while (!(h = acl_track_handle(ini->addr)) && now_ms() < w && !connect_abort(ini->addr))
+                        if (btlink_pump(link, 50) < 0) break;
+                    if (h) {
+                        log_line("select: the console holds it on handle %#05x - closing that link and paging again", h);
+                        (void)btlink_drop_handle(link, h, 2500);
+                        ok = btlink_connect(link, ini->addr, 0x01, 0, ini->link_key, ini->key_type,
+                                            ini->name, (int)sizeof ini->name, timeout_ms);
+                    } else {
+                        log_line("select: held elsewhere and its link is not visible to us");
+                    }
                 }
             }
         }
@@ -740,10 +758,9 @@ static void on_acl_up(const unsigned char addr[6])
 {
     int i = paired_find(g_paired, g_npaired, addr);
     const char *nm = i >= 0 && g_paired[i].name[0] ? g_paired[i].name : "-";
-    note_event("Connecting to %s…", i >= 0 && g_paired[i].name[0] ? nm : "the headset");
+    note_event("Connecting to %s", i >= 0 && g_paired[i].name[0] ? nm : "the headset");
     write_status("connecting %s", nm);
     ctl_set_state("connecting", i >= 0 ? g_paired[i].name : NULL);
-    hci_usb_duty(0, 0);           /* a link is coming up: full attention */
 }
 
 static int g_stream_up;            /* run_session is streaming to ini */
@@ -1116,12 +1133,7 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
             memcpy(g_switch_addr, a, 6);
             g_switch_req = 1;
             break;
-        case HB_CR_LEAVE:
-            /* Not ours (a DualSense waking, a keyboard): while idle, cancel
-             * our reads at once so the console's stack gets the rest of it. */
-            hci_usb_yield();
-            break;
-        default: break;                               /* TAKE: accepted by the state machine */
+        default: break;                               /* TAKE: accepted by the state machine; LEAVE: system */
         }
         return;
     }
@@ -1195,11 +1207,11 @@ static int answer_saved_calls(hci_t hci, headset_ini *ini, btlink **linkp, unsig
 /* Reconnect with a saved key (no pairing). 1 = link ready. */
 static int try_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm, int timeout_ms)
 {
-    int r;
+    int r, held_elsewhere;
     if (!ini->ok) return 0;
     log_choice("reconnecting saved", ini);
     if (g_user_connect) {
-        note_event("Calling %s…", ini->name[0] ? ini->name : "the headset");
+        note_event("Calling %s", ini->name[0] ? ini->name : "the headset");
         write_status("connecting %s", ini->name[0] ? ini->name : "-");
         ctl_set_state("connecting", ini->name);
     } else {
@@ -1247,16 +1259,29 @@ static int try_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm,
         set_why("powercycle");
         return 0;
     }
+    /* 0x0b with no link of ours and not one we left a moment ago: another
+     * host (the console's own stack) holds it. */
+    held_elsewhere = btlink_last_connect_fail() == 0x0B && !acl_track_handle(ini->addr) &&
+                     !hb_dropped_recent(&g_dropped, ini->addr, now_ms(), HB_DROPPED_PAGE_MS);
     if (g_user_connect) {
         const char *nm = ini->name[0] ? ini->name : "headset";
         int f = btlink_last_connect_fail();
         if (r == -1) note_event("%s is not an audio headset", nm);
         else if (r == -2) note_event("%s hung up right after connecting", nm);
         else if (f == 0x04) note_event("%s did not answer. Is it off, in its case or too far?", nm);
-        else if (f == 0x0B) note_event("%s is busy. Try again in a few seconds", nm);
+        else if (f == 0x0B && held_elsewhere) {
+            note_event("%s is connected to the PS5 itself", nm);
+            note_event("Turn %s off and on, then press Connect", nm);
+        } else if (f == 0x0B) note_event("%s is busy. Try again in a few seconds", nm);
         else note_event("Could not connect to %s", nm);
     }
     if (btlink_last_connect_fail() == 0x04) set_why("timeout");
+    else if (held_elsewhere) {
+        /* Not a moment's wait: paging again only repeats it. No more
+         * background pages until it calls in or the user presses Connect. */
+        set_why("powercycle");
+        g_bg_pages = HB_AUTO_PAGES > HB_RE_PAGES ? HB_AUTO_PAGES : HB_RE_PAGES;
+    }
     else if (btlink_last_connect_fail() == 0x0B) set_why("held");
     else set_why("failed");
     return 0;
@@ -1382,10 +1407,6 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
             return 0;
         }
         bg_tick(ini);
-        /* The list is up and nothing is searched or paged: the radio rests
-         * most of the time (#29, the pad shares it). */
-        if (now_ms() < scan_until || cmd_waiting()) hci_usb_duty(0, 0);
-        else hci_usb_duty(HB_IDLE_LISTEN_MS, HB_IDLE_REST_MS);
         if (now_ms() < scan_until && !cmd_waiting()) {
             a2dp_inq_dev got[A2DP_INQ_MAX];
             int ngot = 0;
@@ -1420,7 +1441,6 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
                 if (!cand.ok && g_npaired) { cand = g_paired[0]; cand.ok = cand.have_addr = 1; }
                 if (cand.ok) {
                     g_user_connect = 1;
-                    hci_usb_duty(0, 0);
                     hold_clear(cand.addr);
                     if (try_saved(hci, &cand, linkp, psm, HB_PAGE_MS)) {
                         *ini = cand;
@@ -1438,7 +1458,6 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
         }
         if (poll_cmd(&c, ini)) {
             int ok = 0;
-            hci_usb_duty(0, 0);
             if (c.kind != CMD_SCAN) { scan_until = 0; a2dp_scan_deadline_ms = 0; }
             t_end = now_ms() + SELECT_WAIT_S * 1000L;
             if (c.kind == CMD_SCAN) {
@@ -2064,6 +2083,7 @@ static void note_event(const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
+    (void)hb_utf8_clean(buf);     /* a long name cut mid-character: no stray bytes */
     log_line("%s", buf);
     ctl_event(&g_ctl, buf);
 }
@@ -2372,7 +2392,6 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
              * keeps its error label. */
             {
                 int sel = discover_and_select(asess, hci, ini, &link, &av_psm, pend.kind == CMD_SCAN);
-                hci_usb_duty(0, 0);
                 if (!sel) {
                     log_line("select: no A2DP sink found / paired");
                     goto done;
@@ -3205,13 +3224,12 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
 static int gentle_rejoin_(hci_t hci, headset_ini *ini)
 {
     int r;
-    /* Listen in duty cycle and hold page scan once (no per-slice HCI
-     * command keeps the radio awake); pages lift both. */
-    hci_usb_duty(HB_IDLE_LISTEN_MS, HB_IDLE_REST_MS);
+    /* Hold page scan once for the whole wait (no Read Scan Enable per
+     * listen slice); a page lifts it. HCI events are read all the time, so
+     * a saved headset calling in is always ours, never the console's. */
     btlink_page_scan_hold(hci, 1);
     r = gentle_rejoin_loop(hci, ini);
     if (!transport_dead(hci)) btlink_page_scan_hold(hci, 0);
-    hci_usb_duty(0, 0);
     return r;
 }
 static int gentle_rejoin_loop(hci_t hci, headset_ini *ini)
@@ -3294,13 +3312,11 @@ static int gentle_rejoin_loop(hci_t hci, headset_ini *ini)
         g_user_connect = 0;
         g_bg_page = 1;
         btlink_page_scan_hold(hci, 0);
-        hci_usb_duty(0, 0);                   /* the page needs every event */
         j = try_saved(hci, ini, &g_ready, &g_ready_psm, HB_PAGE_MS);
         g_bg_page = 0;
         (void)woke_up();                      /* the page blocked up to 5 s */
         if (!j && !hb_stop_requested() && !transport_dead(hci)) {
             btlink_page_scan_hold(hci, 1);
-            hci_usb_duty(HB_IDLE_LISTEN_MS, HB_IDLE_REST_MS);
         }
         if (j) {
             note_event("Headset reconnected");
@@ -3600,7 +3616,6 @@ int main(void)
         CTL_UNLOCK(&g_ctl);
         log_line("hearbridge: idle — waiting for Connect");
         if (g_npaired || ini.ok) btlink_page_scan_hold(hci, 1);   /* once for the idle period */
-        hci_usb_duty(HB_IDLE_LISTEN_MS, HB_IDLE_REST_MS);         /* #29: give the radio back */
         {
             /* Auto-connect: headsets that page us on power-on are accepted
              * (listen below). For ones that only wait to be paged: one short
@@ -3705,7 +3720,6 @@ int main(void)
                     log_line("auto: one background page of %s", ini.name[0] ? ini.name : "the saved headset");
                     g_user_connect = 0;
                     btlink_page_scan_hold(hci, 0);
-                    hci_usb_duty(0, 0);           /* the page needs every event */
                     g_bg_page = 1;
                     got = try_saved(hci, &ini, &back, &bpsm, HB_PAGE_MS);
                     g_bg_page = 0;
@@ -3721,7 +3735,6 @@ int main(void)
                     }
                     if (hb_stop_requested() || transport_dead(hci)) break;
                     btlink_page_scan_hold(hci, 1);
-                    hci_usb_duty(HB_IDLE_LISTEN_MS, HB_IDLE_REST_MS);
                     set_why("");
                     write_status("disconnected");
                     ctl_set_state("disconnected", NULL);
@@ -3729,7 +3742,6 @@ int main(void)
                 }
             }
         }
-        hci_usb_duty(0, 0);
         if (!transport_dead(hci)) btlink_page_scan_hold(hci, 0);   /* put back once */
         if (hb_stop_requested()) { rc = 0; break; }
         (void)headset_ini_load(&ini);
@@ -3741,7 +3753,6 @@ close_hci:
     if (hci.ops) {
         /* Leave the radio the way the system expects it (#29): no page or
          * inquiry of ours left running, our ACL closed, scans put back. */
-        hci_usb_duty(0, 0);
         hci_scan_release(hci);
         btlink_release(hci);
     }

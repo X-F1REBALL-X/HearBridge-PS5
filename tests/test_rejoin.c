@@ -31,7 +31,6 @@ int main(void)
         CHECK(hb_auto_gap_ms(0) >= 10000 && hb_auto_gap_ms(1) > hb_auto_gap_ms(0) &&
               hb_auto_gap_ms(2) > hb_auto_gap_ms(1) && hb_auto_gap_ms(HB_AUTO_PAGES) == 0,
               "auto: background pages back off, none after the budget");
-        CHECK(HB_IDLE_REST_MS >= HB_IDLE_LISTEN_MS, "idle: the radio rests at least as long as it listens");
     }
     /* rest mode / resume */
     CHECK(!hb_resume_gap(0, 1000, 0, 1000, 5000), "resume: first tick is not a wake");
