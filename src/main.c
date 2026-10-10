@@ -174,6 +174,7 @@ static int accept_one(btlink *link, const headset_ini *ini, int ms)
  * second or two; this only bounds a miss. Long enough that a slow page
  * still finishes, short enough that we do not sit for half a minute. */
 #define HB_PAGE_MS 5000
+#define HB_DROPPED_LISTEN_MS 10000   /* page to a just-left headset failed: listen this long */
 #define HB_BATT_WAIT_MS 8000   /* no battery report by then: "Not shown by this headset" */
 /* After a hang-up right after encryption: wait this long for its own call. */
 #define HB_CALLBACK_MS 2500
@@ -523,6 +524,23 @@ static void hold_add(const unsigned char a[6])
     if (held(a) || g_nhold >= PAIRED_MAX) return;
     memcpy(g_hold[g_nhold++], a, 6);
     log_line("saved: auto-reconnect paused for the disconnected device");
+}
+
+/* The saved headset we disconnected last (switch / Disconnect) and when.
+ * Its callback right after is accepted and closed cleanly, never turned
+ * down busy (the Xbox Wireless Headset stops answering pages after that
+ * until power cycled). */
+static hb_dropped g_dropped;
+static struct { unsigned char addr[6]; long t; int on; } g_accdrop;
+
+/* Accept a just-left headset's call and close it with 0x13 once its ACL is
+ * up (see the conn-req tick). */
+static void accept_drop(hci_t hci, const unsigned char a[6])
+{
+    btlink_accept_request(hci, a, 1);
+    memcpy(g_accdrop.addr, a, 6);
+    g_accdrop.t = now_ms();
+    g_accdrop.on = 1;
 }
 
 static void hold_clear(const unsigned char a[6])
@@ -988,8 +1006,10 @@ static void turn_down_other_calls(hci_t hci, const unsigned char target[6])
         long age;
         if (!a || !memcmp(a, target, 6)) continue;
         age = acl_track_request_age(a, now);
-        if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(a))
-            btlink_reject_request(hci, a, 0x0D);
+        if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(a)) {
+            if (i < g_npaired && hb_dropped_recent(&g_dropped, a, now, HB_DROPPED_MS)) accept_drop(hci, a);
+            else btlink_reject_request(hci, a, 0x0D);
+        }
     }
 }
 
@@ -1026,6 +1046,7 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
                         (g_stream_up && !memcmp(a, g_stream_addr, 6));
         in.held = held(a) && (g_stream_up || now - g_hold_ms < 30000);
         in.bg_page = g_bg_page && g_have_target && !in.is_target && !g_stream_up;
+        in.just_dropped = in.saved && hb_dropped_recent(&g_dropped, a, now, HB_DROPPED_MS);
         d = hb_connreq_decide(&in);
         hci_addr_str(a, astr);
         log_line("conn-req: %s CoD %06x%s%s -> %s", astr, cod,
@@ -1034,6 +1055,7 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
         switch (d) {
         case HB_CR_REJECT_UNKNOWN: btlink_reject_request(hci, a, 0x0F); break;
         case HB_CR_REJECT_BUSY:    btlink_reject_request(hci, a, 0x0D); break;
+        case HB_CR_ACCEPT_DROP:    accept_drop(hci, a); break;
         case HB_CR_SWITCH:
             memcpy(g_switch_addr, a, 6);
             g_switch_req = 1;
@@ -1047,6 +1069,21 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
          * is turned down (busy) before it blocks pages for ~25 s. */
         static long last;
         int i;
+        if (g_accdrop.on) {
+            /* A just-left headset we accepted: close it cleanly once up,
+             * unless the user picked it again meanwhile. */
+            unsigned h = acl_track_handle(g_accdrop.addr);
+            if (g_have_target && !memcmp(g_target, g_accdrop.addr, 6)) {
+                g_accdrop.on = 0;
+                log_line("conn-req: the headset that called back was picked again, keeping it");
+            } else if (h) {
+                btlink_hci_disconnect(hci, h, 0x13);
+                g_accdrop.on = 0;
+            } else if (now - g_accdrop.t > 5000) {
+                g_accdrop.on = 0;
+                log_line("conn-req: the accepted call never came up");
+            }
+        }
         if (now - last < 500) return;
         last = now;
         for (i = 0; i < g_npaired + hb_forgot_count(); i++) {
@@ -1080,6 +1117,10 @@ static int answer_saved_calls(hci_t hci, headset_ini *ini, btlink **linkp, unsig
     for (i = 0; i < g_npaired; i++) {
         long age = acl_track_request_age(g_paired[i].addr, now);
         if (age < 0 || age >= ACL_REQ_PENDING_MS || acl_track_handle(g_paired[i].addr)) continue;
+        if (hb_dropped_recent(&g_dropped, g_paired[i].addr, now, HB_DROPPED_MS)) {
+            accept_drop(hci, g_paired[i].addr);
+            continue;
+        }
         if (held(g_paired[i].addr) && now - g_hold_ms < 30000) {
             btlink_reject_request(hci, g_paired[i].addr, 0x0D);
             continue;
@@ -1121,6 +1162,29 @@ static int try_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm,
         return 1;
     }
     log_line("select: saved device did not answer (%s)", conn_fail_label(r));
+    if (g_user_connect && r != -1 && r != -2 &&
+        hb_dropped_recent(&g_dropped, ini->addr, now_ms(), HB_DROPPED_PAGE_MS)) {
+        /* We left it a moment ago and it does not answer pages: some
+         * (Xbox Wireless Headset) only come back by calling in. Listen for
+         * it a while, then ask for a power cycle. */
+        const char *nm = ini->name[0] ? ini->name : "the headset";
+        int ok;
+        unsigned char prev[6];
+        int had;
+        log_line("select: %s left a moment ago, listening %d s for it to connect in", nm, HB_DROPPED_LISTEN_MS / 1000);
+        memcpy(prev, g_target, 6);
+        had = set_target(ini->addr);
+        ok = listen_saved(hci, ini, linkp, psm, HB_DROPPED_LISTEN_MS);
+        set_target(had ? prev : NULL);
+        (void)woke_up();
+        if (ok) {
+            remember_device(ini);
+            return 1;
+        }
+        note_event("Turn %s off and on to reconnect", nm);
+        set_why("powercycle");
+        return 0;
+    }
     if (g_user_connect) {
         const char *nm = ini->name[0] ? ini->name : "headset";
         int f = btlink_last_connect_fail();
@@ -2692,6 +2756,8 @@ done:
     if (av.link) avdtp_teardown(&av);
     if (link) {
         btlink_disconnect(link);
+        if ((rc == RUN_SWITCH || rc == RUN_SWITCH_IN || rc == RUN_PAUSED) && ini->ok)
+            hb_dropped_note(&g_dropped, ini->addr, now_ms());   /* its callback: accepted + closed cleanly */
         if (rc == RUN_SWITCH || rc == RUN_SWITCH_IN) {
             /* Only one headset at a time: wait for the old link to be gone. */
             log_line("switch: old headset %s", btlink_last_close_confirmed()

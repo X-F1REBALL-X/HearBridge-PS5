@@ -33,6 +33,27 @@ int main(void)
     CHECK(hb_connreq_decide(&i) == HB_CR_REJECT_UNKNOWN, "forgotten headset while streaming: no switch");
     i = (hb_cr_in){ 0 }; i.is_av = 1; i.streaming_other = 1;
     CHECK(hb_connreq_decide(&i) == HB_CR_REJECT_UNKNOWN, "unsaved headset while streaming: no switch");
+    /* Xbox Wireless Headset: switched away from, it calls back 560 ms later
+     * while we page the new one. A busy rejection made it stop answering
+     * pages until power cycled: accept it and close it cleanly instead. */
+    i = (hb_cr_in){ 0 }; i.is_av = 1; i.saved = 1; i.busy_other = 1; i.held = 1; i.just_dropped = 1;
+    CHECK(hb_connreq_decide(&i) == HB_CR_ACCEPT_DROP, "just-left headset calling back while paging another: accept + clean close, not busy");
+    i.busy_other = 0; i.streaming_other = 1;
+    CHECK(hb_connreq_decide(&i) == HB_CR_ACCEPT_DROP, "...also while streaming the new one (no switch back)");
+    i.is_target = 1;
+    CHECK(hb_connreq_decide(&i) == HB_CR_TAKE, "...unless the user picked it again: taken");
+    i = (hb_cr_in){ 0 }; i.is_av = 1; i.forgotten = 1; i.just_dropped = 1;
+    CHECK(hb_connreq_decide(&i) == HB_CR_REJECT_UNKNOWN, "forgotten (not saved) stays rejected 0x0F");
+    {
+        hb_dropped d = { { 0 }, 0, 0 };
+        static const unsigned char x[6] = { 0xD8, 0xE2, 0xDF, 0xF7, 0xD7, 0x44 }, y[6] = { 0x58, 0x18, 0x62, 0x63, 0x3B, 0x7C };
+        CHECK(!hb_dropped_recent(&d, x, 1000, HB_DROPPED_MS), "dropped: nothing noted");
+        hb_dropped_note(&d, x, 1000);
+        CHECK(hb_dropped_recent(&d, x, 1560, HB_DROPPED_MS), "dropped: callback 560 ms later is recent");
+        CHECK(!hb_dropped_recent(&d, y, 1560, HB_DROPPED_MS), "dropped: another headset is not");
+        CHECK(!hb_dropped_recent(&d, x, 1000 + HB_DROPPED_MS, HB_DROPPED_MS), "dropped: 10 s later it is not");
+        CHECK(hb_dropped_recent(&d, x, 30000, HB_DROPPED_PAGE_MS), "dropped: page window is longer (60 s)");
+    }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

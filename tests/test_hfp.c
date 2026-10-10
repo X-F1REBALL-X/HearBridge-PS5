@@ -179,6 +179,29 @@ int main(void)
     hs(&h, 0, RFC_DISC, 1, -1, NULL, 0);
     CHECK(!h.mux_up && h.battery == 100, "session: mux closed, battery kept");
 
+    /* Our clean close: DISC on the DLC, UA, DISC on DLCI 0, UA. */
+    {
+        hfp_state g;
+        hfp_init(&g, cap, NULL, lg);
+        CHECK(hfp_close(&g) == 0 && hfp_closed(&g), "close: nothing open, nothing sent");
+        hs(&g, 0, RFC_SABM, 1, -1, NULL, 0);
+        hs(&g, 2, RFC_SABM, 1, -1, NULL, 0);
+        nout = 0;
+        CHECK(hfp_close(&g) == 1 && nout == 1 && rfc_parse(out[0], outn[0], 0, &f) == 0 && f.type == RFC_DISC &&
+              f.dlci == 2 && f.cr == 0 && f.pf, "close: DISC on the hands-free DLC first (our command C/R 0)");
+        nout = 0;
+        { unsigned char ua[8]; int m = rfc_build(ua, 8, 2, 0, RFC_UA, 1, -1, NULL, 0); hfp_input(&g, ua, m); }
+        CHECK(nout == 1 && rfc_parse(out[0], outn[0], 0, &f) == 0 && f.type == RFC_DISC && f.dlci == 0 && !g.dlci_up,
+              "close: its UA, then DISC on DLCI 0");
+        CHECK(!hfp_closed(&g), "close: not done before the last UA");
+        { unsigned char ua[8]; int m = rfc_build(ua, 8, 0, 0, RFC_UA, 1, -1, NULL, 0); hfp_input(&g, ua, m); }
+        CHECK(hfp_closed(&g) && g.closing == 0, "close: done after the UA on DLCI 0");
+        hs(&g, 0, RFC_SABM, 1, -1, NULL, 0);
+        nout = 0;
+        CHECK(hfp_close(&g) == 1 && rfc_parse(out[0], outn[0], 0, &f) == 0 && f.dlci == 0 && f.type == RFC_DISC,
+              "close: only the mux open: DISC on DLCI 0 at once");
+    }
+
     printf("%s (%d failed)\n", fails ? "FAILED" : "all passed", fails);
     return fails != 0;
 }

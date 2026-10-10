@@ -377,7 +377,37 @@ void hfp_input(hfp_state *h, const unsigned char *d, int len)
             flush(h);
         }
         break;
+    case RFC_UA:
+    case RFC_DM:
+        /* Answers to our own close. */
+        if (h->closing == 1 && f.dlci == h->dlci) {
+            h->dlci_up = 0; h->slc = 0; h->outq_n = 0; h->line_n = 0;
+            h->closing = 2;
+            tx(h, 0, cr_cmd(h), RFC_DISC, 1, -1, NULL, 0);
+        } else if (h->closing == 2 && f.dlci == 0) {
+            h->mux_up = 0; h->dlci = 0; h->closing = 0;
+            say(h, "hfp: hands-free channel closed");
+        }
+        break;
     default:
-        break;   /* UA / DM: we never send commands that expect them */
+        break;
     }
+}
+
+int hfp_close(hfp_state *h)
+{
+    if (!h->mux_up) return 0;
+    if (h->dlci_up) {
+        h->closing = 1;
+        tx(h, h->dlci, cr_cmd(h), RFC_DISC, 1, -1, NULL, 0);
+    } else {
+        h->closing = 2;
+        tx(h, 0, cr_cmd(h), RFC_DISC, 1, -1, NULL, 0);
+    }
+    return 1;
+}
+
+int hfp_closed(const hfp_state *h)
+{
+    return !h->mux_up && !h->dlci_up;
 }
