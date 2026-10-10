@@ -105,6 +105,11 @@ int main(int argc, char **argv)
     CHECK(get(&c, "/api/status") > 0 && strstr(out, "\"night\":{\"on\":1,"), "night: in the status");
     post(&c, "/api/night?on=0");
     CHECK(c.night == 0, "night: off");
+    CHECK(c.key_vol == 1 && get(&c, "/api/status") > 0 && strstr(out, "\"key_vol\":1,"), "keyvol: earbud next / previous changes volume is on by default");
+    post(&c, "/api/keyvol?on=0");
+    CHECK(c.key_vol == 0 && c.key_vol_dirty && get(&c, "/api/status") > 0 && strstr(out, "\"key_vol\":0,"), "keyvol: off, saved, in the status");
+    post(&c, "/api/keyvol?on=1");
+    CHECK(c.key_vol == 1, "keyvol: back on");
     post(&c, "/api/latency?ms=99999");
     CHECK(c.latency_ms == 200, "latency: clamped to 200 ms");
     post(&c, "/api/latency?stable=0");
@@ -580,6 +585,29 @@ int main(int argc, char **argv)
             CHECK(n == 8 && r[3] == 0x09 && a.volume == v && a.vol_reports == rep, "AVRCP: play key accepted, volume untouched");
             n = avrcp_input(&a, vup, sizeof vup, r, sizeof r);
             CHECK(a.volume == v + 8 && a.vol_reports == rep + 1, "AVRCP: volume up key steps the volume");
+            {
+                static const unsigned char fwd[] = { 0xA0, 0x11, 0x0E, 0x00, 0x48, 0x7C, 0x4B, 0x00 };
+                static const unsigned char back[] = { 0xB0, 0x11, 0x0E, 0x00, 0x48, 0x7C, 0x4C, 0x00 };
+                static const unsigned char fwdup[] = { 0xC0, 0x11, 0x0E, 0x00, 0x48, 0x7C, 0xCB, 0x00 };
+                int m = a.vol_from_headset;
+                v = a.volume;
+                n = avrcp_input(&a, fwd, sizeof fwd, r, sizeof r);
+                CHECK(n == 8 && r[3] == 0x09 && a.volume == v + 8 && a.changed && a.vol_from_headset == m + 1,
+                      "AVRCP: earbud next (0x4b) is volume up +8, counts as moved on the headset");
+                avrcp_input(&a, fwdup, sizeof fwdup, r, sizeof r);
+                CHECK(a.volume == v + 8, "AVRCP: key release does nothing");
+                avrcp_input(&a, back, sizeof back, r, sizeof r);
+                avrcp_input(&a, back, sizeof back, r, sizeof r);
+                CHECK(a.volume == v - 8 && a.vol_from_headset == m + 3, "AVRCP: earbud previous (0x4c) is volume down -8");
+                a.seek_vol = 0;
+                avrcp_input(&a, fwd, sizeof fwd, r, sizeof r);
+                CHECK(a.volume == v - 8 && a.vol_from_headset == m + 3, "AVRCP: setting off: next / previous leave the volume alone");
+                a.seek_vol = 1;
+                a.volume = 124;
+                avrcp_input(&a, fwd, sizeof fwd, r, sizeof r);
+                CHECK(a.volume == 127, "AVRCP: next stops at 127");
+                a.volume = v = 64;
+            }
             CHECK(!strcmp(avrcp_key_name(0x44), "play") && !strcmp(avrcp_key_name(0x46), "pause") && !avrcp_key_name(0x7E)[0],
                   "AVRCP: key names for the log");
             n = avrcp_input(&a, gps, sizeof gps, r, sizeof r);

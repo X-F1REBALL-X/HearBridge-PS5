@@ -301,6 +301,13 @@ check(calls[0] && calls[0].p === '/api/night?on=1' && calls[0].h['X-HB-Token'] &
 STATUS.night = { on: 1, db10: 60 };
 global.hbTest.req('/api/status');
 check(el('night').className === 'night on', 'page: night mode shows on');
+STATUS.key_vol = 1; global.hbTest.req('/api/status');
+check(el('keyvol').className === 'night on' && /Earbud next\/previous changes volume/.test(html), 'page: earbud next/previous changes volume shows on (default)');
+calls.length = 0; el('keyvol').onclick();
+check(calls[0] && calls[0].p === '/api/keyvol?on=0' && calls[0].m === 'POST' && calls[0].h['X-HB-Token'], 'page: earbud keys toggle -> POST on=0 with the token');
+STATUS.key_vol = 0; global.hbTest.req('/api/status');
+check(el('keyvol').className === 'night', 'page: earbud keys setting shows off');
+STATUS.key_vol = 1; global.hbTest.req('/api/status');
 // low battery toast text (the fake setTimeout clears it at once, so check the code path)
 check(/toast\(t\('battToast'\)\.replace\('%s',ba\.level\)\)/.test(html) && /hb_batt_seq/.test(html), 'page: low battery toast, once per heads-up');
 // merged latency slider: "Latency" label, ms value next to it, meter under it

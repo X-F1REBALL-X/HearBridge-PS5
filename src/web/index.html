@@ -588,6 +588,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="pg" id="pg1" style="--acc:var(--violet)">
 <p class="k note" id="eqhint" data-i18n="eqHint">Saved for this headset.</p>
 <div class="btns"><button id="tone" data-i18n="tone">Test tone</button><button id="clean" data-i18n="clean">Clean sound</button></div>
+<button type="button" class="night" id="keyvol"><span class="nt"><b data-i18n="keyVol">Earbud next/previous changes volume</b><small data-i18n="keyVolHint">For earbuds without volume keys</small></span><span class="sw"></span></button>
 <div class="gsec"><p class="sub" data-i18n="tabGames">Games</p>
 <p class="k note" data-i18n="gamesHint">Save the sound you like for a game. It turns on by itself when that game starts, and your usual sound comes back when it closes.</p>
 <div class="game" id="game"><span class="gic" id="gic"></span><b id="gname">-</b><span class="gchip" id="gon" data-i18n="gameOn">game profile</span></div>
@@ -838,7 +839,7 @@ $('gupd').disabled=!(gon&&g.dirty);$('gupd').className='gup'+(gon&&g.dirty?' on'
 $('game').className='game'+(gon?(g.active?' on':''):' none');gIcon($('gic'),gon?g.id:'',g.name);gIcon($('glic'),gon&&g.active?g.id:'',g.name);drawGames(g);$('gname').textContent=gon?(g.name||g.id):t(g.avail===0?'gameNoDetect':'noGame');$('gon').style.display=gon&&g.active?'':'none';
 var own=0,SL=g.saved||[];for(var si=0;si<SL.length;si++)if(SL[si].id==g.id)for(var hi=0;hi<(SL[si].hs||[]).length;hi++)if(SL[si].hs[hi].cur)own=1;
 var gsOn=gon&&(!own||!!g.dirty);$('gsave').textContent=t(own?'gameUpdate':'gameSave');$('gsave').disabled=!gsOn;$('gsave').className=gsOn?'act':'no';$('gdrop').style.display=gon&&own?'':'none';
-$('night').className='night'+(nm.on?' on':'');
+$('night').className='night'+(nm.on?' on':'');$('keyvol').className='night'+(S.key_vol!==0?' on':'');
 /* low headset battery: a toast once per heads-up (20 %, then 10 %) */
 var ba=S.batt_alert||{};if(ba.seq>0&&ba.level){var seen=-1;try{seen=parseInt(localStorage.getItem('hb_batt_seq'),10)}catch(e){}
 if(isNaN(seen)||ba.seq<seen)seen=0;if(ba.seq>seen){try{localStorage.setItem('hb_batt_seq',ba.seq)}catch(e){}toast(t('battToast').replace('%s',ba.level))}}
@@ -852,6 +853,7 @@ var toastT=0;function toast(m){$('toast').textContent=m;clearTimeout(toastT);toa
 $('gsave').onclick=function(){if(!this.disabled)act('/api/game?do=1')};
 $('gupd').onclick=function(){if(this.disabled)return;this.disabled=true;this.className='gup';act('/api/game?do=1')};
 $('night').onclick=function(){act('/api/night?on='+(S&&S.night&&S.night.on?0:1))};
+$('keyvol').onclick=function(){act('/api/keyvol?on='+(S&&S.key_vol===0?1:0))};
 /* settings overlay */
 var TAB=0,NTAB=4;function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}var ts=$('tb'+n).getElementsByTagName?$('tb'+n).getElementsByTagName('span'):[];$('pgtitle').textContent=ts.length?ts[0].textContent:'';$('setm').style.setProperty&&$('setm').style.setProperty('--pgc',['var(--lime)','var(--violet)','var(--cyan)','var(--warn)'][n])}
 function setOpen(n){$('setm').className='drawer show';$('scrim').className='scrim show';setTab(n==null?TAB:n);$('tb'+TAB).focus();if(TAB==3)bkCheck()}

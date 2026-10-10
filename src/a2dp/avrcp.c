@@ -66,6 +66,7 @@ void avrcp_init(avrcp_state *a, int volume)
     a->battery = -1;
     a->batt_label = -1;
     a->our_set_ms = -100000;
+    a->seek_vol = 1;
 }
 
 /* A volume report right after our own SetAbsoluteVolume is that change
@@ -299,14 +300,18 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
         o = hdr(out, label, 1, 0);
         memcpy(out + o, av, (size_t)n);
         out[o] = RSP_ACCEPTED;
-        if (press && (key == 0x41 || key == 0x42)) {
-            int v = a->volume + (key == 0x41 ? 8 : -8);
+        int seek = a->seek_vol && (key == 0x4B || key == 0x4C);
+        if (press && (key == 0x41 || key == 0x42 || seek)) {
+            /* Earbuds without volume keys send next / previous track:
+             * with the setting on, those step the volume as well. */
+            int up = key == 0x41 || key == 0x4B;
+            int v = a->volume + (up ? 8 : -8);
             a->volume = v < 0 ? 0 : v > 127 ? 127 : v;
             a->changed = 1;
             a->vol_from_headset++;
             a->vol_reports++;
-            log_line("avrcp: volume key %s -> %d/127", key == 0x41 ? "up" : "down",
-                     a->volume);
+            log_line("avrcp: %s key %s -> %d/127", seek ? (up ? "next" : "previous") : "volume",
+                     up ? "up" : "down", a->volume);
         } else if (press) {
             const char *nm = avrcp_key_name(key);
             log_line("avrcp: headset key %#x%s%s%s (not used)", key,

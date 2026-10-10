@@ -27,6 +27,7 @@ typedef struct {
     int vol_refused;       /* headset refused (or does not implement) our VOLUME_CHANGED registration */
     long now_ms;           /* caller's clock, set before avrcp_input / avrcp_build_set_volume */
     long our_set_ms;       /* when we last sent SetAbsoluteVolume */
+    int seek_vol;          /* next (0x4b) / previous (0x4c) keys step the volume too */
 } avrcp_state;
 
 /* Name of a PASS THROUGH operation id (play, pause, ...), "" unknown. */

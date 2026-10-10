@@ -2600,6 +2600,11 @@ int btlink_avrcp_headset_moves(const btlink *l)
     return l ? l->avrcp.vol_from_headset : 0;
 }
 
+void btlink_avrcp_seek_volume(btlink *l, int on)
+{
+    if (l) l->avrcp.seek_vol = on != 0;
+}
+
 void btlink_link_quality(const btlink *l, int *rssi, int *lq)
 {
     if (rssi) *rssi = l ? l->rssi : 127;
