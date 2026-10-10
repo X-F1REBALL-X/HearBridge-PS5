@@ -110,12 +110,14 @@ int main(int argc, char **argv)
     CHECK(c.key_vol == 0 && c.key_vol_dirty && get(&c, "/api/status") > 0 && strstr(out, "\"key_vol\":0,"), "keyvol: off, saved, in the status");
     post(&c, "/api/keyvol?on=1");
     CHECK(c.key_vol == 1, "keyvol: back on");
+    post(&c, "/api/latency?ms=300");
+    CHECK(c.latency_ms == 300, "latency: 300 ms by hand is kept");
     post(&c, "/api/latency?ms=99999");
-    CHECK(c.latency_ms == 200, "latency: clamped to 200 ms");
+    CHECK(c.latency_ms == 400, "latency: clamped to the 400 ms maximum");
     post(&c, "/api/latency?stable=0");
     CHECK(c.latency_ms == 200, "latency: old stable=0 -> 200 ms");
     post(&c, "/api/latency?stable=1");
-    CHECK(c.latency_ms == 200 && strstr(out, "\"stable\":0"), "latency: old stable=1 clamps to 200 ms");
+    CHECK(c.latency_ms == 400 && strstr(out, "\"stable\":0"), "latency: old stable=1 clamps to 400 ms");
     c.lat_total = 187; c.lat_sink = 130; c.lat_sink_reported = 1;
     get(&c, "/api/status");
     CHECK(strstr(out, "\"estimate_ms\":187") && strstr(out, "\"sink_ms\":130,\"sink_reported\":1"), "latency: estimate in status");

@@ -76,7 +76,7 @@ int hb_media_queue_cap(int pkt_ms, int target_ms);
 
 /* Latency target picked on the page (per headset), ms. */
 #define HB_LAT_MIN_MS        40
-#define HB_LAT_MAX_MS       200
+#define HB_LAT_MAX_MS       400   /* by hand; Auto stays within HB_LAT_AUTO_MAX_MS */
 #define HB_QUEUE_FLOOR_PKTS   8   /* btlink never queues fewer packets */
 int hb_latency_clamp(int ms);
 /* Below the default target the packets get shorter, so the queue floor

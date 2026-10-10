@@ -516,7 +516,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <p class="k note cno" id="codecno"></p>
 <p class="k note cno" id="xqnote"></p>
 <div class="latp latin"><p class="sub" data-i18n="latency">Latency</p>
-<div class="latm"><div class="lt lt1 la"><button type="button" id="latauto" class="sm" data-i18n="codecAuto">Auto</button><input type="range" id="lat" min="40" max="200" step="1"><span class="v" id="latt">-</span></div>
+<div class="latm"><div class="lt lt1 la"><button type="button" id="latauto" class="sm" data-i18n="codecAuto">Auto</button><input type="range" id="lat" min="40" max="400" step="1"><span class="v" id="latt">-</span></div>
 <div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big"><span id="latv">-</span><span class="llsave" id="llsave"></span></span></div>
 </div>
 </div>
@@ -909,15 +909,15 @@ $('bkfile').onchange=function(){var f=this.files&&this.files[0];if(!f)return;if(
 var r=new FileReader();r.onload=function(){bkMsg('…');postj('/api/restore?where=upload',r.result,bkRestored)};r.readAsText(f)};
 /* latency: estimate from the stream loop (see hb_latency_estimate) */
 var busyL=0,latT=0,latAck=-1,latTouch=0,LATCOL=['var(--b0)','var(--b1)','var(--b3)','var(--b4)'];
-function pushLat(v){v=parseInt(v,10);if(!(v>=40&&v<=200)||v===latAck)return;latAck=v;latTouch=0;busyL=1;
+function pushLat(v){v=parseInt(v,10);if(!(v>=40&&v<=400)||v===latAck)return;latAck=v;latTouch=0;busyL=1;
 $('latt').textContent=v+' ms';act('/api/latency?ms='+v,function(){busyL=0})}
 function drawLat(){var L=S.latency;if(!L)return;
-/* Auto: the buffer the stream loop learned for this headset (may be above 200) */
+/* Auto: the buffer the stream loop learned for this headset */
 var X=S.lat_extra||{},au=!!X.auto,am=au&&X.auto_ms>0?X.auto_ms:0;
 $('latauto').className='sm'+(au?' act':'');
-var ms=am||L.target_ms,shown=ms;if(ms>200)ms=200;if(ms<40)ms=40;
+var ms=am||L.target_ms,shown=ms;if(ms>400)ms=400;if(ms<40)ms=40;
 var cur=parseInt($('lat').value,10);
-if(latTouch&&cur>=40&&cur<=200&&cur!==ms)pushLat(cur);
+if(latTouch&&cur>=40&&cur<=400&&cur!==ms)pushLat(cur);
 else if(!busyL){$('lat').value=ms;latAck=ms}
 $('latt').textContent=(latTouch||busyL?$('lat').value:shown)+' ms';
 var on=S.connected&&L.estimate_ms>0;$('latv').textContent=on?'≈ '+L.estimate_ms+' ms':'-';

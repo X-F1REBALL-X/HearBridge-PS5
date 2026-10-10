@@ -570,7 +570,7 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         /* ms=40..200: media queue target by hand (adaptive off), saved per
          * headset. auto=1: adaptive (lowest drop-free buffer, learned per
          * headset), auto=0: back to the slider value.
-         * stable=0|1 (older pages): both land on 200 ms now. */
+         * stable=0|1 (older pages): 200 ms / the 400 ms maximum. */
         if (query_int(q, "auto", &v)) {
             c->latency_auto = v != 0;
             c->prefs_dirty = 1;

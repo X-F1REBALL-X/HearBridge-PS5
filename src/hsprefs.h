@@ -12,7 +12,7 @@ enum { HB_CODEC_AUTO = 0, HB_CODEC_SBC = 1, HB_CODEC_SBC_HQ = 2, HB_CODEC_SBC_XQ
 #define HB_EQ_MAX_DB 12
 
 #define HB_LAT_MIN_MS      40
-#define HB_LAT_MAX_MS     200
+#define HB_LAT_MAX_MS     400
 #define HB_LAT_DEFAULT_MS 200
 
 typedef struct {
