@@ -310,6 +310,28 @@ background:hsl(var(--h,320),55%,32%);border:1px solid hsla(var(--h,320),70%,70%,
 .grow button{min-height:2.2rem;min-width:0;padding:.15rem .8rem;font-size:.85rem}
 .glist .empty{padding:var(--s2) var(--s3);color:var(--mute);border:1px dashed var(--edge2);font-size:.88rem}
 .gline span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gline{flex-wrap:wrap}.gline #gltxt{flex:1 1 8rem;white-space:normal;overflow-wrap:anywhere;line-height:1.25}
+/* Update Game Profile: grey until the sound differs from this headset's saved profile */
+button.gup{flex:0 0 auto;min-height:2.6rem;min-width:0;margin-inline-start:auto;padding:.2rem 1.1rem;font-size:.9rem;white-space:nowrap;color:var(--void)}
+button.gup:before{background:var(--rose);border-color:var(--rose)}
+button.gup:focus:before{border-color:#fff;box-shadow:0 0 0 3px #fff,0 0 1rem rgba(255,122,217,.6)}
+button.gup[disabled]{color:var(--mute);cursor:default}
+button.gup[disabled]:before{background:transparent;border-color:var(--edge2);box-shadow:none}
+button.gup[disabled]:focus{transform:none}
+@media (max-width:560px){button.gup{flex:1 1 100%;margin-inline-start:0}}
+/* headsets that have a profile for a game (Settings, Games list) */
+.grow{flex-wrap:wrap}
+.ghs{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:var(--s1);padding-inline-start:3.3rem}
+.ghs .k{font-size:.78rem;color:var(--mute);align-self:center}
+.hchip{display:inline-flex;align-items:stretch;max-width:100%;border:1px solid var(--edge2);background:rgba(255,122,217,.05)}
+.hchip.cur{border-color:var(--rose);background:rgba(255,122,217,.14)}
+.hchip button{min-height:2.4rem;padding:.1rem .7rem;font-size:.84rem;font-weight:800;display:inline-flex;align-items:center;gap:.4rem;min-width:0}
+.hchip button:before{background:transparent;border:0;left:0;right:0}
+.hchip button svg{width:1.15rem;height:1.15rem;flex:0 0 auto;color:var(--rose)}
+.hchip button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:14rem}
+.hchip button[disabled]{cursor:default;color:var(--ink2)}
+.hchip button.hx{color:var(--bad);padding:.1rem .65rem;border-inline-start:1px solid var(--edge2);font-size:1rem}
+.hchip button:focus:before{border:2px solid var(--lime)}
 button.night{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:4.2rem;padding:.4rem 1.5rem;text-align:start;margin-top:auto}
 .night .nt{display:flex;flex-direction:column;min-width:0}.night b{font-size:1.2rem}.night small{font-size:.8rem;font-weight:700;color:var(--mute);white-space:normal}
 .sw{flex:0 0 auto;position:relative;width:3.4rem;height:1.6rem;margin-inline-start:var(--s3);background:var(--void);border:2px solid var(--edge2)}
@@ -364,6 +386,7 @@ button.sm{min-height:2.2rem;padding:.15rem .9rem;font-size:.85rem}
 #pg2 .kv{margin-bottom:var(--s3)}
 .gsec{margin-top:var(--s5);padding-top:var(--s3);border-top:1px solid var(--edge);--acc:var(--rose)}
 .gsec button.act:before{background:var(--rose);border-color:var(--rose)}
+.gsec button[disabled]{color:var(--mute);cursor:default}.gsec button[disabled]:before{background:transparent;border-color:var(--edge2);box-shadow:none}.gsec button[disabled]:focus{transform:none}
 #pg0{--acc:var(--lime)}#pg2{--acc:var(--cyan)}#pg3{--acc:var(--warn)}
 #pg3 .seg button.act:before,#pg3 .bkgo button.act:before{background:var(--warn);border-color:var(--warn)}
 .tabs button:focus,.qs button:focus{transform:scale(1.02)}
@@ -502,7 +525,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 </div>
 <div class="col c2">
 <section class="panel eqp" id="eqp"><div class="phead"><p class="label" data-i18n="sound">Sound</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div>
-<div class="gline" id="gline" style="display:none"><span class="gic sm" id="glic"></span><span id="gltxt">-</span></div>
+<div class="gline" id="gline" style="display:none"><span class="gic sm" id="glic"></span><span id="gltxt">-</span><button type="button" id="gupd" class="gup" disabled data-i18n="gameUpdate">Update Game Profile</button></div>
 <div class="eqhead" id="eqhead"><span class="cl" data-i18n="equalizer">Equalizer</span><button id="eqon" data-i18n="eqOff">Off</button></div>
 <div class="eqbox"><div class="curve"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eqg" x1="0" x2="1" y1="0" y2="0">
 <stop offset="0" stop-color="#ff6a2b"/><stop offset=".3" stop-color="#ffb23d"/><stop offset=".5" stop-color="#c8ff3d"/><stop offset=".72" stop-color="#3dd8ff"/><stop offset="1" stop-color="#ff7ad9"/></linearGradient></defs>
@@ -635,14 +658,21 @@ function gHue(id){var h=0;for(var i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))%
 function gIcon(box,id,name){if(!box||box.hbId===id)return;box.hbId=id;box.innerHTML='';if(!id){box.style.display='none';return}
 box.style.display='';box.style.setProperty&&box.style.setProperty('--h',gHue(id));var L=String(name||id).replace(/^[^A-Za-z0-9\u00c0-\uffff]+/,'').charAt(0).toUpperCase()||'?';
 box.innerHTML='<i>'+esc(L)+'</i><img src="/api/gameicon?id='+encodeURIComponent(id)+'" alt="" onerror="this.parentNode.removeChild(this)">'}
-function gameRow(g,cur){return '<div class="grow'+(g.id==cur?' on':'')+'" data-gid="'+esc(g.id)+'"><span class="gic" data-gic="'+esc(g.id)+'"></span><span class="gt"><b>'+esc(g.name||g.id)+'</b><small>'+esc(g.id)+'</small></span>'+
-'<button type="button" class="red" data-gdrop="'+esc(g.id)+'">'+esc(t('gameRemove'))+'</button></div>'}
+function hsChip(g,h,run){var nm=h.n||h.a,tl=esc(t('gameHsUse').replace('%s',nm));
+return '<span class="hchip'+(h.cur?' cur':'')+'"><button type="button" data-gpick="'+esc(g.id)+'" data-hs="'+esc(h.a)+'"'+(run?' title="'+tl+'"':' disabled')+'>'+icon('headphones').replace(/ width="34" height="34"/,'')+'<span>'+esc(nm)+'</span></button>'+
+'<button type="button" class="hx" data-ghdel="'+esc(g.id)+'" data-hs="'+esc(h.a)+'" aria-label="'+esc(t('gameRemove'))+' '+esc(nm)+'" title="'+esc(t('gameRemove'))+'">&#215;</button></span>'}
+function gameRow(g,cur){var hs=g.hs||[],c='';for(var i=0;i<hs.length;i++)c+=hsChip(g,hs[i],g.id==cur);
+return '<div class="grow'+(g.id==cur?' on':'')+'" data-gid="'+esc(g.id)+'"><span class="gic" data-gic="'+esc(g.id)+'"></span><span class="gt"><b>'+esc(g.name||g.id)+'</b><small>'+esc(g.id)+'</small></span>'+
+'<button type="button" class="red" data-gdrop="'+esc(g.id)+'">'+esc(t('gameRemove'))+'</button>'+
+'<div class="ghs">'+(c||'<span class="k">'+esc(t('gameHsNone'))+'</span>')+'</div></div>'}
 var gListSig=null;
 function drawGames(g){var L=g.saved||[],sig=JSON.stringify(L)+'|'+(g.id||'')+'|'+LANG,box=$('glist');if(!box||sig===gListSig)return;gListSig=sig;
 if(!L.length){box.innerHTML='<div class="empty">'+esc(t('noSavedGames'))+'</div>';return}
 var h='';for(var i=0;i<L.length;i++)h+=gameRow(L[i],g.id);box.innerHTML=h;
 var ic=box.querySelectorAll?box.querySelectorAll('[data-gic]'):[];for(var j=0;j<ic.length;j++){var id=ic[j].getAttribute('data-gic');for(var k=0;k<L.length;k++)if(L[k].id==id)gIcon(ic[j],id,L[k].name)}
-var bs=box.querySelectorAll?box.querySelectorAll('[data-gdrop]'):[];for(var b=0;b<bs.length;b++)bs[b].onclick=function(){var id=this.getAttribute('data-gdrop');if(confirm(t('gameRemoveConfirm')))act('/api/game?do=3&id='+encodeURIComponent(id))}}
+var bs=box.querySelectorAll?box.querySelectorAll('[data-gdrop]'):[];for(var b=0;b<bs.length;b++)bs[b].onclick=function(){var id=this.getAttribute('data-gdrop');if(confirm(t('gameRemoveConfirm')))act('/api/game?do=3&id='+encodeURIComponent(id))};
+var ps=box.querySelectorAll?box.querySelectorAll('[data-gpick]'):[];for(var p=0;p<ps.length;p++)ps[p].onclick=function(){if(this.disabled)return;act('/api/game?do=5&id='+encodeURIComponent(this.getAttribute('data-gpick'))+'&hs='+this.getAttribute('data-hs'))};
+var ds=box.querySelectorAll?box.querySelectorAll('[data-ghdel]'):[];for(var d=0;d<ds.length;d++)ds[d].onclick=function(){if(confirm(t('gameHsRemoveConfirm')))act('/api/game?do=4&id='+encodeURIComponent(this.getAttribute('data-ghdel'))+'&hs='+this.getAttribute('data-hs'))}}
 var devT=0,scanLive=0,okT=0;
 /* The last status is older than 4 s (console busy, tab was in the
  * background): never keep showing "connected" from it. */
@@ -799,9 +829,12 @@ lh='<span class="lq">'+bb+l.score+'%<small>'+(l.lq>=0||l.rssi?'RSSI '+l.rssi+' Â
 lm='<span class="lq">'+bb+t(['','sigWeak','sigFair','sigGood','sigGreat'][n])+'</span>'}
 setHtml('lqv',lh);setHtml('lqm',S.connected?lm:'-');
 /* games: main screen only says when a game's sound is on; saving lives in Settings */
-var gon=!!g.id;$('gline').style.display=gon&&g.active?'':'none';if(gon&&g.active)$('gltxt').textContent=t('gameSoundOn').replace('%s',g.name||g.id);
+var gon=!!g.id,gnm=g.name||g.id;$('gline').style.display=gon?'':'none';
+if(gon)$('gltxt').textContent=g.active?t('gameSoundOn').replace('%s',gnm)+(g.from?' ('+t('gameFrom').replace('%s',g.from)+')':''):t('gameNoProfile').replace('%s',gnm);
+$('gupd').disabled=!(gon&&g.dirty);$('gupd').className='gup'+(gon&&g.dirty?' on':'');
 $('game').className='game'+(gon?(g.active?' on':''):' none');gIcon($('gic'),gon?g.id:'',g.name);gIcon($('glic'),gon&&g.active?g.id:'',g.name);drawGames(g);$('gname').textContent=gon?(g.name||g.id):t(g.avail===0?'gameNoDetect':'noGame');$('gon').style.display=gon&&g.active?'':'none';
-$('gsave').textContent=t(g.profile?'gameUpdate':'gameSave');$('gsave').disabled=!gon;$('gsave').className=gon?'act':'no';$('gdrop').style.display=gon&&g.profile?'':'none';
+var own=0,SL=g.saved||[];for(var si=0;si<SL.length;si++)if(SL[si].id==g.id)for(var hi=0;hi<(SL[si].hs||[]).length;hi++)if(SL[si].hs[hi].cur)own=1;
+var gsOn=gon&&(!own||!!g.dirty);$('gsave').textContent=t(own?'gameUpdate':'gameSave');$('gsave').disabled=!gsOn;$('gsave').className=gsOn?'act':'no';$('gdrop').style.display=gon&&g.profile?'':'none';
 $('night').className='night'+(nm.on?' on':'');
 /* low headset battery: a toast once per heads-up (20 %, then 10 %) */
 var ba=S.batt_alert||{};if(ba.seq>0&&ba.level){var seen=-1;try{seen=parseInt(localStorage.getItem('hb_batt_seq'),10)}catch(e){}
@@ -814,6 +847,7 @@ else if(on&&low&&L.normal_ms>S.latency.estimate_ms){sv.className='llsave';sv.tex
 else{sv.className='llsave';sv.textContent=''}}
 var toastT=0;function toast(m){$('toast').textContent=m;clearTimeout(toastT);toastT=setTimeout(function(){$('toast').textContent=''},7000)}
 $('gsave').onclick=function(){if(!this.disabled)act('/api/game?do=1')};
+$('gupd').onclick=function(){if(this.disabled)return;this.disabled=true;this.className='gup';act('/api/game?do=1')};
 $('night').onclick=function(){act('/api/night?on='+(S&&S.night&&S.night.on?0:1))};
 /* settings overlay */
 var TAB=0,NTAB=4;function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}var ts=$('tb'+n).getElementsByTagName?$('tb'+n).getElementsByTagName('span'):[];$('pgtitle').textContent=ts.length?ts[0].textContent:'';$('setm').style.setProperty&&$('setm').style.setProperty('--pgc',['var(--lime)','var(--violet)','var(--cyan)','var(--warn)'][n])}

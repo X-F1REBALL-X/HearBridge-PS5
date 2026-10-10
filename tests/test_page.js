@@ -237,14 +237,45 @@ STATUS.game = { avail: 1, id: '', name: '', profile: 0, active: 0 };
 global.hbTest.req('/api/status');
 check(el('gline').style.display === 'none' && el('gsave').disabled === true && el('gname').textContent === 'No game running',
   'page: no game: nothing on the main screen, save is off');
-STATUS.game = { avail: 1, id: 'PPSA01325', name: 'ASTRO BOT', profile: 0, active: 0 };
+check(el('gupd').disabled === true, 'page: no game: Update Game Profile not offered');
+STATUS.game = { avail: 1, id: 'PPSA01325', name: 'ASTRO BOT', profile: 0, active: 0, dirty: 1 };
 global.hbTest.req('/api/status');
-check(el('gline').style.display === 'none' && el('gname').textContent === 'ASTRO BOT' && !el('gsave').disabled &&
-  el('gdrop').style.display === 'none', 'page: game without a profile: can be saved, nothing to remove');
-STATUS.game = { avail: 1, id: 'PPSA01325', name: 'ASTRO BOT', profile: 1, active: 1 };
+check(el('gline').style.display === '' && /No profile for ASTRO BOT on this headset yet/.test(el('gltxt').textContent) &&
+  el('gname').textContent === 'ASTRO BOT' && !el('gsave').disabled && el('gdrop').style.display === 'none' && el('gupd').disabled === false,
+  'page: game without a profile: the game line says so, it can be saved, nothing to remove');
+STATUS.game = { avail: 1, id: 'PPSA01325', name: 'ASTRO BOT', profile: 1, active: 1, exact: 1, from: '', dirty: 0,
+  saved: [{ id: 'PPSA01325', name: 'ASTRO BOT', hs: [{ a: 'D8:E2:DF:F7:D7:44', n: 'Xbox Wireless Headset', cur: 1 }, { a: '58:18:62:63:3B:7C', n: 'WF-1000XM6', cur: 0 }] },
+          { id: 'CUSA00001', name: 'Other', hs: [] }] };
 global.hbTest.req('/api/status');
-check(el('gline').style.display === '' && /ASTRO BOT/.test(el('gltxt').textContent) && el('gdrop').style.display === '',
+check(el('gline').style.display === '' && /^Game sound on for ASTRO BOT$/.test(el('gltxt').textContent) && el('gdrop').style.display === '',
   'page: game sound on: main screen says so, Settings can remove it');
+check(el('gupd').disabled === true && el('gupd').className === 'gup', 'page: Update Game Profile is grey while the sound matches the saved profile');
+check(el('gsave').textContent === 'Update Game Profile', 'page: Settings button says Update Game Profile once this headset has one');
+calls.length = 0; el('gupd').onclick.call(el('gupd'));
+check(calls.length === 0, 'page: grey Update Game Profile does nothing');
+STATUS.game.dirty = 1;
+global.hbTest.req('/api/status');
+check(el('gupd').disabled === false && /\bon\b/.test(el('gupd').className), 'page: Update Game Profile turns active once the sound is changed');
+STATUS.game.dirty = 0;   /* what the server answers the save with */
+calls.length = 0; el('gupd').onclick.call(el('gupd'));
+check(calls[0] && calls[0].p === '/api/game?do=1' && calls[0].m === 'POST' && el('gupd').disabled === true,
+  'page: Update Game Profile saves for this game and headset, then goes grey');
+STATUS.game.dirty = 0; STATUS.game.exact = 0; STATUS.game.from = 'WF-1000XM6';
+global.hbTest.req('/api/status');
+check(/ASTRO BOT \(from WF-1000XM6\)/.test(el('gltxt').textContent), 'page: says when the profile comes from another headset');
+{
+  const gl = el('glist').innerHTML;
+  check(/class="hchip cur"><button type="button" data-gpick="PPSA01325" data-hs="D8:E2:DF:F7:D7:44"/.test(gl) && /Xbox Wireless Headset/.test(gl) &&
+    /data-ghdel="PPSA01325" data-hs="58:18:62:63:3B:7C"/.test(gl) && /<svg viewBox/.test(gl), 'page: game card shows a chip with icon and name per saved headset');
+  check(/Not saved for a headset yet/.test(gl), 'page: a game with no headset profile says so');
+  check(/data-gpick="PPSA01325" data-hs="58:18:62:63:3B:7C" title="Use the WF-1000XM6 profile now"/.test(gl), 'page: chips of the running game can be picked');
+}
+check(/act\('\/api\/game\?do=5&id='/.test(html) && /act\('\/api\/game\?do=4&id='/.test(html) && /gameHsRemoveConfirm/.test(html),
+  'page: pick (use now) and delete per headset');
+check(/@media \(max-width:560px\)\{button\.gup\{flex:1 1 100%/.test(html) && /button\.gup\{[^}]*min-height:2\.6rem[^}]*white-space:nowrap/.test(html),
+  'page: Update Game Profile is a big button that wraps to its own line on phones');
+check(el('gsave').disabled === true, 'page: Settings Update Game Profile is grey too while nothing changed');
+STATUS.game.dirty = 1; global.hbTest.req('/api/status');
 calls.length = 0; el('gsave').onclick.call(el('gsave'));
 check(calls[0] && calls[0].p === '/api/game?do=1' && calls[0].m === 'POST', 'page: save for this game -> POST');
 // night mode

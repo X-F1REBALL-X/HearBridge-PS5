@@ -27,6 +27,40 @@ static long num(const char *s, const char **end)
     return neg ? -v : v;
 }
 
+static int hexv(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return -1;
+}
+
+/* "AA:BB:CC:DD:EE:FF" (as shown) into a[0..5] in that order. */
+static int parse_addr(const char *s, unsigned char a[6])
+{
+    int i;
+    for (i = 0; i < 6; i++) {
+        int h = hexv(s[i * 3]), l = hexv(s[i * 3 + 1]);
+        if (h < 0 || l < 0) return 0;
+        if (i < 5 && s[i * 3 + 2] != ':') return 0;
+        a[i] = (unsigned char)(h * 16 + l);
+    }
+    return s[17] == 0 || s[17] == ' ';
+}
+
+static int count_id(const hb_games *gs, const char *id)
+{
+    int i, n = 0;
+    for (i = 0; i < gs->n; i++) if (!strcmp(gs->g[i].id, id)) n++;
+    return n;
+}
+
+static void drop_at(hb_games *gs, int i)
+{
+    memmove(&gs->g[i], &gs->g[i + 1], sizeof gs->g[0] * (size_t)(gs->n - i - 1));
+    gs->n--;
+}
+
 static void parse_line(hb_games *gs, char *line)
 {
     hb_game g;
@@ -34,6 +68,7 @@ static void parse_line(hb_games *gs, char *line)
     memset(&g, 0, sizeof g);
     g.gain_pct = 250;
     g.hs_vol = -1;
+    g.night = -1;
     sp = strchr(p, ' ');
     if (!sp) return;
     *sp = 0;
@@ -55,6 +90,8 @@ static void parse_line(hb_games *gs, char *line)
             if (!strcmp(key, "eq")) g.eq_on = !strcmp(v, "on");
             else if (!strcmp(key, "gain")) { long x = num(v, &end); if (end != v) g.gain_pct = clampi((int)x, 0, 500); }
             else if (!strcmp(key, "hs_vol")) { long x = num(v, &end); if (end != v) g.hs_vol = clampi((int)x, -1, 127); }
+            else if (!strcmp(key, "night")) { long x = num(v, &end); if (end != v) g.night = clampi((int)x, -1, 1); }
+            else if (!strcmp(key, "hs")) g.has_hs = parse_addr(v, g.hs);
             else if (!strcmp(key, "eq_db")) {
                 const char *s = v;
                 int i;
@@ -70,7 +107,11 @@ static void parse_line(hb_games *gs, char *line)
         if (!nx) break;
         p = nx + 1;
     }
-    if (gs->n < HB_GAME_MAX && hb_games_find(gs, g.id) < 0) gs->g[gs->n++] = g;
+    /* the file is newest first: keep that order, same limits as put */
+    if (gs->n >= HB_GPROF_MAX || hb_games_find_hs(gs, g.id, g.has_hs ? g.hs : NULL) >= 0) return;
+    if (count_id(gs, g.id) >= HB_GAME_HS_MAX) return;
+    if (hb_games_find(gs, g.id) < 0 && hb_games_list(gs, NULL, 0) >= HB_GAME_MAX) return;
+    gs->g[gs->n++] = g;
 }
 
 void hb_games_parse(hb_games *gs, const char *t)
@@ -99,9 +140,14 @@ int hb_games_format(const hb_games *gs, char *out, int max)
         /* one line per game: no newlines in the name */
         snprintf(name, sizeof name, "%s", g->name);
         for (k = 0; name[k]; k++) if (name[k] == '\n' || name[k] == '\r') name[k] = ' ';
-        n += snprintf(out + n, (size_t)(max - n), "%s eq=%s eq_db=%d,%d,%d,%d,%d gain=%d hs_vol=%d%s%s\n",
-                      g->id, g->eq_on ? "on" : "off", g->eq_db[0], g->eq_db[1], g->eq_db[2],
-                      g->eq_db[3], g->eq_db[4], g->gain_pct, g->hs_vol, name[0] ? " name=" : "", name);
+        char hs[24] = "", nt[12] = "";
+        if (g->has_hs)
+            snprintf(hs, sizeof hs, " hs=%02X:%02X:%02X:%02X:%02X:%02X",
+                     g->hs[0], g->hs[1], g->hs[2], g->hs[3], g->hs[4], g->hs[5]);
+        if (g->night >= 0) snprintf(nt, sizeof nt, " night=%d", g->night ? 1 : 0);
+        n += snprintf(out + n, (size_t)(max - n), "%s%s eq=%s eq_db=%d,%d,%d,%d,%d gain=%d hs_vol=%d%s%s%s\n",
+                      g->id, hs, g->eq_on ? "on" : "off", g->eq_db[0], g->eq_db[1], g->eq_db[2],
+                      g->eq_db[3], g->eq_db[4], g->gain_pct, g->hs_vol, nt, name[0] ? " name=" : "", name);
     }
     return n > 0 && n < max ? n : -1;
 }
@@ -114,22 +160,97 @@ int hb_games_find(const hb_games *gs, const char *id)
     return -1;
 }
 
+int hb_games_find_hs(const hb_games *gs, const char *id, const unsigned char *hs)
+{
+    int i;
+    if (!id || !id[0]) return -1;
+    for (i = 0; i < gs->n; i++) {
+        const hb_game *g = &gs->g[i];
+        if (strcmp(g->id, id)) continue;
+        if (hs ? (g->has_hs && !memcmp(g->hs, hs, 6)) : !g->has_hs) return i;
+    }
+    return -1;
+}
+
+int hb_games_pick(const hb_games *gs, const char *id, const unsigned char *hs, int *exact)
+{
+    int i = hs ? hb_games_find_hs(gs, id, hs) : -1;
+    if (exact) *exact = i >= 0;
+    return i >= 0 ? i : hb_games_find(gs, id);
+}
+
+int hb_games_list(const hb_games *gs, int *idx, int max)
+{
+    int i, k, n = 0;
+    for (i = 0; i < gs->n; i++) {
+        for (k = 0; k < i; k++) if (!strcmp(gs->g[k].id, gs->g[i].id)) break;
+        if (k < i) continue;                       /* not this game's newest */
+        if (idx && n < max) idx[n] = i;
+        n++;
+    }
+    return n;
+}
+
 void hb_games_put(hb_games *gs, const hb_game *g)
 {
-    int i = hb_games_find(gs, g->id);
+    int i = hb_games_find_hs(gs, g->id, g->has_hs ? g->hs : NULL);
     if (!hb_game_id_ok(g->id)) return;
-    if (i < 0) i = gs->n < HB_GAME_MAX ? gs->n++ : HB_GAME_MAX - 1;
-    memmove(&gs->g[1], &gs->g[0], sizeof gs->g[0] * (size_t)i);
+    if (i >= 0) drop_at(gs, i);
+    if (gs->n >= HB_GPROF_MAX) gs->n = HB_GPROF_MAX - 1;   /* cannot happen with the limits below */
+    memmove(&gs->g[1], &gs->g[0], sizeof gs->g[0] * (size_t)gs->n);
     gs->g[0] = *g;
+    gs->n++;
+    /* a game on more than HB_GAME_HS_MAX headsets: its oldest goes */
+    while (count_id(gs, g->id) > HB_GAME_HS_MAX) {
+        for (i = gs->n - 1; i > 0 && strcmp(gs->g[i].id, g->id); i--) { }
+        drop_at(gs, i);
+    }
+    /* more than HB_GAME_MAX games: the one saved longest ago goes, all of it */
+    while (hb_games_list(gs, NULL, 0) > HB_GAME_MAX) {
+        char old[16];
+        int idx[HB_GAME_MAX + 1];
+        int n = hb_games_list(gs, idx, HB_GAME_MAX + 1);
+        snprintf(old, sizeof old, "%s", gs->g[idx[n - 1]].id);
+        hb_games_drop(gs, old);
+    }
 }
 
 int hb_games_drop(hb_games *gs, const char *id)
 {
-    int i = hb_games_find(gs, id);
+    int i, n = 0;
+    for (i = gs->n - 1; i >= 0; i--)
+        if (!strcmp(gs->g[i].id, id)) { drop_at(gs, i); n++; }
+    return n;
+}
+
+int hb_games_drop_hs(hb_games *gs, const char *id, const unsigned char *hs)
+{
+    int i = hb_games_find_hs(gs, id, hs);
     if (i < 0) return 0;
-    memmove(&gs->g[i], &gs->g[i + 1], sizeof gs->g[0] * (size_t)(gs->n - i - 1));
-    gs->n--;
+    drop_at(gs, i);
     return 1;
+}
+
+int hb_games_migrate(hb_games *gs, const unsigned char hs[6])
+{
+    int i, n = 0;
+    for (i = gs->n - 1; i >= 0; i--) {
+        hb_game *g = &gs->g[i];
+        if (g->has_hs) continue;
+        if (hb_games_find_hs(gs, g->id, hs) >= 0) drop_at(gs, i);   /* it has its own already */
+        else { g->has_hs = 1; memcpy(g->hs, hs, 6); }
+        n++;
+    }
+    return n;
+}
+
+int hb_game_differs(const hb_game *g, int eq_on, const int eq_db[5], int gain_pct, int night)
+{
+    int i;
+    if (!g) return 1;
+    if ((g->eq_on != 0) != (eq_on != 0) || g->gain_pct != gain_pct) return 1;
+    for (i = 0; i < 5; i++) if (g->eq_db[i] != eq_db[i]) return 1;
+    return g->night >= 0 && (g->night != 0) != (night != 0);
 }
 
 int hb_game_decide(const char *applied, const char *cur, int has)

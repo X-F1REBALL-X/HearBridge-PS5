@@ -81,9 +81,19 @@ typedef struct {
     int game_active;       /* that profile is applied now */
     int req_game;          /* page: 1 save for this game, 2 forget it */
     char req_game_drop[16]; /* page: forget this saved game (any, not just the running one) */
-    int games_n;           /* saved game profiles, newest first (for the Games list) */
+    int game_exact;        /* the profile on now is this headset's own */
+    char game_from[32];    /* else: the headset it was saved on ("" none) */
+    int game_dirty;        /* sound differs from this headset's profile: Update Game Profile */
+    char req_game_hs[16];  /* page: drop (req_game_hs_do 1) or use now (2) one headset's profile */
+    unsigned char req_game_hs_addr[6];
+    int req_game_hs_do;
+    int games_n;           /* saved games, newest first (for the Games list) */
     char games_id[32][16];
     char games_name[32][48];
+    int games_hs_n[32];    /* headsets with a profile for that game, newest first */
+    unsigned char games_hs[32][4][6];
+    char games_hsname[32][4][32];
+    unsigned char games_hs_cur[32][4];   /* it is the headset in use */
     int lat_backoff_ms;    /* low buffer target stepped back this much (drops) */
     int lat_normal_ms;     /* last delay estimate at the default 200 ms target, 0 none */
     /* backup / restore */

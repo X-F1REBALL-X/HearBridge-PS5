@@ -607,9 +607,39 @@ int main(int argc, char **argv)
         c.games_n = 2;
         snprintf(c.games_id[0], 16, "PPSA01325"); snprintf(c.games_name[0], 48, "ASTRO \"BOT\"");
         snprintf(c.games_id[1], 16, "CUSA00001"); c.games_name[1][0] = 0;
+        c.games_hs_n[0] = 2; c.games_hs_n[1] = 0;
+        { static const unsigned char x[6] = { 0xD8, 0xE2, 0xDF, 0xF7, 0xD7, 0x44 }, y[6] = { 0x58, 0x18, 0x62, 0x63, 0x3B, 0x7C };
+          memcpy(c.games_hs[0][0], x, 6); memcpy(c.games_hs[0][1], y, 6); }
+        snprintf(c.games_hsname[0][0], 32, "Xbox Wireless Headset"); snprintf(c.games_hsname[0][1], 32, "WF-1000XM6");
+        c.games_hs_cur[0][0] = 1; c.games_hs_cur[0][1] = 0;
+        snprintf(c.game_id, sizeof c.game_id, "PPSA01325");
+        c.game_dirty = 1; c.game_exact = 0; snprintf(c.game_from, sizeof c.game_from, "WF-1000XM6");
         get(&c, "/api/status");
-        CHECK(strstr(out, "\"saved\":[{\"id\":\"PPSA01325\",\"name\":\"ASTRO \\\"BOT\\\"\"},{\"id\":\"CUSA00001\",\"name\":\"\"}]") != NULL,
-              "status: saved games list (escaped names)");
+        CHECK(strstr(out, "\"saved\":[{\"id\":\"PPSA01325\",\"name\":\"ASTRO \\\"BOT\\\"\",\"hs\":["
+                          "{\"a\":\"D8:E2:DF:F7:D7:44\",\"n\":\"Xbox Wireless Headset\",\"cur\":1},"
+                          "{\"a\":\"58:18:62:63:3B:7C\",\"n\":\"WF-1000XM6\",\"cur\":0}]},"
+                          "{\"id\":\"CUSA00001\",\"name\":\"\",\"hs\":[]}]") != NULL,
+              "status: saved games with the headsets that have a profile (escaped names)");
+        CHECK(strstr(out, "\"exact\":0,\"from\":\"WF-1000XM6\",\"dirty\":1") != NULL,
+              "status: whose profile is on and whether Update Game Profile is active");
+        post(&c, "/api/game?do=1");
+        CHECK(c.req_game == 1 && c.game_dirty == 0 && c.game_exact == 1 && !c.game_from[0],
+              "game: Update Game Profile goes grey at once");
+        c.req_game = 0;
+        post(&c, "/api/game?do=4&id=PPSA01325&hs=58:18:62:63:3B:7C");
+        CHECK(!strncmp(out, "HTTP/1.1 200", 12) && c.req_game_hs_do == 1 && !strcmp(c.req_game_hs, "PPSA01325") &&
+              c.req_game_hs_addr[0] == 0x58 && c.req_game_hs_addr[5] == 0x7C, "game: delete one headset's profile");
+        c.req_game_hs_do = 0;
+        post(&c, "/api/game?do=5&id=PPSA01325&hs=d8:e2:df:f7:d7:44");
+        CHECK(c.req_game_hs_do == 2 && c.req_game_hs_addr[0] == 0xD8, "game: use one headset's profile now");
+        c.req_game_hs_do = 0;
+        post(&c, "/api/game?do=5&id=CUSA00001&hs=d8:e2:df:f7:d7:44");
+        CHECK(!strncmp(out, "HTTP/1.1 400", 12) && !c.req_game_hs_do, "game: use now only for the running game");
+        post(&c, "/api/game?do=4&id=PPSA01325&hs=58:18:62:63:3B");
+        CHECK(!strncmp(out, "HTTP/1.1 400", 12) && !c.req_game_hs_do, "game: a bad headset address -> 400");
+        post(&c, "/api/game?do=4&id=PPSA01325&hs=58:18:62:63:3B:7C;x");
+        CHECK(!strncmp(out, "HTTP/1.1 400", 12) && !c.req_game_hs_do, "game: trailing junk after the address -> 400");
+        c.game_id[0] = 0;
         post(&c, "/api/game?do=3&id=CUSA00001");
         CHECK(!strcmp(c.req_game_drop, "CUSA00001"), "game: remove a saved game by id");
         c.req_game_drop[0] = 0;

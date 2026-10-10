@@ -22,6 +22,14 @@
 
 /* ---- request handling (pure) ----------------------------------------- */
 
+static int hexd(char ch)
+{
+    if (ch >= '0' && ch <= '9') return ch - '0';
+    if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
+    if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
+    return -1;
+}
+
 static int query_int(const char *q, const char *key, int *val)
 {
     size_t kl = strlen(key);
@@ -104,8 +112,8 @@ static int is_write_path(const char *path)
 
 static int status_json(hb_ctl *c, char *o, int max)
 {
-    char dev[140], st[70], url[140], det[200], why[40], ev[2400], cid[2][8], gname[100];
-    static char gl[32 * 140];
+    char dev[140], st[70], url[140], det[200], why[40], ev[2400], cid[2][8], gname[100], gfrom[70];
+    static char gl[32 * 600];
     const char *cven = btchip_vendor(c->chip_vid);
     int ei, en, chip_ok = c->chip_vid >= 0 && c->chip_vid <= 0xffff &&
                           c->chip_pid >= 0 && c->chip_pid <= 0xffff;
@@ -115,15 +123,26 @@ static int status_json(hb_ctl *c, char *o, int max)
     json_esc(det, sizeof det, c->detail);
     json_esc(why, sizeof why, c->why);
     json_esc(gname, sizeof gname, c->game_name);
+    json_esc(gfrom, sizeof gfrom, c->game_from);
     {
         int gi, gn = 1;
         gl[0] = '[';
         for (gi = 0; gi < c->games_n && gi < 32; gi++) {
             char nm[100];
+            int hk;
             json_esc(nm, sizeof nm, c->games_name[gi]);
             if (!hb_game_id_ok(c->games_id[gi])) continue;
-            gn += snprintf(gl + gn, sizeof gl - (size_t)gn, "%s{\"id\":\"%s\",\"name\":\"%s\"}",
+            gn += snprintf(gl + gn, sizeof gl - (size_t)gn, "%s{\"id\":\"%s\",\"name\":\"%s\",\"hs\":[",
                            gn > 1 ? "," : "", c->games_id[gi], nm);
+            for (hk = 0; hk < c->games_hs_n[gi] && hk < 4 && gn < (int)sizeof gl - 2; hk++) {
+                char hn[70];
+                const unsigned char *a = c->games_hs[gi][hk];
+                json_esc(hn, sizeof hn, c->games_hsname[gi][hk]);
+                gn += snprintf(gl + gn, sizeof gl - (size_t)gn,
+                               "%s{\"a\":\"%02X:%02X:%02X:%02X:%02X:%02X\",\"n\":\"%s\",\"cur\":%d}",
+                               hk ? "," : "", a[0], a[1], a[2], a[3], a[4], a[5], hn, c->games_hs_cur[gi][hk] ? 1 : 0);
+            }
+            if (gn < (int)sizeof gl - 2) gn += snprintf(gl + gn, sizeof gl - (size_t)gn, "]}");
             if (gn >= (int)sizeof gl - 2) { gn = 1; break; }
         }
         gl[gn] = ']';
@@ -158,7 +177,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"none\":%d},\"hs_moves\":%d,"
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
         "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,"
-        "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d,\"saved\":%s},\"events\":%s}",
+        "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d,\"exact\":%d,\"from\":\"%s\",\"dirty\":%d,\"saved\":%s},\"events\":%s}",
         c->version, c->token, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
@@ -176,7 +195,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->batt_pct, c->batt_none, c->hs_moves,
         c->link_score, c->link_rssi == 127 ? 0 : c->link_rssi, c->link_lq, c->drops_min,
         c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch,
-        c->game_avail, c->game_id, gname, c->game_profile, c->game_active, gl, ev);
+        c->game_avail, c->game_id, gname, c->game_profile, c->game_active, c->game_exact, gfrom, c->game_dirty, gl, ev);
 }
 
 static int respond(char *out, int max, int code, const char *ctype,
@@ -336,7 +355,7 @@ int http_gameicon_id(const char *req, int reqlen, char *id, int idmax)
 int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 {
     char method[8], path[128], *q;
-    static char body[16384];   /* status with the saved games list */
+    static char body[32768];   /* status with the saved games list (per headset) */
     int i = 0, j = 0, v, bl, is_api;
 
     while (i < reqlen && req[i] != ' ' && j < (int)sizeof method - 1) method[j++] = req[i++];
@@ -593,8 +612,9 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->eq_seq++;
         c->prefs_dirty = 1;
     } else if (!strcmp(path, "/api/game")) {
-        /* do=1 save the live EQ / boost / headset volume for the running
-         * game, do=2 forget its profile. The stream loop does it. */
+        /* do=1 save the live EQ / boost / night / headset volume for the
+         * running game on this headset (Save / Update Game Profile), do=2
+         * forget this headset's profile of it. The stream loop does it. */
         char gid[16];
         if (query_int(q, "do", &v) && v == 3) {
             /* do=3&id=PPSA01234: forget that saved game (Games list) */
@@ -603,9 +623,29 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
             if (!strcmp(gid, c->game_id)) { c->game_profile = 0; c->game_active = 0; }
             goto done_game;
         }
+        if (query_int(q, "do", &v) && (v == 4 || v == 5)) {
+            /* do=4&id=..&hs=AA:..: forget that headset's profile of the game;
+             * do=5: use that headset's profile now (the game is running). */
+            const char *h = q ? strstr(q, "hs=") : NULL;
+            unsigned char a[6];
+            int k;
+            if (!query_word(q, "id", gid, sizeof gid) || !hb_game_id_ok(gid) || !h) goto bad;
+            h += 3;
+            for (k = 0; k < 6; k++) {
+                int hi = hexd(h[k * 3]), lo = hexd(h[k * 3 + 1]);
+                if (hi < 0 || lo < 0 || (k < 5 && h[k * 3 + 2] != ':')) goto bad;
+                a[k] = (unsigned char)(hi * 16 + lo);
+            }
+            if (h[17] && h[17] != '&') goto bad;
+            if (v == 5 && strcmp(gid, c->game_id)) goto bad;
+            snprintf(c->req_game_hs, sizeof c->req_game_hs, "%s", gid);
+            memcpy(c->req_game_hs_addr, a, 6);
+            c->req_game_hs_do = v == 4 ? 1 : 2;
+            goto done_game;
+        }
         if (!query_int(q, "do", &v) || v < 1 || v > 2 || !c->game_id[0]) goto bad;
         c->req_game = v;
-        if (v == 1) { c->game_profile = 1; c->game_active = 1; }
+        if (v == 1) { c->game_profile = 1; c->game_active = 1; c->game_exact = 1; c->game_dirty = 0; c->game_from[0] = 0; }
         else { c->game_profile = 0; c->game_active = 0; }
     done_game:;
     } else if (!strcmp(path, "/api/mute")) {

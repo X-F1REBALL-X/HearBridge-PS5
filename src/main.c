@@ -1563,14 +1563,16 @@ static int g_prefs_have;
  * them) and do not overwrite the headset's own settings. */
 static hb_games g_games;
 static char g_game_applied[16];
+static hb_game g_game_on;       /* copy of the profile on now (valid while g_game_applied[0]) */
+static void games_migrate_locked(void);
 
 /* Page values -> g_prefs. Caller holds the lock. */
 static void prefs_from_ctl(void)
 {
     g_prefs.codec = g_ctl.codec_pref;
     g_prefs.latency_ms = g_ctl.latency_ms;
+    if (g_game_applied[0]) return;     /* EQ and night belong to the game profile now */
     g_prefs.night = g_ctl.night;
-    if (g_game_applied[0]) return;     /* EQ belongs to the game profile now */
     g_prefs.eq_on = g_ctl.eq_on;
     memcpy(g_prefs.eq_db, g_ctl.eq_db, sizeof g_prefs.eq_db);
     /* gain is not copied: only a slider move / Clean sound sets it
@@ -1620,6 +1622,9 @@ static void prefs_attach(const unsigned char addr[6])
     persist_gain_if_dirty();          /* a pending slider move belongs to the previous one */
     memcpy(g_prefs_addr, addr, 6);
     g_prefs_have = 1;
+    CTL_LOCK(&g_ctl);
+    games_migrate_locked();            /* profiles from before per-headset: this headset's */
+    CTL_UNLOCK(&g_ctl);
     if (hb_prefs_load(HB_PREFS_DIR, addr, &p)) {
         g_prefs = p;
         CTL_LOCK(&g_ctl);
@@ -1673,7 +1678,7 @@ static void note_event(const char *fmt, ...) __attribute__((format(printf, 1, 2)
 
 static void games_load(void)
 {
-    static char buf[HB_GAME_MAX * 160];
+    static char buf[HB_GPROF_MAX * 200];
     FILE *f = fopen(HB_GAMES_PATH, "r");
     size_t n = 0;
     if (f) {
@@ -1682,11 +1687,12 @@ static void games_load(void)
     }
     buf[n] = 0;
     hb_games_parse(&g_games, buf);
+    games_migrate_locked();
 }
 
 static void games_save(void)
 {
-    static char buf[HB_GAME_MAX * 160];
+    static char buf[HB_GPROF_MAX * 200];
     int n = hb_games_format(&g_games, buf, (int)sizeof buf);
     FILE *f;
     if (n <= 0 || !(f = fopen(HB_GAMES_PATH ".tmp", "w"))) {
@@ -1698,19 +1704,51 @@ static void games_save(void)
     rename(HB_GAMES_PATH ".tmp", HB_GAMES_PATH);
 }
 
-/* Saved games for the page's Games list. Caller holds the lock. */
-static void games_publish_locked(void)
+/* Profiles saved before they were per headset (no "hs=") belong to the
+ * headset in use, once one is known. Caller holds the lock. */
+static int g_games_dirty;      /* games.txt to be written (outside the lock) */
+static void games_migrate_locked(void)
 {
-    int i;
-    g_ctl.games_n = g_games.n < 32 ? g_games.n : 32;
-    for (i = 0; i < g_ctl.games_n; i++) {
-        snprintf(g_ctl.games_id[i], sizeof g_ctl.games_id[i], "%s", g_games.g[i].id);
-        snprintf(g_ctl.games_name[i], sizeof g_ctl.games_name[i], "%s", g_games.g[i].name);
+    int n;
+    if (!g_prefs_have) return;
+    n = hb_games_migrate(&g_games, g_prefs_addr);
+    if (n) {
+        log_line("game: %d profile(s) from before per-headset profiles moved to this headset", n);
+        g_games_dirty = 1;
     }
 }
 
-/* The headset's own EQ / boost / volume back (game closed or forgotten).
- * Caller holds the lock. */
+/* Saved games for the page's Games list, with the headsets each one has a
+ * profile for. Caller holds the lock. */
+static void games_publish_locked(void)
+{
+    int idx[HB_GAME_MAX], n = hb_games_list(&g_games, idx, HB_GAME_MAX), i, j;
+    g_ctl.games_n = n < 32 ? n : 32;
+    for (i = 0; i < g_ctl.games_n; i++) {
+        const hb_game *top = &g_games.g[idx[i]];
+        int k = 0;
+        snprintf(g_ctl.games_id[i], sizeof g_ctl.games_id[i], "%s", top->id);
+        g_ctl.games_name[i][0] = 0;
+        for (j = 0; j < g_games.n && k < 4; j++) {
+            const hb_game *g = &g_games.g[j];
+            int pi;
+            if (strcmp(g->id, top->id)) continue;
+            if (!g_ctl.games_name[i][0] && g->name[0])
+                snprintf(g_ctl.games_name[i], sizeof g_ctl.games_name[i], "%s", g->name);
+            if (!g->has_hs) continue;
+            memcpy(g_ctl.games_hs[i][k], g->hs, 6);
+            pi = paired_find(g_paired, g_npaired, g->hs);
+            snprintf(g_ctl.games_hsname[i][k], sizeof g_ctl.games_hsname[i][k], "%s",
+                     pi >= 0 && g_paired[pi].name[0] ? g_paired[pi].name : "");
+            g_ctl.games_hs_cur[i][k] = g_prefs_have && !memcmp(g->hs, g_prefs_addr, 6);
+            k++;
+        }
+        g_ctl.games_hs_n[i] = k;
+    }
+}
+
+/* The headset's own EQ / boost / night / volume back (game closed or
+ * forgotten). Caller holds the lock. */
 static void game_restore_locked(void)
 {
     if (!g_prefs_have) return;
@@ -1718,15 +1756,42 @@ static void game_restore_locked(void)
     memcpy(g_ctl.eq_db, g_prefs.eq_db, sizeof g_ctl.eq_db);
     g_ctl.eq_seq++;
     g_ctl.gain_pct = hb_prefs_gain(&g_prefs);
+    g_ctl.night = g_prefs.night;
     g_ctl.req_hs_volume = hb_prefs_hs_volume(&g_prefs);
 }
 
-/* Running game changed, or Save / Forget on the page. Once a second. */
+/* A profile onto the live sound. Caller holds the lock. */
+static void game_apply_locked(const hb_game *g)
+{
+    g_ctl.eq_on = g->eq_on;
+    memcpy(g_ctl.eq_db, g->eq_db, sizeof g_ctl.eq_db);
+    g_ctl.eq_seq++;
+    g_ctl.gain_pct = g->gain_pct;
+    if (g->night >= 0) g_ctl.night = g->night;
+    if (g->hs_vol >= 0) g_ctl.req_hs_volume = g->hs_vol;
+    g_game_on = *g;
+    snprintf(g_game_applied, sizeof g_game_applied, "%s", g->id);
+}
+
+static void hs_label(const unsigned char a[6], char *out, int max)
+{
+    int pi = paired_find(g_paired, g_npaired, a);
+    if (pi >= 0 && g_paired[pi].name[0]) snprintf(out, (size_t)max, "%s", g_paired[pi].name);
+    else snprintf(out, (size_t)max, "%02X:%02X:%02X", a[3], a[4], a[5]);
+}
+
+/* Running game changed, or Save / Update / Remove on the page. Once a
+ * second. Profiles are per game and per headset: the headset in use gets
+ * its own, else the game's newest from another headset (used, not copied:
+ * Update Game Profile saves it for this one). */
 static void game_tick(void)
 {
-    char id[16], name[HB_GAME_NAME], drop[16], dname[HB_GAME_NAME];
-    int req, act, gi, dropped = 0;
+    char id[16], name[HB_GAME_NAME], drop[16], dname[HB_GAME_NAME], hsg[16], hsn[40], from[32];
+    unsigned char hsa[6];
+    const unsigned char *cur;
+    int req, act, gi, exact = 0, dropped = 0, hsdo, hs_dropped = 0, picked = 0, save;
     CTL_LOCK(&g_ctl);
+    cur = g_prefs_have ? g_prefs_addr : NULL;
     snprintf(drop, sizeof drop, "%s", g_ctl.req_game_drop);
     g_ctl.req_game_drop[0] = 0;
     dname[0] = 0;
@@ -1736,6 +1801,27 @@ static void game_tick(void)
         if (!strcmp(g_game_applied, drop)) game_restore_locked();
         if (!strcmp(g_game_applied, drop)) g_game_applied[0] = 0;
         dropped = 1;
+    }
+    /* one headset's profile: forget it, or use it now */
+    snprintf(hsg, sizeof hsg, "%s", g_ctl.req_game_hs);
+    memcpy(hsa, g_ctl.req_game_hs_addr, 6);
+    hsdo = g_ctl.req_game_hs_do;
+    g_ctl.req_game_hs[0] = 0;
+    g_ctl.req_game_hs_do = 0;
+    hsn[0] = 0;
+    if (hsdo && hsg[0]) hs_label(hsa, hsn, (int)sizeof hsn);
+    if (hsdo == 1 && hsg[0] && (gi = hb_games_find_hs(&g_games, hsg, hsa)) >= 0) {
+        int was_on = !strcmp(g_game_applied, hsg) && g_game_on.has_hs && !memcmp(g_game_on.hs, hsa, 6);
+        snprintf(dname, sizeof dname, "%s", g_games.g[gi].name);
+        hb_games_drop_hs(&g_games, hsg, hsa);
+        if (was_on) g_game_applied[0] = 0;   /* the next one (or the usual sound) below */
+        if (was_on && hb_games_find(&g_games, hsg) < 0) game_restore_locked();
+        hs_dropped = 1;
+    } else if (hsdo == 2 && hsg[0] && !strcmp(hsg, g_ctl.game_id) &&
+               (gi = hb_games_find_hs(&g_games, hsg, hsa)) >= 0) {
+        hb_game pick = g_games.g[gi];
+        game_apply_locked(&pick);
+        picked = 1;
     }
     snprintf(id, sizeof id, "%s", g_ctl.game_id);
     snprintf(name, sizeof name, "%s", g_ctl.game_name);
@@ -1750,36 +1836,54 @@ static void game_tick(void)
         memcpy(g.eq_db, g_ctl.eq_db, sizeof g.eq_db);
         g.gain_pct = g_ctl.gain_pct;
         g.hs_vol = g_ctl.hs_volume;
+        g.night = g_ctl.night ? 1 : 0;
+        if (cur) { g.has_hs = 1; memcpy(g.hs, cur, 6); }
         hb_games_put(&g_games, &g);
+        g_game_on = g;
         snprintf(g_game_applied, sizeof g_game_applied, "%s", id);
     } else if (req == 2 && id[0]) {
-        hb_games_drop(&g_games, id);
-        if (!strcmp(g_game_applied, id)) game_restore_locked();
-        g_game_applied[0] = 0;
+        /* Remove: this headset's profile (all of them when it has none) */
+        int was = !strcmp(g_game_applied, id);
+        if (!(cur && hb_games_drop_hs(&g_games, id, cur))) hb_games_drop(&g_games, id);
+        if (was) g_game_applied[0] = 0;
+        if (was && hb_games_find(&g_games, id) < 0) game_restore_locked();
     }
-    gi = hb_games_find(&g_games, id);
-    act = hb_game_decide(g_game_applied, id, gi >= 0);
+    gi = hb_games_pick(&g_games, id, cur, &exact);
+    act = picked ? HB_GAME_KEEP : hb_game_decide(g_game_applied, id, gi >= 0);
     if (act == HB_GAME_APPLY) {
-        const hb_game *g = &g_games.g[gi];
-        g_ctl.eq_on = g->eq_on;
-        memcpy(g_ctl.eq_db, g->eq_db, sizeof g_ctl.eq_db);
-        g_ctl.eq_seq++;
-        g_ctl.gain_pct = g->gain_pct;
-        if (g->hs_vol >= 0) g_ctl.req_hs_volume = g->hs_vol;
-        snprintf(g_game_applied, sizeof g_game_applied, "%s", id);
+        hb_game g = g_games.g[gi];
+        game_apply_locked(&g);
     } else if (act == HB_GAME_RESTORE) {
         game_restore_locked();
         g_game_applied[0] = 0;
     }
     g_ctl.game_profile = gi >= 0;
     g_ctl.game_active = g_game_applied[0] != 0;
-    if (req || dropped) games_publish_locked();
+    /* whose profile is on, and does the sound still match this headset's own */
+    g_ctl.game_from[0] = 0;
+    if (g_game_applied[0] && g_game_on.has_hs && !(cur && !memcmp(g_game_on.hs, cur, 6)))
+        hs_label(g_game_on.hs, g_ctl.game_from, (int)sizeof g_ctl.game_from);
+    {
+        int own = id[0] ? hb_games_find_hs(&g_games, id, cur) : -1;
+        g_ctl.game_exact = own >= 0 && g_game_applied[0] && !g_ctl.game_from[0];
+        g_ctl.game_dirty = id[0] && (own < 0 ||
+            hb_game_differs(&g_games.g[own], g_ctl.eq_on, g_ctl.eq_db, g_ctl.gain_pct, g_ctl.night));
+    }
+    games_publish_locked();
+    snprintf(from, sizeof from, "%s", g_ctl.game_from);
+    save = req || dropped || hs_dropped || g_games_dirty;
+    g_games_dirty = 0;
     CTL_UNLOCK(&g_ctl);
-    if (req || dropped) games_save();
+    if (save) games_save();
     if (dropped) note_event("Game profile removed (%s)", dname[0] ? dname : drop);
+    if (hs_dropped) note_event("Game profile removed (%s on %s)", dname[0] ? dname : hsg, hsn);
+    if (picked) note_event("Using the %s profile of this game", hsn);
     if (req == 1) note_event("Saved for %s", name[0] ? name : id);
     if (req == 2) note_event("Game profile removed (%s)", name[0] ? name : id);
-    if (act == HB_GAME_APPLY && !req) note_event("Game sound on for %s", name[0] ? name : id);
+    if (act == HB_GAME_APPLY && !req) {
+        if (from[0]) note_event("Game sound on for %s (from %s)", name[0] ? name : id, from);
+        else note_event("Game sound on for %s", name[0] ? name : id);
+    }
     if (act == HB_GAME_RESTORE && !req) note_event("Game closed, your usual sound is back");
 }
 

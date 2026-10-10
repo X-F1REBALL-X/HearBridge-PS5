@@ -189,7 +189,7 @@
    "fromHeadset": "from headset",
    "gameOn": "game profile",
    "gameSave": "Save for this game",
-   "gameUpdate": "Update game",
+   "gameUpdate": "Update Game Profile",
    "gameRemove": "Remove",
    "gameRemoveConfirm": "Remove this game's profile?",
    "settings": "Settings",
@@ -220,7 +220,12 @@
    "tabDetails": "Details",
    "tabSound": "Sound & games",
    "scanBusy": "Disconnect %s first to add a new headset",
-   "theHeadset": "the headset"
+   "theHeadset": "the headset",
+   "gameNoProfile": "No profile for %s on this headset yet",
+   "gameFrom": "from %s",
+   "gameHsUse": "Use the %s profile now",
+   "gameHsNone": "Not saved for a headset yet",
+   "gameHsRemoveConfirm": "Remove this headset's profile for this game?"
   },
   "ar": {
    "language": "اللغة",
@@ -359,7 +364,7 @@
    "fromHeadset": "من السماعة",
    "gameOn": "ملف اللعبة",
    "gameSave": "حفظ لهذه اللعبة",
-   "gameUpdate": "تحديث اللعبة",
+   "gameUpdate": "تحديث ملف اللعبة",
    "gameRemove": "إزالة",
    "gameRemoveConfirm": "إزالة ملف هذه اللعبة؟",
    "settings": "الإعدادات",
@@ -390,7 +395,12 @@
    "tabDetails": "التفاصيل",
    "tabSound": "الصوت والألعاب",
    "scanBusy": "افصل %s أولا لإضافة سماعة جديدة",
-   "theHeadset": "السماعة"
+   "theHeadset": "السماعة",
+   "gameNoProfile": "لا يوجد ملف لـ %s على هذه السماعة بعد",
+   "gameFrom": "من %s",
+   "gameHsUse": "استخدم ملف %s الآن",
+   "gameHsNone": "لم يُحفظ لأي سماعة بعد",
+   "gameHsRemoveConfirm": "إزالة ملف هذه السماعة لهذه اللعبة؟"
   },
   "es": {
    "language": "Idioma",
@@ -529,7 +539,7 @@
    "fromHeadset": "desde el auricular",
    "gameOn": "perfil de juego",
    "gameSave": "Guardar para este juego",
-   "gameUpdate": "Actualizar juego",
+   "gameUpdate": "Actualizar perfil del juego",
    "gameRemove": "Quitar",
    "gameRemoveConfirm": "¿Quitar el perfil de este juego?",
    "settings": "Ajustes",
@@ -560,7 +570,12 @@
    "tabDetails": "Detalles",
    "tabSound": "Sonido y juegos",
    "scanBusy": "Desconecta %s primero para añadir unos auriculares nuevos",
-   "theHeadset": "los auriculares"
+   "theHeadset": "los auriculares",
+   "gameNoProfile": "Aún no hay perfil de %s en estos auriculares",
+   "gameFrom": "de %s",
+   "gameHsUse": "Usar ahora el perfil de %s",
+   "gameHsNone": "Aún no guardado para ningunos auriculares",
+   "gameHsRemoveConfirm": "¿Quitar el perfil de estos auriculares para este juego?"
   },
   "fr": {
    "language": "Langue",
@@ -699,7 +714,7 @@
    "fromHeadset": "depuis le casque",
    "gameOn": "profil de jeu",
    "gameSave": "Garder pour ce jeu",
-   "gameUpdate": "Mettre à jour",
+   "gameUpdate": "Mettre à jour le profil du jeu",
    "gameRemove": "Retirer",
    "gameRemoveConfirm": "Retirer le profil de ce jeu ?",
    "settings": "Réglages",
@@ -730,7 +745,12 @@
    "tabDetails": "Détails",
    "tabSound": "Son et jeux",
    "scanBusy": "Déconnectez %s d'abord pour ajouter un nouveau casque",
-   "theHeadset": "le casque"
+   "theHeadset": "le casque",
+   "gameNoProfile": "Pas encore de profil pour %s sur ce casque",
+   "gameFrom": "de %s",
+   "gameHsUse": "Utiliser maintenant le profil de %s",
+   "gameHsNone": "Pas encore enregistré pour un casque",
+   "gameHsRemoveConfirm": "Supprimer le profil de ce casque pour ce jeu ?"
   },
   "de": {
    "language": "Sprache",
@@ -869,7 +889,7 @@
    "fromHeadset": "vom Kopfhörer",
    "gameOn": "Spielprofil",
    "gameSave": "Für dieses Spiel speichern",
-   "gameUpdate": "Spiel aktualisieren",
+   "gameUpdate": "Spielprofil aktualisieren",
    "gameRemove": "Entfernen",
    "gameRemoveConfirm": "Profil dieses Spiels entfernen?",
    "settings": "Einstellungen",
@@ -900,7 +920,12 @@
    "tabDetails": "Details",
    "tabSound": "Klang und Spiele",
    "scanBusy": "Trenne zuerst %s, um ein neues Headset hinzuzufügen",
-   "theHeadset": "das Headset"
+   "theHeadset": "das Headset",
+   "gameNoProfile": "Noch kein Profil für %s auf diesem Headset",
+   "gameFrom": "von %s",
+   "gameHsUse": "Profil von %s jetzt verwenden",
+   "gameHsNone": "Noch für kein Headset gespeichert",
+   "gameHsRemoveConfirm": "Profil dieses Headsets für dieses Spiel entfernen?"
   },
   "pt": {
    "language": "Idioma",
@@ -1039,7 +1064,7 @@
    "fromHeadset": "do fone",
    "gameOn": "perfil do jogo",
    "gameSave": "Guardar para este jogo",
-   "gameUpdate": "Atualizar jogo",
+   "gameUpdate": "Atualizar perfil do jogo",
    "gameRemove": "Remover",
    "gameRemoveConfirm": "Remover o perfil deste jogo?",
    "settings": "Definições",
@@ -1070,7 +1095,12 @@
    "tabDetails": "Detalhes",
    "tabSound": "Som e jogos",
    "scanBusy": "Desconecte %s primeiro para adicionar um novo headset",
-   "theHeadset": "o headset"
+   "theHeadset": "o headset",
+   "gameNoProfile": "Ainda não há perfil de %s neste headset",
+   "gameFrom": "de %s",
+   "gameHsUse": "Usar agora o perfil de %s",
+   "gameHsNone": "Ainda não salvo para nenhum headset",
+   "gameHsRemoveConfirm": "Remover o perfil deste headset para este jogo?"
   },
   "ru": {
    "language": "Язык",
@@ -1209,7 +1239,7 @@
    "fromHeadset": "с наушников",
    "gameOn": "профиль игры",
    "gameSave": "Сохранить для игры",
-   "gameUpdate": "Обновить игру",
+   "gameUpdate": "Обновить профиль игры",
    "gameRemove": "Удалить",
    "gameRemoveConfirm": "Удалить профиль этой игры?",
    "settings": "Настройки",
@@ -1240,7 +1270,12 @@
    "tabDetails": "Подробности",
    "tabSound": "Звук и игры",
    "scanBusy": "Сначала отключите %s, чтобы добавить новую гарнитуру",
-   "theHeadset": "гарнитуру"
+   "theHeadset": "гарнитуру",
+   "gameNoProfile": "Для %s на этой гарнитуре профиля пока нет",
+   "gameFrom": "из %s",
+   "gameHsUse": "Использовать профиль %s сейчас",
+   "gameHsNone": "Пока не сохранено ни для одной гарнитуры",
+   "gameHsRemoveConfirm": "Удалить профиль этой гарнитуры для этой игры?"
   },
   "ja": {
    "language": "言語",
@@ -1379,7 +1414,7 @@
    "fromHeadset": "ヘッドセットから",
    "gameOn": "ゲームプロファイル",
    "gameSave": "このゲーム用に保存",
-   "gameUpdate": "ゲームを更新",
+   "gameUpdate": "ゲームプロファイルを更新",
    "gameRemove": "削除",
    "gameRemoveConfirm": "このゲームのプロファイルを削除しますか？",
    "settings": "設定",
@@ -1410,7 +1445,12 @@
    "tabDetails": "詳細",
    "tabSound": "サウンドとゲーム",
    "scanBusy": "新しいヘッドセットを追加するには、先に%sを切断してください",
-   "theHeadset": "ヘッドセット"
+   "theHeadset": "ヘッドセット",
+   "gameNoProfile": "このヘッドセットには%sのプロファイルがまだありません",
+   "gameFrom": "%sから",
+   "gameHsUse": "%sのプロファイルを今すぐ使う",
+   "gameHsNone": "まだどのヘッドセットにも保存されていません",
+   "gameHsRemoveConfirm": "このゲームのこのヘッドセットのプロファイルを削除しますか？"
   },
   "zh": {
    "language": "语言",
@@ -1549,7 +1589,7 @@
    "fromHeadset": "来自耳机",
    "gameOn": "游戏配置",
    "gameSave": "为此游戏保存",
-   "gameUpdate": "更新游戏",
+   "gameUpdate": "更新游戏配置",
    "gameRemove": "移除",
    "gameRemoveConfirm": "移除此游戏的配置？",
    "settings": "设置",
@@ -1580,7 +1620,12 @@
    "tabDetails": "详细信息",
    "tabSound": "声音与游戏",
    "scanBusy": "请先断开 %s，再添加新耳机",
-   "theHeadset": "耳机"
+   "theHeadset": "耳机",
+   "gameNoProfile": "此耳机还没有 %s 的配置",
+   "gameFrom": "来自 %s",
+   "gameHsUse": "现在使用 %s 的配置",
+   "gameHsNone": "尚未为任何耳机保存",
+   "gameHsRemoveConfirm": "删除此耳机在该游戏中的配置？"
   },
   "it": {
    "language": "Lingua",
@@ -1719,7 +1764,7 @@
    "fromHeadset": "dalle cuffie",
    "gameOn": "profilo gioco",
    "gameSave": "Salva per questo gioco",
-   "gameUpdate": "Aggiorna gioco",
+   "gameUpdate": "Aggiorna profilo gioco",
    "gameRemove": "Rimuovi",
    "gameRemoveConfirm": "Rimuovere il profilo di questo gioco?",
    "settings": "Impostazioni",
@@ -1750,7 +1795,12 @@
    "tabDetails": "Dettagli",
    "tabSound": "Suono e giochi",
    "scanBusy": "Disconnetti prima %s per aggiungere nuove cuffie",
-   "theHeadset": "le cuffie"
+   "theHeadset": "le cuffie",
+   "gameNoProfile": "Ancora nessun profilo per %s su queste cuffie",
+   "gameFrom": "da %s",
+   "gameHsUse": "Usa ora il profilo di %s",
+   "gameHsNone": "Non ancora salvato per nessuna cuffia",
+   "gameHsRemoveConfirm": "Rimuovere il profilo di queste cuffie per questo gioco?"
   }
  }
 }
