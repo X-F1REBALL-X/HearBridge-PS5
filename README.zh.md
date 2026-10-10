@@ -14,7 +14,7 @@
 
 HearBridge PS5 是一个 payload（ELF），通过主机自带的蓝牙，把 PS5 的游戏和系统声音送到普通蓝牙耳机。你可以在主机提供的网页上控制它。
 
-<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 网页" width="900"></p>
+<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 网页" width="440"> <img src="docs/img/ui-settings.png" alt="HearBridge PS5 网页" width="440"></p>
 
 ## 亮点
 

@@ -14,7 +14,7 @@
 
 HearBridge PS5 は、PS5 のゲームとシステムの音を本体内蔵の Bluetooth で普通の Bluetooth ヘッドホンに流すペイロード（ELF）です。操作は本体が提供する Web ページから行います。
 
-<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 の Web ページ" width="900"></p>
+<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 の Web ページ" width="440"> <img src="docs/img/ui-settings.png" alt="HearBridge PS5 の Web ページ" width="440"></p>
 
 ## ハイライト
 

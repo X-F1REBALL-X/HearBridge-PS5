@@ -16,7 +16,7 @@
 
 HearBridge PS5 حمولة (ELF) تشغّل صوت الألعاب والنظام في PS5 على سماعات بلوتوث عادية، باستخدام بلوتوث الجهاز نفسه. تتحكم بها من صفحة ويب يقدمها الجهاز.
 
-<p align="center"><img src="docs/img/ui-tv.png" alt="صفحة ويب HearBridge PS5" width="900"></p>
+<p align="center"><img src="docs/img/ui-tv.png" alt="صفحة ويب HearBridge PS5" width="440"> <img src="docs/img/ui-settings.png" alt="صفحة ويب HearBridge PS5" width="440"></p>
 
 ## أبرز الميزات
 
