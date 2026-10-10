@@ -977,7 +977,7 @@ static const char HB_WEBPAGE[] =
     "buildLangs();\n"
     "(function(){var c=null,m=/[?&]lang=([a-z]{2})/.exec(location.search);if(m)c=m[1];else try{c=localStorage.getItem('hb_lang')}catch(e){}\n"
     "if(!c){var n=(navigator.language||'en').slice(0,2).toLowerCase();c=info(n).code==n?n:'en'}setLang(c)})();\n"
-    "req('/api/status');act('/api/scan');armScan();setInterval(function(){req('/api/status');if(S&&!fresh())draw()},1000);\n"
+    "req('/api/status');devices();setInterval(function(){req('/api/status');if(S&&!fresh())draw()},1000);\n"
     "/* Back to the page (PS5 browser resumes a background tab late): ask now. */\n"
     "if(document.addEventListener)document.addEventListener('visibilitychange',function(){if(!document.hidden){req('/api/status');saved()}});\n"
     "setInterval(function(){if(scanLive&&Date.now()<scanLive)devices()},300);\n"

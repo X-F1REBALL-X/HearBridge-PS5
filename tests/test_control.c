@@ -226,7 +226,6 @@ int main(int argc, char **argv)
     CHECK(!strncmp(out, "HTTP/1.1 200", 12), "select by index");
     {
         static const struct { const char *path, *line; } cmds[] = {
-            { "/api/scan", "scan\n" },
             { "/api/reconnect", "reconnect\n" },
             { "/api/forget?addr=58:18:62:63:3B:7C", "forget 58:18:62:63:3B:7C\n" },
         };
@@ -243,7 +242,16 @@ int main(int argc, char **argv)
             CHECK(!strncmp(out, "HTTP/1.1 200", 12) && !strcmp(line, cmds[i].line), what);
         }
         CHECK(c.paused == 1, "forget does not resume a paused session");
-        post(&c, "/api/scan");
+        remove("build/host/select.txt");
+        {
+            unsigned seq = c.cmd_seq;
+            FILE *f;
+            post(&c, "/api/scan");
+            f = fopen("build/host/select.txt", "r");
+            CHECK(!strncmp(out, "HTTP/1.1 200", 12) && !f && c.cmd_seq == seq,
+                  "a scan nobody pressed is ignored (no inquiry, no background pages)");
+            if (f) fclose(f);
+        }
         CHECK(c.paused == 1, "a refresh scan (page load) does not undo a Disconnect");
         c.req_disconnect = 1;
         post(&c, "/api/scan?user=1");

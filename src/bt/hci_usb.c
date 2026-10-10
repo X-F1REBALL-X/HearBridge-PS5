@@ -105,7 +105,21 @@ struct usb_hci {
     /* counters for diag */
     unsigned long n_evt, n_acl_in, n_acl_out, n_cmd, n_err, n_switch, n_rearm;
     int    last_status;
+    int    quiet;                /* resting: no reads in flight (see hci_usb_duty) */
 };
+
+/* Idle duty cycle (hci_usb.h). The system stack reads the same pipes and
+ * whoever has a read pending gets the packet, so while our reads are armed
+ * a DualSense that wakes up may never see its Connection Request or Link
+ * Key Request (#29). Off = reads always armed (streaming, connecting). */
+static int  g_duty_listen, g_duty_rest;    /* ms; 0 = off */
+static long g_duty_t0;                     /* current phase started */
+static int  g_duty_resting;
+static long g_awake_until;                 /* our command / ACL in flight: stay armed */
+static unsigned long g_duty_rests;
+
+/* The open transport, so it is released on any exit path (atexit). */
+static struct usb_hci *g_open;
 
 /* ---- rings ------------------------------------------------------------ */
 
@@ -303,10 +317,10 @@ static int reap(struct usb_hci *u)
                     memcpy(g_creq[g_ncreq++], s->buf, 12);
                 ring_put(&u->evq, s->buf, (int)s->len); u->n_evt++; got = 1;
             }
-            arm_read(u, idx);
+            if (!u->quiet) arm_read(u, idx);
         } else if (idx >= SLOT_ACL0 && idx < SLOT_OUT) {
             if (!st && s->len >= 4) { ring_put(&u->aclq, s->buf, (int)s->len); u->n_acl_in++; got = 1; }
-            arm_read(u, idx);
+            if (!u->quiet) arm_read(u, idx);
         } else if (idx == u->tx_slot) {
             if (!st) { ring_drop(&u->txq); u->n_acl_out++; hb_txpath_sent(&u->tp); }
             else ring_drop(&u->txq);       /* do not spin on a bad frame */
@@ -349,6 +363,82 @@ static void creq_flush(struct usb_hci *u)
     busy = 0;
 }
 
+/* Rest: cancel every read we have in flight so the system stack gets all
+ * events and ACL data. Listen: arm them again. */
+static void set_quiet(struct usb_hci *u, int on)
+{
+    int k;
+    if (on == u->quiet) return;
+    u->quiet = on;
+    if (on) {
+        for (k = SLOT_EVT0; k < SLOT_OUT; k++) slot_abort(u, k);
+        (void)reap(u);                       /* the cancelled reads: not re-armed */
+        g_duty_rests++;
+    } else {
+        for (k = SLOT_EVT0; k < SLOT_OUT; k++)
+            if (u->sl[k].open && !u->sl[k].busy) arm_read(u, k);
+    }
+}
+
+/* Where the duty cycle is now; switches phase when its time is up. */
+static void duty_step(struct usb_hci *u)
+{
+    long now = now_ms();
+    if (!g_duty_listen || now < g_awake_until) {
+        set_quiet(u, 0);
+        return;
+    }
+    if (!g_duty_t0) { g_duty_t0 = now; g_duty_resting = 0; }
+    if (!g_duty_resting && now - g_duty_t0 >= g_duty_listen) {
+        g_duty_resting = 1;
+        g_duty_t0 = now;
+    } else if (g_duty_resting && now - g_duty_t0 >= g_duty_rest) {
+        g_duty_resting = 0;
+        g_duty_t0 = now;
+    }
+    set_quiet(u, g_duty_resting);
+}
+
+void hci_usb_duty(int listen_ms, int rest_ms)
+{
+    if (listen_ms <= 0 || rest_ms <= 0) listen_ms = rest_ms = 0;
+    if (listen_ms == g_duty_listen && rest_ms == g_duty_rest) return;
+    if (!g_duty_listen && listen_ms)
+        log_line("hci_usb: radio idle: listening %d ms, then resting %d ms (reads off)", listen_ms, rest_ms);
+    else if (g_duty_listen && !listen_ms)
+        log_line("hci_usb: radio active (reads armed)");
+    g_duty_listen = listen_ms;
+    g_duty_rest = rest_ms;
+    g_duty_t0 = 0;
+    g_duty_resting = 0;
+    if (g_open) duty_step(g_open);
+}
+
+void hci_usb_yield(void)
+{
+    if (!g_duty_listen || !g_open) return;
+    g_awake_until = 0;
+    if (!g_duty_resting) {
+        log_line("hci_usb: another device is calling the console - resting now so the system answers it");
+        g_duty_resting = 1;
+    }
+    g_duty_t0 = now_ms();
+    set_quiet(g_open, 1);
+}
+
+int hci_usb_resting(void)
+{
+    return g_open && g_open->quiet;
+}
+
+/* Our own command or ACL frame: its answer must be read. */
+static void stay_awake(struct usb_hci *u)
+{
+    if (!g_duty_listen) return;
+    g_awake_until = now_ms() + 4000;
+    set_quiet(u, 0);
+}
+
 static int op_pump(void *self, int wait_ms)
 {
     struct usb_hci *u = self;
@@ -357,11 +447,26 @@ static int op_pump(void *self, int wait_ms)
     /* Stop file / signal: report "transport gone" so every loop unwinds
      * to its cleanup path (links closed, USB released). */
     if (hb_stop_requested()) return -1;
+    duty_step(u);
+    while (u->quiet) {
+        /* Resting: nothing read, nothing armed. Still notice a device that
+         * went away (rest mode) and the end of the rest. */
+        long left;
+        (void)reap(u);
+        if (u->dead) return -1;
+        if (u->evq.count || u->aclq.count) return 1;
+        left = until - now_ms();
+        if (left <= 0) return 0;
+        usleep((useconds_t)(left > 50 ? 50 : left) * 1000);
+        if (hb_stop_requested()) return -1;
+        duty_step(u);
+    }
     for (;;) {
         struct pollfd pf;
         long left;
         int got = reap(u), k;
         creq_flush(u);
+        if (u->quiet) return got || u->evq.count || u->aclq.count;   /* a hook yielded */
         /* A read whose re-arm failed (EBUSY/transient error) would leave
          * the event or ACL pipe silent for good: re-arm idle readers. */
         for (k = SLOT_EVT0; k < SLOT_OUT; k++)
@@ -390,6 +495,7 @@ static int op_cmd(void *self, unsigned op, const void *args, int nargs)
     unsigned char pkt[3 + 255];
     struct usb_ctl_request rq;
     if (u->dead || nargs < 0 || nargs > 255) return 0;
+    stay_awake(u);
     hcidbg_cmd(op, args, nargs);
     put16(pkt, op);
     pkt[2] = (unsigned char)nargs;
@@ -425,6 +531,7 @@ static int op_acl_send(void *self, const unsigned char *frame, int nbytes)
 {
     struct usb_hci *u = self;
     if (u->dead || !frame || nbytes < 4 || nbytes > HCI_PKT_MAX) return 0;
+    stay_awake(u);
     ring_put(&u->txq, frame, nbytes);
     tx_kick(u);
     return 1;
@@ -445,8 +552,6 @@ static void op_diag(void *self)
              u->evq.overwritten, u->aclq.overwritten, u->txq.overwritten);
 }
 
-/* The open transport, so it is released on any exit path (atexit). */
-static struct usb_hci *g_open;
 
 static void op_close(void *self)
 {
@@ -499,7 +604,9 @@ static int read_config(int fd, uint8_t *buf, int cap)
     return gd.ugd_actlen;
 }
 
-static void pick_endpoints(int fd, struct usbhci_iface *ifc)
+/* Returns the number of Bluetooth HCI interfaces (class e0/01/01) in the
+ * configuration, or -1 when the descriptor could not be read. */
+static int pick_endpoints(int fd, struct usbhci_iface *ifc)
 {
     static uint8_t cfg[1024];
     struct usbhci_iface found[USBHCI_MAX_IFACES];
@@ -514,8 +621,20 @@ static void pick_endpoints(int fd, struct usbhci_iface *ifc)
     if (!ifc->evt_mps) ifc->evt_mps = DEF_MPS;
     if (!ifc->in_mps)  ifc->in_mps  = DEF_MPS;
     if (!ifc->out_mps) ifc->out_mps = DEF_MPS;
-    log_line("hci_usb: %s descriptor (%d HCI iface), evt 0x%02x in 0x%02x out 0x%02x",
-             k > 0 ? "using" : "fallback, no", k, ifc->evt_ep, ifc->in_ep, ifc->out_ep);
+    if (k > 0 || n <= 0)
+        log_line("hci_usb: %s descriptor (%d HCI iface), evt 0x%02x in 0x%02x out 0x%02x",
+                 k > 0 ? "using" : "fallback, no", k, ifc->evt_ep, ifc->in_ep, ifc->out_ep);
+    return n > 0 ? k : -1;
+}
+
+/* No readable configuration: only a device that says it is a wireless
+ * controller (class e0) or comes from a PS5 Bluetooth chip vendor. */
+static int bt_by_device(int fd, int vid)
+{
+    struct usb_device_descriptor dd;
+    memset(&dd, 0, sizeof dd);
+    if (ioctl(fd, USB_GET_DEVICE_DESC, &dd) == 0 && dd.bDeviceClass == 0xE0) return 1;
+    return vid == 0x1286 || vid == 0x0e8d;   /* Marvell, MediaTek (btchip.h) */
 }
 
 /* VID:PID of the controller hci_usb_open() picked (-1 until then). */
@@ -553,11 +672,14 @@ static void device_id(int fd, char *out, size_t cap, int *vid, int *pid)
                  di.udi_product, di.udi_vendor);
 }
 
+/* 1 = opened. 0 = not usable (or not a Bluetooth controller at all).
+ * -1 = a Bluetooth controller whose transfer slots are still held, e.g. by
+ * an instance that is shutting down: worth another try in a moment. */
 static int try_node(struct usb_hci *u, const char *path)
 {
     struct usb_fs_init in;
     char id[128], chip[64];
-    int i, vid, pid, mtk;
+    int i, vid, pid, mtk, nbt, inited = 0, e;
     u->fd = open(path, O_RDWR);
     if (u->fd < 0) {
         log_line("hci_usb: open %s: errno %d", path, errno);
@@ -566,7 +688,15 @@ static int try_node(struct usb_hci *u, const char *path)
     snprintf(u->node, sizeof u->node, "%s", path);
     device_id(u->fd, id, sizeof id, &vid, &pid);
     log_line("usb: %s is %s", path, id);
-    pick_endpoints(u->fd, &u->ifc);
+    nbt = pick_endpoints(u->fd, &u->ifc);
+    if (nbt == 0 || (nbt < 0 && !bt_by_device(u->fd, vid))) {
+        /* Never treat a headset dongle, pad or anything else as a Bluetooth
+         * controller (#25: the PS Link dongle 054c:0ce6 / 0ecc is audio). */
+        log_line("hci_usb: %s is not a Bluetooth controller (no e0/01/01 interface), skipped", path);
+        close(u->fd);
+        u->fd = -1;
+        return 0;
+    }
     /* MediaTek (every Pro, some fat and Slim): its fixes only run there. */
     mtk = btchip_profile(vid, btchip_get_override()) == BTCHIP_PROFILE_MEDIATEK;
     log_line("hci_usb: chip profile %s%s", btchip_profile_name(mtk ? BTCHIP_PROFILE_MEDIATEK : BTCHIP_PROFILE_DEFAULT),
@@ -581,6 +711,7 @@ static int try_node(struct usb_hci *u, const char *path)
     in.pEndpoints = u->fsep;
     in.ep_index_max = SLOT_COUNT;
     if (ioctl(u->fd, USB_FS_INIT, &in) < 0) goto fail;
+    inited = 1;
 
     for (i = 0; i < READS_EVT; i++)
         if (!slot_bind(u, SLOT_EVT0 + i, u->ifc.evt_ep)) goto fail;
@@ -605,14 +736,31 @@ static int try_node(struct usb_hci *u, const char *path)
     log_line("hci_usb: chip %s", chip[0] ? chip : "unknown");
     return 1;
 fail:
-    log_line("hci_usb: %s unusable: %s", path, strerror(errno));
-    diag_set("bt controller", "%s %s unusable (errno %d)", path, id, errno);
+    e = errno;
+    log_line("hci_usb: %s unusable: %s", path, strerror(e));
+    diag_set("bt controller", "%s %s unusable (errno %d)", path, id, e);
+    /* Give back what was taken, so a retry starts from nothing. */
+    for (i = 0; i < SLOT_COUNT; i++) {
+        struct usb_fs_close cl;
+        if (!u->sl[i].open) continue;
+        cl.ep_index = (uint8_t)i;
+        (void)ioctl(u->fd, USB_FS_CLOSE, &cl);
+    }
+    if (inited) {
+        struct usb_fs_uninit un;
+        memset(&un, 0, sizeof un);
+        (void)ioctl(u->fd, USB_FS_UNINIT, &un);
+    }
     close(u->fd);
     u->fd = -1;
     memset(u->sl, 0, sizeof u->sl);
     memset(u->fsep, 0, sizeof u->fsep);
-    return 0;
+    return (e == ENOMEM || e == EBUSY) ? -1 : 0;
 }
+
+/* A second copy started right after the first one was told to stop: the
+ * old one may still hold the controller's transfer slots for a moment. */
+#define HCI_BUSY_RETRY_MS 8000
 
 int hci_usb_open(hci_t *out)
 {
@@ -621,23 +769,39 @@ int hci_usb_open(hci_t *out)
     };
     struct usb_hci *u;
     size_t i;
+    long until = now_ms() + HCI_BUSY_RETRY_MS;
+    int tries = 0;
     if (!out) return 0;
     memset(out, 0, sizeof *out);
     u = calloc(1, sizeof *u);
     if (!u) return 0;
     u->fd = -1;
-    for (i = 0; i < sizeof nodes / sizeof nodes[0]; i++) {
-        if (try_node(u, nodes[i])) {
-            static int hooked;
-            out->ctx = u;
-            out->ops = &usb_ops;
-            g_open = u;
-            if (!hooked) { atexit(release_at_exit); hooked = 1; }
-            return 1;
+    for (;;) {
+        int busy = 0;
+        for (i = 0; i < sizeof nodes / sizeof nodes[0]; i++) {
+            int r = try_node(u, nodes[i]);
+            if (r == 1) {
+                static int hooked;
+                out->ctx = u;
+                out->ops = &usb_ops;
+                g_open = u;
+                if (!hooked) { atexit(release_at_exit); hooked = 1; }
+                if (tries) log_line("hci_usb: controller free after %d retries", tries);
+                return 1;
+            }
+            if (r < 0) {
+                busy = 1;   /* the Bluetooth controller is still held: wait for it, */
+                break;      /* never move on to other USB devices */
+            }
         }
+        if (!busy || now_ms() >= until || hb_stop_requested()) break;
+        if (!tries) log_line("hci_usb: controller still held (another copy closing?), retrying for %d s",
+                             HCI_BUSY_RETRY_MS / 1000);
+        tries++;
+        usleep(500 * 1000);
     }
     free(u);
-    diag_set("bt controller", "NOT FOUND: none of /dev/ugen0.2, 0.3, 1.2, 0.1 could be used");
+    diag_set("bt controller", "NOT FOUND: no Bluetooth controller at /dev/ugen0.2, 0.3, 1.2 or 0.1 could be used");
     return 0;
 }
 

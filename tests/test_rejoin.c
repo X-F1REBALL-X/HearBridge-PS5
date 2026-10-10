@@ -10,15 +10,28 @@ int main(void)
 {
     int i, prev = 0;
     CHECK(hb_re_paging(0) && hb_re_listen_ms(0) >= 1000 && hb_re_listen_ms(0) <= 2000,
-          "after a drop: about a second of listen, then a page");
+          "after a drop: a second or two of listen, then a page");
     CHECK(hb_re_paging(HB_RE_PAGES - 1) && !hb_re_paging(HB_RE_PAGES),
           "only a few pages, then no more");
     CHECK(hb_re_listen_ms(HB_RE_PAGES) == 0 && hb_re_listen_ms(99) == 0,
           "after the pages: sit and accept an incoming connection");
     for (i = 0; i < HB_RE_PAGES; i++) {
         int ms = hb_re_listen_ms(i);
-        CHECK(ms > prev && ms <= 3000, i ? "later listens stay short" : "first listen is the short one");
+        CHECK(ms > prev && (i ? ms >= 3 * prev : ms <= 2000),
+              i ? "later gaps back off (radio left to the pad)" : "first listen is the short one");
         prev = ms;
+    }
+    {
+        /* #29: at most HB_RE_PAGES pages of up to 5 s each; total paging
+         * time stays bounded and the radio gets long gaps between them. */
+        int tot_gap = 0;
+        for (i = 1; i < HB_RE_PAGES; i++) tot_gap += hb_re_listen_ms(i);
+        CHECK(HB_RE_PAGES * 5000 <= 15000 && tot_gap >= 60000,
+              "rejoin: 15 s of paging at most, a minute of gaps between pages");
+        CHECK(hb_auto_gap_ms(0) >= 10000 && hb_auto_gap_ms(1) > hb_auto_gap_ms(0) &&
+              hb_auto_gap_ms(2) > hb_auto_gap_ms(1) && hb_auto_gap_ms(HB_AUTO_PAGES) == 0,
+              "auto: background pages back off, none after the budget");
+        CHECK(HB_IDLE_REST_MS >= HB_IDLE_LISTEN_MS, "idle: the radio rests at least as long as it listens");
     }
     /* rest mode / resume */
     CHECK(!hb_resume_gap(0, 1000, 0, 1000, 5000), "resume: first tick is not a wake");

@@ -72,6 +72,9 @@ void btlink_hci_disconnect(hci_t hci, unsigned handle, unsigned char reason);
 int  btlink_is_incoming(const btlink *l);
 /* Idle: page scan on once (on=1), restored once (on=0). */
 void btlink_page_scan_hold(hci_t hci, int on);
+/* Stop / exit: cancel our inquiry / page, close our headset ACL, put page
+ * scan and the Page Timeout back. Commands are fired, not waited for. */
+void btlink_release(hci_t hci);
 /* Called when an ACL comes up (page answered or incoming accepted). */
 extern void (*btlink_on_acl_up)(const unsigned char addr[6]);
 

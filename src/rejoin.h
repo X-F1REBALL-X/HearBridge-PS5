@@ -1,7 +1,8 @@
 /* After the link drops: a short listen (so we do not page in the same
- * instant the host disconnected — some headsets ignore that), then one
- * page, a few times, then only listen. The listens are a second or two,
- * not half a minute. Pure. */
+ * instant the host disconnected, some headsets ignore that), then one
+ * page, then longer and longer gaps before the next ones (15 s, 45 s), then
+ * only listen. Pages of the rejoin and the idle auto pages count against
+ * one budget per drop (#29). Pure. */
 #ifndef HEARBRIDGE_REJOIN_H
 #define HEARBRIDGE_REJOIN_H
 
@@ -17,6 +18,16 @@
 #define HB_AUTO_PAGES 3
 /* 1 while another background page is allowed (pages done so far). */
 int hb_auto_page_ok(int done);
+/* Idle: how long to wait before background page number `done` (backoff),
+ * 0 = none left. */
+int hb_auto_gap_ms(int done);
+
+/* Nothing playing or connecting: the radio listens this long (a saved
+ * headset calling in is seen), then rests this long with every read of
+ * ours cancelled so the console's own stack gets every packet (a DualSense
+ * that wakes up must see its Connection Request), see hci_usb_duty(). */
+#define HB_IDLE_LISTEN_MS 4000
+#define HB_IDLE_REST_MS   8000
 
 /* How long to listen before page number `pages` (0 = the first one).
  * 0 means no more pages: sit and accept an incoming connection. */
