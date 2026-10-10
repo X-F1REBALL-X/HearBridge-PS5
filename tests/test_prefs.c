@@ -101,7 +101,9 @@ int main(int argc, char **argv)
         hb_prefs_parse(&r, "latency_ms=200\n");
         CHECK(hb_prefs_lat_auto(&r), "latency auto: an older file at the default gets auto");
         hb_prefs_parse(&r, "lat_auto=off\nlat_learned=5000\n");
-        CHECK(!hb_prefs_lat_auto(&r) && r.lat_learned == 400, "latency auto: off kept, learned value clamped");
+        CHECK(!hb_prefs_lat_auto(&r) && r.lat_learned == 0, "latency auto: off kept, a learned value above 250 ms (old 400 ms) is dropped");
+        hb_prefs_parse(&r, "lat_learned=240\n");
+        CHECK(r.lat_learned == 240, "latency auto: a learned 240 ms is kept");
         r.lat_auto = 1;
         r.lat_learned = 130;
         CHECK(hb_prefs_format(&r, b2, (int)sizeof b2) > 0 && strstr(b2, "lat_auto=on\n") &&

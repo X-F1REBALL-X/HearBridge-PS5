@@ -10,7 +10,8 @@
  * seen for a handle, whoever reads the event afterwards. */
 static unsigned g_epoch[0x1000];
 
-static struct { unsigned char addr[6]; unsigned handle; long req_ms; int used; unsigned char psrm; unsigned clock; } g_t[TRACK_MAX];
+static struct { unsigned char addr[6]; unsigned handle; long req_ms; int used; unsigned char psrm; unsigned clock;
+                 unsigned any_handle, any_epoch; } g_t[TRACK_MAX];
 
 static int slot(const unsigned char a[6], int create)
 {
@@ -20,7 +21,10 @@ static int slot(const unsigned char a[6], int create)
         if (!g_t[i].used && free_i < 0) free_i = i;
     }
     if (!create) return -1;
-    if (free_i < 0) free_i = 0;
+    if (free_i < 0) {
+        if (create == 2) return -1;   /* only into a free slot: never evict one */
+        free_i = 0;
+    }
     memset(&g_t[free_i], 0, sizeof g_t[free_i]);
     memcpy(g_t[free_i].addr, a, 6);
     g_t[free_i].used = 1;
@@ -49,8 +53,14 @@ void acl_track_event(const unsigned char *ev, int n, long now)
          * never; it stays that way (handle tracking also drives drops and a
          * stale handle could be a pad's). Here only the pending call ends,
          * unless it is our own page failing 0x0b. */
-        i = slot(ev + 5, 0);
+        i = slot(ev + 5, ev[2] == 0 ? 2 : 0);
         if (i >= 0 && ev[2] != 0x0B) g_t[i].req_ms = -1;
+        if (i >= 0 && ev[2] == 0) {
+            /* Any owner (the console's own stack too): only for
+             * acl_track_any_handle(), never for acl_track_handle(). */
+            g_t[i].any_handle = ((unsigned)ev[3] | ((unsigned)ev[4] << 8)) & 0x0FFF;
+            g_t[i].any_epoch = g_epoch[g_t[i].any_handle];
+        }
     } else if (ev[0] == 0x03 && n >= 13 && ev[12] == 0x01) {   /* Connection Complete, ACL */
         i = slot(ev + 5, ev[2] == 0);
         if (i < 0) return;
@@ -59,12 +69,16 @@ void acl_track_event(const unsigned char *ev, int n, long now)
         if (ev[2] != 0x0B) g_t[i].req_ms = -1;
         if (ev[2] == 0) {
             g_t[i].handle = ((unsigned)ev[3] | ((unsigned)ev[4] << 8)) & 0x0FFF;
+            g_t[i].any_handle = g_t[i].handle;
+            g_t[i].any_epoch = g_epoch[g_t[i].handle];
             log_line("acl: link up handle %#05x (tracked)", g_t[i].handle);
         }
     } else if (ev[0] == 0x05 && n >= 6 && ev[2] == 0) {        /* Disconnection Complete */
         unsigned h = ((unsigned)ev[3] | ((unsigned)ev[4] << 8)) & 0x0FFF;
-        for (i = 0; i < TRACK_MAX; i++)          /* keep page params for the reconnect */
+        for (i = 0; i < TRACK_MAX; i++) {        /* keep page params for the reconnect */
             if (g_t[i].used && g_t[i].handle == h) g_t[i].handle = 0;
+            if (g_t[i].used && g_t[i].any_handle == h) g_t[i].any_handle = 0;
+        }
     } else if (ev[0] == 0x1C && n >= 7 && ev[2] == 0) {        /* Read Clock Offset Complete */
         unsigned h = ((unsigned)ev[3] | ((unsigned)ev[4] << 8)) & 0x0FFF;
         for (i = 0; i < TRACK_MAX; i++)
@@ -106,6 +120,14 @@ unsigned acl_track_handle(const unsigned char addr[6])
 {
     int i = slot(addr, 0);
     return i >= 0 ? g_t[i].handle : 0;
+}
+
+unsigned acl_track_any_handle(const unsigned char addr[6])
+{
+    int i = slot(addr, 0);
+    if (i < 0 || !g_t[i].any_handle) return 0;
+    if (g_epoch[g_t[i].any_handle] != g_t[i].any_epoch) return 0;   /* that handle changed since */
+    return g_t[i].any_handle;
 }
 
 long acl_track_request_age(const unsigned char addr[6], long now)

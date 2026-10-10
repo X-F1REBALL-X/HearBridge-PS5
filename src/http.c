@@ -183,8 +183,9 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->pkts, c->frames, c->empty_reads, c->peak_milli / 1000.0,
         c->out_peak_milli / 1000.0, c->sample_rate, c->bitpool, c->backlog,
         c->bitpool_lo, c->bitpool_hi, c->per_packet, c->dropped, ctl_uptime_s(c), c->uptime_s,
-        c->latency_ms >= 500, c->latency_ms,
-        c->latency_ms, c->lat_total, c->lat_capture, c->lat_packet, c->lat_queue, c->lat_radio,
+        c->latency_ms >= 500, c->latency_auto && c->lat_auto_ms > 0 ? c->lat_auto_ms : c->latency_ms,
+        /* target in effect: Auto's own level while it runs, else the slider */
+        c->latency_auto && c->lat_auto_ms > 0 ? c->lat_auto_ms : c->latency_ms, c->lat_total, c->lat_capture, c->lat_packet, c->lat_queue, c->lat_radio,
         c->lat_sink, c->lat_sink_reported, c->codec,
         c->codec_pref, c->codec_avail,
         c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4],

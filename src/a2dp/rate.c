@@ -1,5 +1,6 @@
 /* Developed by X-F1REBALL-X. */
 #include "rate.h"
+#include <string.h>
 
 #define DOWN_GAP_MS   300   /* at most one step down per this */
 #define UP_CALM_MS   4000   /* no late packet this long before stepping up */
@@ -185,43 +186,72 @@ int hb_lat_auto_clamp(int ms)
 
 void hb_lat_auto_init(hb_lat_auto *a, int start_ms)
 {
-    a->cur_ms = hb_lat_auto_clamp(start_ms);
-    a->fail_ms = 0;
-    a->drops = a->win_s = a->good_s = a->safe_ms = 0;
+    memset(a, 0, sizeof *a);
+    if (start_ms > HB_LAT_AUTO_TRUST_MS) start_ms = 0;   /* not trusted: 200 ms */
+    a->cur_ms = a->start_ms = hb_lat_auto_clamp(start_ms);
     a->ignore_s = HB_LAT_AUTO_START_S;
+}
+
+static int lat_auto_sum(const hb_lat_auto *a)
+{
+    int i, n = 0;
+    for (i = 0; i < HB_LAT_AUTO_WIN_S; i++) n += a->win[i];
+    return n;
+}
+
+static void lat_auto_changed(hb_lat_auto *a)
+{
+    memset(a->win, 0, sizeof a->win);
+    a->good_s = 0;
+    a->ignore_s = HB_LAT_AUTO_SETTLE_S;
 }
 
 int hb_lat_auto_tick(hb_lat_auto *a, int d, int *changed)
 {
+    int sum, top;
     if (changed) *changed = 0;
     if (d < 0) d = 0;
     if (a->ignore_s > 0) {
         a->ignore_s--;
         return a->cur_ms;
     }
+    a->win[a->wi] = d;
+    a->wi = (a->wi + 1) % HB_LAT_AUTO_WIN_S;
+    sum = lat_auto_sum(a);
+    if (sum >= HB_LAT_AUTO_LINK_DROPS) {
+        /* Far more than a stall: the link cannot carry the stream. A
+         * bigger buffer would only add delay, so undo our raises. */
+        a->link_bad = 1;
+        a->good_s = 0;
+        if (a->cur_ms > a->start_ms) {
+            a->cur_ms = a->start_ms;
+            lat_auto_changed(a);
+            if (changed) *changed = -1;
+        }
+        return a->cur_ms;
+    }
+    if (sum == 0) a->link_bad = 0;
     if (d > 0) {
         a->good_s = 0;
-        if (!a->drops) a->win_s = 0;
-        a->drops += d;
-        if (a->drops >= HB_LAT_AUTO_BAD_DROPS) {
+        if (sum >= HB_LAT_AUTO_BAD_DROPS && !a->link_bad) {
             if (a->cur_ms > a->fail_ms) a->fail_ms = a->cur_ms;
-            a->drops = 0;
-            if (a->cur_ms < HB_LAT_AUTO_MAX_MS) {
-                /* A probe below the floor failed: straight back to the level
-                 * that held, not a full step above it. */
+            top = a->start_ms + HB_LAT_AUTO_MAX_RAISES * HB_LAT_AUTO_UP_MS;
+            if (top > HB_LAT_AUTO_MAX_MS) top = HB_LAT_AUTO_MAX_MS;
+            if (a->cur_ms < top) {
+                /* A probe below the floor failed: straight back to the
+                 * level that held, not a full step above it. */
                 if (a->safe_ms > a->cur_ms && a->safe_ms <= a->cur_ms + HB_LAT_AUTO_UP_MS)
                     a->cur_ms = a->safe_ms;
                 else
                     a->cur_ms += HB_LAT_AUTO_UP_MS;
+                if (a->cur_ms > top) a->cur_ms = top;
                 a->safe_ms = 0;
-                if (a->cur_ms > HB_LAT_AUTO_MAX_MS) a->cur_ms = HB_LAT_AUTO_MAX_MS;
-                a->ignore_s = HB_LAT_AUTO_SETTLE_S;
+                lat_auto_changed(a);
                 if (changed) *changed = 1;
             }
         }
         return a->cur_ms;
     }
-    if (a->drops && ++a->win_s >= HB_LAT_AUTO_BAD_WIN_S) a->drops = 0;   /* an odd drop: forgiven */
     a->good_s++;
     if (a->cur_ms <= HB_LAT_AUTO_MIN_MS) return a->cur_ms;
     if (a->cur_ms - HB_LAT_AUTO_DOWN_MS <= a->fail_ms) {
@@ -234,9 +264,8 @@ int hb_lat_auto_tick(hb_lat_auto *a, int d, int *changed)
     }
     a->cur_ms -= HB_LAT_AUTO_DOWN_MS;
     if (a->cur_ms < HB_LAT_AUTO_MIN_MS) a->cur_ms = HB_LAT_AUTO_MIN_MS;
-    a->good_s = 0;
-    a->drops = 0;
-    a->ignore_s = HB_LAT_AUTO_SETTLE_S;
+    if (a->cur_ms < a->start_ms) a->start_ms = a->cur_ms;   /* raises count from the lowest held */
+    lat_auto_changed(a);
     if (changed) *changed = -1;
     return a->cur_ms;
 }

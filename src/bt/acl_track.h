@@ -8,6 +8,10 @@
 void acl_track_event(const unsigned char *ev, int n, long now_ms);
 /* Handle of a live ACL to addr, 0 if none known. */
 unsigned acl_track_handle(const unsigned char addr[6]);
+/* Handle of a live ACL to addr whoever opened it (the console's own stack
+ * included), 0 if none known or that handle connected / disconnected again
+ * since. Only for closing a saved headset's link held elsewhere. */
+unsigned acl_track_any_handle(const unsigned char addr[6]);
 /* ms since a Connection Request from addr that has not completed, -1 if none. */
 long acl_track_request_age(const unsigned char addr[6], long now_ms);
 /* The request was answered (accepted, rejected or given up on). */

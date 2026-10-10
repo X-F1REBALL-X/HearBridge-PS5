@@ -62,6 +62,23 @@ int main(void)
         acl_track_event(c3, 13, 52000);
         if (acl_track_handle_epoch(0x002) == e0) { puts("FAIL epoch after reuse"); fails++; }
     }
+    {
+        /* A link the console's own stack opened (encryption byte 0): never
+         * acl_track_handle(), but acl_track_any_handle() until it closes or
+         * the handle is reused. */
+        static const unsigned char y[6] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
+        unsigned char c4[13] = { 0x03, 11 }, d4[6] = { 0x05, 4, 0, 0x07, 0, 0x13 };
+        c4[2] = 0; c4[3] = 0x07; c4[4] = 0; memcpy(c4 + 5, y, 6); c4[11] = 1; c4[12] = 0;
+        acl_track_event(c4, 13, 60000);
+        if (acl_track_handle(y)) { puts("FAIL system link reported as ours"); fails++; }
+        if (acl_track_any_handle(y) != 0x07) { puts("FAIL system link not seen"); fails++; }
+        acl_track_event(d4, 6, 61000);
+        if (acl_track_any_handle(y)) { puts("FAIL system link kept after disconnect"); fails++; }
+        acl_track_event(c4, 13, 62000);
+        c4[5] = 0x99;                                  /* handle 7 reused by another device */
+        acl_track_event(c4, 13, 63000);
+        if (acl_track_any_handle(y)) { puts("FAIL reused handle still mapped to the old device"); fails++; }
+    }
     puts(fails ? "FAIL acl tracking" : "ok   inbound ACL tracked by handle, cleared on disconnect, kept over our 0x0b, stale handle seen");
     return fails != 0;
 }
