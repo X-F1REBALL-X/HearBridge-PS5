@@ -47,6 +47,7 @@
 #include "alerts.h"
 #include "avrcp.h"
 #include "night.h"
+#include "linktune.h"
 #include "rest_sys.h"
 #include "gameprof.h"
 #include "game_sys.h"
@@ -2048,7 +2049,7 @@ typedef struct {
     btlink *link;
     hb_rate rate;
     int fsz, samples_per, per_pkt, mtu;
-    int max_pp;          /* tuned frames/packet ceiling (0 = MTU fit) */
+    hb_tune tune;        /* tuned frames/packet ceiling (tune.max_pp, 0 = MTU fit) */
     int queue_ms;        /* media queue target (latency slider), ms */
     long bl_sum, bl_n;   /* backlog samples since the last status (latency estimate) */
     int rate_hz;
@@ -2060,18 +2061,22 @@ typedef struct {
 /* As many whole frames as the media MTU holds (RTP 12 + SBC header 1;
  * the NUM field is 4 bits, so at most 15), from the frame length at the
  * bitpool in use. */
+/* Frames/packet without the tuner's ceiling: MTU fit, buffer, latency target. */
+static int packer_fit(const packer *p)
+{
+    int pp = hb_frames_per_packet(p->mtu, p->fsz);       /* always MTU-capped */
+    int lat_pp = hb_latency_frames_cap(p->queue_ms, p->rate_hz, p->samples_per);
+    if (pp * p->fsz > (int)sizeof p->buf) pp = (int)sizeof p->buf / p->fsz;
+    if (lat_pp > 0 && pp > lat_pp) pp = lat_pp;
+    return pp < 1 ? 1 : pp;
+}
+
 static void packer_size(packer *p)
 {
     p->fsz = (int)sbc_encoder_frame_bytes(p->enc);
     if (p->fsz <= 0) p->fsz = 29;
-    p->per_pkt = hb_frames_per_packet(p->mtu, p->fsz);   /* always MTU-capped */
-    if (p->per_pkt * p->fsz > (int)sizeof p->buf) p->per_pkt = (int)sizeof p->buf / p->fsz;
-    if (p->per_pkt < 1) p->per_pkt = 1;
-    if (p->max_pp > 0 && p->per_pkt > p->max_pp) p->per_pkt = p->max_pp;
-    {
-        int lat_pp = hb_latency_frames_cap(p->queue_ms, p->rate_hz, p->samples_per);
-        if (lat_pp > 0 && p->per_pkt > lat_pp) p->per_pkt = lat_pp;
-    }
+    p->per_pkt = packer_fit(p);
+    if (p->tune.max_pp > 0 && p->per_pkt > p->tune.max_pp) p->per_pkt = p->tune.max_pp;
     if (p->link && p->rate_hz > 0)
         btlink_set_media_pace(p->link, (long)p->per_pkt * p->samples_per * 1000L / p->rate_hz);
 }
@@ -2109,16 +2114,16 @@ static void tune_link(packer *p, long now)
 {
     static unsigned long l_sent, l_cred;
     static long l_drop, l_t;
-    static int jitter_s;
     unsigned long sent = 0, cred = 0;
     long drops = btlink_tx_dropped(p->link), dt;
-    int limit = 0, pkt_ms, cap;
+    int limit = 0, pkt_ms, cap, act;
     double need_pps, cred_pps;
+    hb_tune_in in;
 
     btlink_tx_counters(p->link, &sent, &cred, &limit);
     if (!l_t || sent < l_sent) {                  /* new link */
         l_sent = sent; l_cred = cred; l_drop = drops; l_t = now;
-        jitter_s = 0;
+        hb_tune_init(&p->tune);
         return;
     }
     dt = now - l_t;
@@ -2137,20 +2142,32 @@ static void tune_link(packer *p, long now)
                  btlink_media_cap(p->link) * pkt_ms, pkt_ms);
     }
 
-    if (drops > l_drop && (cred_pps >= need_pps * 1.05 ||
-                           btlink_tx_backlog(p->link) * 2 > btlink_media_cap(p->link))) {
-        /* Enough credits on average but still dropping: bursty credit
-         * return. Smaller packets hold each credit for less time. */
-        if (++jitter_s >= 2 && p->per_pkt > 5) {
-            p->max_pp = p->per_pkt - 2 < 5 ? 5 : p->per_pkt - 2;
+    /* Frames per packet from the credits this link returns (linktune.h). */
+    memset(&in, 0, sizeof in);
+    in.now = now;
+    in.per_pkt = p->per_pkt;
+    in.fit_pp = packer_fit(p);
+    in.cred_pps = cred_pps;
+    in.need_pps = need_pps;
+    in.new_drops = drops > l_drop ? (int)(drops - l_drop) : 0;
+    in.backlog = btlink_tx_backlog(p->link);
+    in.cap = btlink_media_cap(p->link);
+    act = hb_tune_step(&p->tune, &in);
+    if (act == HB_TUNE_DIP) {
+        int old = sbc_encoder_bitpool(p->enc);
+        hb_rate_hold_floor(&p->rate, now, p->tune.freeze_until);
+        if (p->rate.cur != old) {
+            sbc_encoder_set_bitpool(p->enc, p->rate.cur);
             packer_size(p);
-            log_line("tune: drops with backlog %d (%.0f credits/s for %.0f packets/s): %d frames/packet",
-                     btlink_tx_backlog(p->link),
-                     cred_pps, need_pps, p->per_pkt);
-            jitter_s = 0;
         }
-    } else if (drops == l_drop) {
-        jitter_s = 0;
+        log_line("tune: %s for %d s (%ld dropped, backlog %d/%d, %.0f credits/s for %.0f packets/s, bitpool %d -> %d)",
+                 hb_tune_name(act), HB_TUNE_FREEZE_MS / 1000, drops - l_drop, in.backlog, in.cap,
+                 cred_pps, need_pps, old, p->rate.cur);
+    } else if (act != HB_TUNE_KEEP) {
+        int old_pp = p->per_pkt;
+        packer_size(p);
+        log_line("tune: %s, %.0f credits/s for %.0f packets/s, %ld dropped, backlog %d: %d -> %d frames/packet (fit %d)",
+                 hb_tune_name(act), cred_pps, need_pps, drops - l_drop, in.backlog, old_pp, p->per_pkt, in.fit_pp);
     }
     /* Bitpool: only step up while the link returns credits with headroom. */
     /* (Paced packets waiting for their due time are not a backlog.) */
@@ -2400,6 +2417,7 @@ stream_setup:
     }
 
     memset(&pk, 0, sizeof pk);
+    hb_tune_init(&pk.tune);
     pk.av = &av;
     pk.enc = enc;
     pk.link = link;

@@ -43,6 +43,7 @@ void hb_rate_init(hb_rate *r, int lo, int hi, int start, long now_ms)
     r->cap = 0;
     r->t_cap = -100000;
     r->t_late = -1;
+    r->hold_until = -100000;
 }
 
 void hb_rate_set_ceiling(hb_rate *r, int cfg_hi, int ceil)
@@ -58,6 +59,17 @@ void hb_rate_not_calm(hb_rate *r, long now_ms)
     r->t_calm = now_ms;
 }
 
+void hb_rate_hold_floor(hb_rate *r, long now_ms, long until)
+{
+    r->hold_until = until;
+    if (r->cur != r->lo) {
+        r->cur = r->lo;
+        r->t_down = now_ms;
+        r->downs++;
+    }
+    r->t_calm = until;
+}
+
 int hb_rate_update(hb_rate *r, long now, int queue, int qmax, long drops)
 {
     int dropped = drops > r->last_drops, step = 0;
@@ -65,6 +77,12 @@ int hb_rate_update(hb_rate *r, long now, int queue, int qmax, long drops)
     long late_ms = 0;
 
     r->last_drops = drops;
+    if (now < r->hold_until) {            /* a dip: floor, nothing else */
+        r->cur = r->lo;
+        r->t_calm = r->hold_until;
+        r->t_late = -1;
+        return r->cur;
+    }
     if (room < 2) room = 2;
     /* Late packets only count once they persist: bursty completion events
      * (e.g. a 96 ms gap) fill the queue for a moment and it drains again

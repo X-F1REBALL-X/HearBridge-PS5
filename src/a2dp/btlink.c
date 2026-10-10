@@ -1262,6 +1262,14 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
             if (ev[5] == 0) {
                 if (cop == 0x1405) l->rssi = (signed char)ev[8];
                 else l->lq = ev[8];
+                /* every reading in the log (one per 10 s): drops next to
+                 * the radio's view of the link */
+                if (cop == 0x1405)
+                    log_line("link: RSSI %d dB (golden range 0), media dropped %ld", l->rssi, btlink_tx_dropped(l));
+                else
+                    log_line("link: quality %d/255, media dropped %ld", l->lq, btlink_tx_dropped(l));
+            } else {
+                log_line("link: %s read failed (status %#04x)", cop == 0x1405 ? "RSSI" : "link quality", ev[5]);
             }
             return;
         }
