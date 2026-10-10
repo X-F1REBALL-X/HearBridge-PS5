@@ -44,7 +44,8 @@ int main(void)
     }
     CHECK(strstr((const char *)hb_start_html, "127.0.0.1:8090") &&
           strstr((const char *)hb_start_html, "HearBridge is not running") &&
-          strstr((const char *)hb_start_html, "he:["), "fallback page probes the server, has languages");
+          strstr((const char *)hb_start_html, "ar:[") && !strstr((const char *)hb_start_html, "he:["),
+          "fallback page probes the server, has languages, no Hebrew");
 
     if (!mkdtemp(root)) return 1;
     CHECK(tile_files_put(root, NULL, hb_icon_png, sizeof hb_icon_png, hb_start_html, HB_START_HTML_LEN) == 1, "first put writes");

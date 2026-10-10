@@ -1,4 +1,5 @@
 #include "a2dp.h"
+#include "../rejoin.h"
 #include "devclass.h"
 #include "../utf8.h"
 #include "hci_cmd.h"
@@ -146,6 +147,7 @@ void (*a2dp_inquiry_progress)(const a2dp_inq_dev *devs, int n);
 #define INQ_ABORTED() (a2dp_inquiry_abort && a2dp_inquiry_abort())
 
 long a2dp_scan_deadline_ms;
+int a2dp_scan_evmask_sent;
 
 #define PAST_DEADLINE() (a2dp_scan_deadline_ms && now_ms() >= a2dp_scan_deadline_ms)
 
@@ -427,6 +429,7 @@ static int inquiry_listen(hci_t hci, a2dp_inq_dev *out, int max, int *n,
 }
 
 #define INQ_START_TRIES 6
+static int g_inq_skipped;   /* the scan window had no room for another inquiry */
 
 static int inquiry_once(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound)
 {
@@ -445,10 +448,9 @@ static int inquiry_once(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound
     length_slots = (int)((seconds * 100 + 64) / 128);
     if (a2dp_scan_deadline_ms) {
         /* Hard scan deadline: shorten this inquiry to end before it, or skip. */
-        long left = a2dp_scan_deadline_ms - now_ms() - 500;
-        int fit = (int)(left / 1280);
+        int fit = hb_scan_slots_left(a2dp_scan_deadline_ms, now_ms());
         if (fit < 1) {
-            log_line("inquiry: scan deadline reached — not starting another");
+            g_inq_skipped = 1;            /* not an inquiry: no event recovery */
             return 1;
         }
         if (length_slots > fit) length_slots = fit;
@@ -602,11 +604,18 @@ static int inquiry_scan_off(a2dp_session *s, a2dp_inq_dev *out, int max, int *nf
 {
     int ok;
     g_inq_events = 0;
+    g_inq_skipped = 0;
     ok = inquiry_once(s, out, max, nfound);
-    if (ok && *nfound == 0 && g_inq_events == 0 && !INQ_ABORTED() && s && s->hci.ops) {
-        log_line("inquiry: no HCI events at all — re-sending the event mask and retrying");
-        if (!hci_cmd_sync(s->hci, HB_OP_SET_EVENT_MASK, k_evmask, 8, NULL, NULL, 0))
-            log_line("inquiry: SET_EVENT_MASK got no reply — event pipe looks stalled");
+    if (ok && *nfound == 0 && g_inq_events == 0 && !g_inq_skipped && !INQ_ABORTED() && s && s->hci.ops) {
+        if (!a2dp_scan_evmask_sent) {
+            /* once per scan: inquiries are chained for the whole window */
+            a2dp_scan_evmask_sent = 1;
+            log_line("inquiry: no HCI events at all, re-sending the event mask and retrying");
+            if (!hci_cmd_sync(s->hci, HB_OP_SET_EVENT_MASK, k_evmask, 8, NULL, NULL, 0))
+                log_line("inquiry: SET_EVENT_MASK got no reply, event pipe looks stalled");
+        } else {
+            log_line("inquiry: no HCI events at all, retrying (event mask already re-sent this scan)");
+        }
         if (s->hci.ops->diag) s->hci.ops->diag(s->hci.ctx);
         g_inq_events = 0;
         ok = inquiry_once(s, out, max, nfound);

@@ -65,3 +65,12 @@ long acl_pace_next(long *clock, long dur_ms, long now)
     *clock += dur_ms > 0 ? dur_ms : 0;
     return due;
 }
+
+int acl_pool_disconnected(acl_pool *p, long now)
+{
+    int n = p->outstanding;
+    p->outstanding = 0;
+    p->last_credit_ms = now;
+    p->last_fb_ms = now;
+    return n;
+}

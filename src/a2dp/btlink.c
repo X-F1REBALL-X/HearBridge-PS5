@@ -2,6 +2,7 @@
 #include "acl_track.h"
 #include "acl_pool.h"
 #include "avrcp.h"
+#include "hfp.h"
 #include "sdp_server.h"
 #include "hci_cmd.h"
 #include "log.h"
@@ -11,6 +12,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* RSSI / link quality poll period (alternating reads). */
+#ifndef BTLINK_LQ_POLL_MS
+#define BTLINK_LQ_POLL_MS 10000
+#endif
 
 /* L2CAP signaling command codes (Core Vol 3 Part A, 4). */
 enum {
@@ -40,6 +46,8 @@ enum {
 #define T_REBIND_SETTLE  300      /* media re-config done -> SUSPEND/START */
 #define REBIND_MAX       2        /* own CFG_REQs answering a peer re-config */
 #define CFG_OPT_MAX    16
+#define HFP_CLOSE_WAIT_MS 600     /* our RFCOMM close: both UAs */
+#define DISC_RSP_WAIT_MS  1000    /* L2CAP DISC_RSPs before the HCI Disconnect */
 
 typedef enum { CH_CLOSED = 0, CH_CONNECTING, CH_CONFIG, CH_OPEN } chan_state;
 
@@ -94,6 +102,11 @@ typedef struct {
 struct btlink {
     hci_t hci;
     avrcp_state avrcp;
+    hfp_state hfp;            /* HFP AG on inbound RFCOMM: battery only */
+    unsigned hfp_scid;        /* RFCOMM channel the hfp state belongs to */
+    int avlog_n;              /* AVRCP rx frames hex-logged in this window */
+    long avlog_t;             /* start of that window */
+    unsigned long avlog_skipped;
     unsigned avrcp_scid;      /* open AVRCP control channel (either side) */
     unsigned in_rx_psm;
     btlink_rx_fn in_rx;
@@ -133,6 +146,11 @@ struct btlink {
     int rx_len, rx_need;
 
     int dead;
+    /* Link quality (HCI Read RSSI / Read Link Quality), polled while up. */
+    int rssi;                 /* signed, 127 = unknown */
+    int lq;                   /* 0..255, -1 unknown */
+    long lq_next;             /* next poll time */
+    int lq_turn;              /* alternate RSSI / link quality */
     int retry_create; /* set on ACL-already-exists 0x0b */
     int create_retries;
     int purge_fail; /* Disconnect transport/errno fail — stop cleanly */
@@ -541,7 +559,7 @@ static const char *psm_name(unsigned psm)
 {
     switch (psm) {
     case BTLINK_PSM_SDP:      return "(SDP)";
-    case 0x0003:              return "(RFCOMM)";
+    case BTLINK_PSM_RFCOMM:   return "(RFCOMM, hands-free)";
     case BTLINK_PSM_AVCTP:    return "(AVRCP control)";
     case BTLINK_PSM_AVDTP:    return "(AVDTP)";
     case BTLINK_PSM_AVCTP_BR: return "(AVRCP browsing)";
@@ -639,7 +657,8 @@ static void on_signaling(btlink *l, const unsigned char *d, int len)
                 unsigned psm = le16(pl);
                 unsigned their_cid = le16(pl + 2);
                 if (psm == BTLINK_PSM_SDP || psm == BTLINK_PSM_AVDTP ||
-                    psm == BTLINK_PSM_AVCTP || psm == BTLINK_PSM_AVCTP_BR) {
+                    psm == BTLINK_PSM_AVCTP || psm == BTLINK_PSM_AVCTP_BR ||
+                    psm == BTLINK_PSM_RFCOMM) {
                     chan *inc = chan_free_slot(l);
                     if (!inc) {
                         put16(out, 0);
@@ -915,6 +934,27 @@ static void avctp_reply(btlink *l, chan *c, const unsigned char *d, int len)
     unsigned char r[128];
     int n;
 
+    {
+        /* Short hex of what the headset sends (debug volume keys): at most
+         * 6 frames per 5 s, 16 bytes each. */
+        long now = now_ms();
+        if (now - l->avlog_t >= 5000) {
+            if (l->avlog_skipped)
+                log_line("avrcp: rx %lu more frames not shown", l->avlog_skipped);
+            l->avlog_t = now; l->avlog_n = 0; l->avlog_skipped = 0;
+        }
+        if (l->avlog_n < 6) {
+            char hx[3 * 16 + 1];
+            int i, m = len < 16 ? len : 16;
+            for (i = 0; i < m; i++) snprintf(hx + 3 * i, 4, "%02x ", d[i]);
+            hx[3 * m] = 0;
+            log_line("avrcp: rx%s %d bytes: %s%s", c->psm == BTLINK_PSM_AVCTP_BR ? " (browsing)" : "",
+                     len, hx, len > 16 ? "..." : "");
+            l->avlog_n++;
+        } else {
+            l->avlog_skipped++;
+        }
+    }
     if (c->psm == BTLINK_PSM_AVCTP_BR) {
         /* Browsing: no media player, General Reject every PDU. */
         if (len < 4 || (d[0] & 0x02)) return;
@@ -926,6 +966,7 @@ static void avctp_reply(btlink *l, chan *c, const unsigned char *d, int len)
         return;
     }
     l->avrcp_scid = c->scid;
+    l->avrcp.now_ms = now_ms();
     n = avrcp_input(&l->avrcp, d, len, r, (int)sizeof r);
     if (n > 0) (void)l2_send_raw(l, c->dcid, r, n);
     if (l->avrcp.need_register) {
@@ -933,6 +974,25 @@ static void avctp_reply(btlink *l, chan *c, const unsigned char *d, int len)
         n = avrcp_build_register_volume(&l->avrcp, r, (int)sizeof r);
         avrcp_send(l, r, n);
     }
+    if (l->avrcp.need_batt) {
+        /* Volume registration worked: ask for battery status too (AVRCP
+         * 1.6). A headset without it refuses and stays "unknown". */
+        n = avrcp_build_register_battery(&l->avrcp, r, (int)sizeof r);
+        avrcp_send(l, r, n);
+    }
+}
+
+/* HFP over RFCOMM: frames out on the headset's RFCOMM channel. */
+static void hfp_tx(void *ud, const unsigned char *p, int n)
+{
+    btlink *l = ud;
+    chan *c = l->hfp_scid ? chan_by_scid(l, l->hfp_scid) : NULL;
+    if (c && c->st == CH_OPEN) (void)l2_send_raw(l, c->dcid, p, n);
+}
+
+static void hfp_log(const char *m)
+{
+    log_line("%s", m);
 }
 
 static void on_frame(btlink *l, unsigned cid, const unsigned char *d, int len)
@@ -954,6 +1014,16 @@ static void on_frame(btlink *l, unsigned cid, const unsigned char *d, int len)
     }
     if (c->psm == BTLINK_PSM_AVCTP || c->psm == BTLINK_PSM_AVCTP_BR) {
         avctp_reply(l, c, d, len);
+        return;
+    }
+    if (c->inbound && c->psm == BTLINK_PSM_RFCOMM) {
+        if (l->hfp_scid != c->scid) {          /* new RFCOMM session; battery value kept */
+            int b = l->hfp.battery, bs = l->hfp.battery_seq, src = l->hfp.battery_src;
+            hfp_init(&l->hfp, hfp_tx, l, hfp_log);
+            l->hfp.battery = b; l->hfp.battery_seq = bs; l->hfp.battery_src = src;
+            l->hfp_scid = c->scid;
+        }
+        hfp_input(&l->hfp, d, len);
         return;
     }
     if (c->inbound && !c->rx && l->in_rx && c->psm == l->in_rx_psm) {
@@ -1184,6 +1254,28 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
 
     if (nEv < 1) return;
 
+    if (ev[0] == 0x0E && nEv >= 9 && l->connected) {
+        /* Command Complete: Read Link Quality (0x1403) / Read RSSI (0x1405)
+         * for our handle: status, handle, value. */
+        unsigned cop = (unsigned)ev[3] | ((unsigned)ev[4] << 8);
+        unsigned h = ((unsigned)ev[6] | ((unsigned)ev[7] << 8)) & 0x0FFF;
+        if ((cop == 0x1403 || cop == 0x1405) && h == l->handle) {
+            if (ev[5] == 0) {
+                if (cop == 0x1405) l->rssi = (signed char)ev[8];
+                else l->lq = ev[8];
+                /* every reading in the log (one per 10 s): drops next to
+                 * the radio's view of the link */
+                if (cop == 0x1405)
+                    log_line("link: RSSI %d dB (golden range 0), media dropped %ld", l->rssi, btlink_tx_dropped(l));
+                else
+                    log_line("link: quality %d/255, media dropped %ld", l->lq, btlink_tx_dropped(l));
+            } else {
+                log_line("link: %s read failed (status %#04x)", cop == 0x1405 ? "RSSI" : "link quality", ev[5]);
+            }
+            return;
+        }
+    }
+
     if (ev[0] == 0x0F && nEv >= 6) {
         unsigned rop = (unsigned)ev[4] | ((unsigned)ev[5] << 8);
         if (rop == HB_OP_CREATE_CONNECTION) {
@@ -1210,6 +1302,19 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
             l->auth_sent = 0;
             l->t_conn = now_ms();
         }
+        return;
+    }
+
+    if (ev[0] == 0x04 && nEv >= 12 && ev[11] != 0x01 && l->connected &&
+        same_addr(ev + 2, l->addr)) {
+        /* SCO / eSCO from our headset (call audio): never. HFP is only
+         * there for the battery. Reject Synchronous Connection Request,
+         * reason 0x0D (limited resources). */
+        unsigned char rp[7];
+        memcpy(rp, ev + 2, 6);
+        rp[6] = 0x0D;
+        (void)fire_cmd(l->hci, 0x042A, rp, 7);
+        log_line("hfp: headset asked for call audio, refused");
         return;
     }
 
@@ -1314,7 +1419,14 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
                      ev[5], dh);
         }
         if (l->connected && dh == (l->handle & 0x0FFF)) {
+            int was_out = acl_pool_disconnected(&l->pool, now_ms()), was_q = l->txq_n;
             log_line("btlink: disconnected (reason %#04x)", ev[5]);
+            /* The controller dropped this handle's buffers: credits back,
+             * nothing queued for the dead handle goes out later. */
+            l->txq_n = l->txq_media = 0;
+            l->txq_head = 0;
+            if (was_out || was_q)
+                log_line("btlink: %d credit(s) back, %d queued packet(s) flushed", was_out, was_q);
             g_disc_reason = ev[5];
             if (l->acc_n && l->acc_got && !l->enc_on) l->acc_dropped = 1;
             l->connected = 0;
@@ -1537,6 +1649,9 @@ btlink *btlink_create(hci_t hci, int acl_mtu, int acl_buffers)
     if (l->pool.limit < 1) l->pool.limit = 1;
     l->next_scid = 0x0040;
     avrcp_init(&l->avrcp, 64);
+    hfp_init(&l->hfp, hfp_tx, l, hfp_log);
+    l->rssi = 127;
+    l->lq = -1;
     return l;
 }
 
@@ -1581,6 +1696,16 @@ int btlink_pump(btlink *l, int timeout_ms)
     tx_flush(l);
     drive_auth(l);
     now = now_ms();
+    if (l->connected && l->enc_on && now >= l->lq_next) {
+        /* One small read every 10 s (RSSI, then link quality): answered
+         * by the controller itself, never sent to the headset. Kept slow
+         * so the radio stays free for the DualSense. */
+        unsigned char hp[2];
+        put16(hp, l->handle);
+        (void)fire_cmd(l->hci, l->lq_turn ? 0x1403 : 0x1405, hp, 2);
+        l->lq_turn = !l->lq_turn;
+        l->lq_next = now + BTLINK_LQ_POLL_MS;
+    }
     for (i = 0; i < BTLINK_CHAN_MAX; i++) {
         if (l->ch[i].st != CH_CLOSED)
             chan_tick(l, &l->ch[i], now);
@@ -1601,6 +1726,27 @@ void btlink_reject_request(hci_t hci, const unsigned char addr[6], unsigned char
     acl_track_request_clear(addr);
     hci_addr_str(addr, astr);
     log_line("btlink: turned down a connection from saved %s (reason %#04x)", astr, reason);
+}
+
+void btlink_accept_request(hci_t hci, const unsigned char addr[6], int stay_peripheral)
+{
+    unsigned char ap[7];
+    char astr[18];
+    memcpy(ap, addr, 6);
+    ap[6] = stay_peripheral ? 0x01 : 0x00;
+    (void)fire_cmd(hci, 0x0409, ap, 7);    /* Accept Connection Request */
+    acl_track_request_clear(addr);
+    hci_addr_str(addr, astr);
+    log_line("btlink: accepted a connection from saved %s (to close it cleanly)", astr);
+}
+
+void btlink_hci_disconnect(hci_t hci, unsigned handle, unsigned char reason)
+{
+    unsigned char dp[3];
+    put16(dp, handle & 0x0FFF);
+    dp[2] = reason;
+    (void)fire_cmd(hci, 0x0406, dp, 3);    /* Disconnect */
+    log_line("btlink: closing ACL %#05x (reason %#04x)", handle & 0x0FFF, reason);
 }
 
 int btlink_is_incoming(const btlink *l)
@@ -1990,16 +2136,30 @@ void btlink_disconnect(btlink *l)
 
     if (!l) return;
     if (l->connected) {
-        /* Graceful order: every channel still up (AVRCP, SDP, anything the
-         * AVDTP teardown left) gets its DISC_REQ, then up to 200 ms for the
-         * DISC_RSPs, then the HCI Disconnect (0x13). */
+        /* Graceful order (audio was torn down by the caller): HFP's RFCOMM
+         * closed inside (DISC on the DLC, DISC on DLCI 0, each answered by
+         * UA), then AVRCP's L2CAP channels, then the rest (AVDTP, RFCOMM,
+         * SDP), up to 1 s for the DISC_RSPs, then the HCI Disconnect
+         * (0x13). Pulling RFCOMM without its DISC made the Xbox Wireless
+         * Headset drop the link and sulk. */
         long w;
+        chan *rc = l->hfp_scid ? chan_by_scid(l, l->hfp_scid) : NULL;
+        if (rc && rc->st == CH_OPEN && hfp_close(&l->hfp)) {
+            w = now_ms() + HFP_CLOSE_WAIT_MS;
+            while (!hfp_closed(&l->hfp) && l->connected && now_ms() < w)
+                if (btlink_pump(l, 20) < 0) break;
+            if (!hfp_closed(&l->hfp))
+                log_line("hfp: no answer to our close in %d ms, closing the channel anyway", HFP_CLOSE_WAIT_MS);
+        }
+        for (i = 0; i < BTLINK_CHAN_MAX; i++)
+            if (l->ch[i].psm == BTLINK_PSM_AVCTP || l->ch[i].psm == BTLINK_PSM_AVCTP_BR)
+                chan_close_disc(l, &l->ch[i]);
         for (i = 0; i < BTLINK_CHAN_MAX; i++) chan_close_disc(l, &l->ch[i]);
-        w = now_ms() + 200;
+        w = now_ms() + DISC_RSP_WAIT_MS;
         while (l->disc_wait > 0 && l->connected && now_ms() < w)
             if (btlink_pump(l, 20) < 0) break;
-        if (l->disc_wait > 0)
-            log_line("l2cap: %d DISC_RSP not seen in 200 ms — disconnecting anyway", l->disc_wait);
+        if (l->disc_wait > 0 && l->connected)
+            log_line("l2cap: %d DISC_RSP not seen in %d ms, disconnecting anyway", l->disc_wait, DISC_RSP_WAIT_MS);
     }
     l->disc_wait = 0;
     for (i = 0; i < BTLINK_CHAN_MAX; i++)
@@ -2377,13 +2537,23 @@ void btlink_avrcp_set_volume(btlink *l, int vol)
     if (vol > 127) vol = 127;
     if (!avrcp_open(l)) {
         l->avrcp.volume = vol;
+        l->avrcp.key_pending = 0;
         return;
     }
+    l->avrcp.now_ms = now_ms();
     n = avrcp_build_set_volume(&l->avrcp, vol, r, (int)sizeof r);
     avrcp_send(l, r, n);                       /* we as controller */
     n = avrcp_build_volume_changed(&l->avrcp, r, (int)sizeof r);
     avrcp_send(l, r, n);                       /* we as target */
     log_line("avrcp: SetAbsoluteVolume %d/127 sent", vol);
+}
+
+void btlink_avrcp_key_flush(btlink *l)
+{
+    if (!l) return;
+    l->avrcp.now_ms = now_ms();
+    if (!avrcp_key_due(&l->avrcp)) return;
+    btlink_avrcp_set_volume(l, l->avrcp.volume);
 }
 
 int btlink_avrcp_volume(btlink *l, int *changed)
@@ -2410,6 +2580,51 @@ int btlink_avrcp_state(const btlink *l)
      * the channel-open check is false (seen on Sony WF-1000XM6). */
     if (avrcp_reported(&l->avrcp)) st |= 1;
     return st;
+}
+
+int btlink_avrcp_battery(const btlink *l)
+{
+    return l ? l->avrcp.battery : -1;
+}
+
+int btlink_hfp_battery(const btlink *l)
+{
+    return l ? l->hfp.battery : -1;
+}
+
+int btlink_avrcp_requery(btlink *l)
+{
+    unsigned char r[32];
+    int n;
+    if (!l || !avrcp_open(l) || l->avrcp.vol_refused) return 0;
+    n = avrcp_build_register_volume(&l->avrcp, r, (int)sizeof r);
+    avrcp_send(l, r, n);
+    return n > 0;
+}
+
+void btlink_avrcp_stats(const btlink *l, unsigned long *cmds, unsigned long *rsps,
+                        unsigned long *reports, int *refused)
+{
+    if (cmds) *cmds = l ? l->avrcp.rx_cmds : 0;
+    if (rsps) *rsps = l ? l->avrcp.rx_rsps : 0;
+    if (reports) *reports = l ? l->avrcp.vol_reports : 0;
+    if (refused) *refused = l ? l->avrcp.vol_refused : 0;
+}
+
+int btlink_avrcp_headset_moves(const btlink *l)
+{
+    return l ? l->avrcp.vol_from_headset : 0;
+}
+
+void btlink_avrcp_seek_volume(btlink *l, int on)
+{
+    if (l) l->avrcp.seek_vol = on != 0;
+}
+
+void btlink_link_quality(const btlink *l, int *rssi, int *lq)
+{
+    if (rssi) *rssi = l ? l->rssi : 127;
+    if (lq) *lq = l ? l->lq : -1;
 }
 
 int btlink_avrcp_connect(btlink *l)

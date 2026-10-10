@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp test-linktune test-txpath
 
 all: ps5
 
@@ -58,12 +58,15 @@ test-control:
 	@mkdir -p $(BUILD)/host
 	python3 scripts/gen_webpage.py src/web/index.html $(BUILD)/host/webpage.h src/web/i18n.json
 	cmp -s $(BUILD)/host/webpage.h src/webpage.h || (echo "src/webpage.h is stale: make webpage"; false)
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp -Isrc/bt tests/test_control.c src/http.c src/bt/btchip.c src/diag.c src/ctl.c src/gain.c src/a2dp/eq.c src/a2dp/rate.c src/a2dp/avrcp.c src/a2dp/sdp_server.c -lpthread -lm -o $(BUILD)/host/test_control
+	python3 scripts/gen_font.py assets/fonts/inter-latin.woff2 $(BUILD)/host/font_woff2.h
+	cmp -s $(BUILD)/host/font_woff2.h src/font_woff2.h || (echo "src/font_woff2.h is stale: make webpage"; false)
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp -Isrc/bt tests/test_control.c src/http.c src/gameprof.c src/bt/btchip.c src/diag.c src/ctl.c src/gain.c src/a2dp/eq.c src/a2dp/rate.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/backup.c -lpthread -lm -o $(BUILD)/host/test_control
 	$(BUILD)/host/test_control $(BUILD)/host/status.json
 	python3 -c "import json;d=json.load(open('$(BUILD)/host/status.json'));print('ok   status JSON parses,', len(d), 'keys')"
 
 webpage:
 	python3 scripts/gen_webpage.py
+	python3 scripts/gen_font.py assets/fonts/inter-latin.woff2 src/font_woff2.h
 
 test-tile:
 	@mkdir -p $(BUILD)/host
@@ -91,7 +94,12 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp test-linktune test-txpath
+
+test-txpath:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -Isrc/bt -Isrc/a2dp tests/test_txpath.c src/bt/txpath.c src/a2dp/acl_pool.c -o $(BUILD)/host/test_txpath
+	$(BUILD)/host/test_txpath
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -133,13 +141,13 @@ test-rejoin:
 
 test-switch:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_switch_ab.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_switch_ab
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_switch_ab.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/hfp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_switch_ab
 	$(BUILD)/host/test_switch_ab
 
 # L2CAP config pacing on a slow (MediaTek) and a quick (Marvell) link.
 test-cfg:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_cfg_mtk.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_cfg_mtk
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_cfg_mtk.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/hfp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_cfg_mtk
 	$(BUILD)/host/test_cfg_mtk
 
 # Chip profile, scan pause, ACL pipe and the AVDTP PSM fallback.
@@ -186,3 +194,40 @@ test-reinstall:
 test-page:
 	@if command -v node >/dev/null 2>&1; then node tests/test_page.js src/web/index.html src/web/i18n.json; \
 	else echo "skip test-page: node not installed"; fi
+
+test-night:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/a2dp tests/test_night.c src/a2dp/night.c -lm -o $(BUILD)/host/test_night
+	$(BUILD)/host/test_night
+
+test-alerts:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -Isrc tests/test_alerts.c src/alerts.c -o $(BUILD)/host/test_alerts
+	$(BUILD)/host/test_alerts
+
+test-linkq:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -Isrc tests/test_linkq.c src/linkq.c -o $(BUILD)/host/test_linkq
+	$(BUILD)/host/test_linkq
+
+test-gameprof:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc tests/test_gameprof.c src/gameprof.c -o $(BUILD)/host/test_gameprof
+	$(BUILD)/host/test_gameprof
+
+test-backup:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc tests/test_backup.c src/backup.c -o $(BUILD)/host/test_backup
+	$(BUILD)/host/test_backup $(BUILD)/host/backup
+
+test-hfp:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/a2dp tests/test_hfp.c src/a2dp/hfp.c -o $(BUILD)/host/test_hfp
+	$(BUILD)/host/test_hfp
+
+# Frames/packet tuner: slow link grows packets, bursty credits shrink them,
+# a dip freezes the size with the bitpool at its floor, recovery after 10 s.
+test-linktune:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_linktune.c src/a2dp/linktune.c src/a2dp/rate.c -o $(BUILD)/host/test_linktune
+	$(BUILD)/host/test_linktune

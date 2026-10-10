@@ -29,6 +29,11 @@ typedef struct {
     int eq_on;             /* equalizer (per headset) */
     int eq_db[5];          /* -12..12 dB: 80 Hz shelf, 250, 1k, 3.5k, 10 kHz shelf */
     unsigned eq_seq;       /* bumped on every change (stream loop re-designs) */
+    int night;             /* night mode compressor (per headset) */
+    int night_db10;        /* its gain right now, tenths of a dB (status) */
+    int batt_alert;        /* last low battery heads-up: 20 / 10, 0 none */
+    unsigned batt_alert_seq; /* bumped with each one (the page toasts once) */
+    int rest_watch;        /* 1 = rest mode requests can be seen */
     /* status (stream loop → web) */
     char token[HB_TOKEN_LEN + 1];  /* hex, set once by ctl_init() */
     char version[16];
@@ -59,6 +64,44 @@ typedef struct {
     char events[HB_EVENT_N][HB_EVENT_LEN]; /* last codec switches / disconnects */
     int event_n;
     unsigned cmd_seq;      /* bumped by the web thread for each select.txt command */
+    /* headset extras (stream loop -> web) */
+    int battery;           /* AVRCP battery status 0..4, -1 unknown */
+    unsigned long status_polls; /* /api/status requests: the page is open while it moves */
+    int batt_pct;          /* HFP battery percent 0..100, -1 unknown */
+    int batt_none;         /* connected a while, the headset reported nothing */
+    int hs_moves;          /* volume changes made on the headset itself */
+    int key_vol;           /* earbud next / previous keys change the volume (all headsets, default on) */
+    int key_vol_dirty;     /* write key_vol down */
+    int link_rssi, link_lq; /* HCI Read RSSI (127 unknown) / Link Quality (-1 unknown) */
+    int link_score;        /* 0..100, -1 unknown (linkq.h) */
+    int drops_min;         /* media packets dropped per minute (smoothed) */
+    /* running game + its profile */
+    int game_avail;        /* game detection works on this firmware */
+    char game_id[16];      /* "" no game */
+    char game_name[48];
+    int game_profile;      /* a profile is saved for game_id */
+    int game_active;       /* that profile is applied now */
+    int req_game;          /* page: 1 save for this game, 2 forget it */
+    char req_game_drop[16]; /* page: forget this saved game (any, not just the running one) */
+    int game_exact;        /* the profile on now is this headset's own */
+    char game_from[32];    /* else: the headset it was saved on ("" none) */
+    int game_dirty;        /* sound differs from this headset's profile: Update Game Profile */
+    char req_game_hs[16];  /* page: drop (req_game_hs_do 1) or use now (2) one headset's profile */
+    unsigned char req_game_hs_addr[6];
+    int req_game_hs_do;
+    int games_n;           /* saved games, newest first (for the Games list) */
+    char games_id[32][16];
+    char games_name[32][48];
+    int games_hs_n[32];    /* headsets with a profile for that game, newest first */
+    unsigned char games_hs[32][4][6];
+    char games_hsname[32][4][32];
+    unsigned char games_hs_cur[32][4];   /* it is the headset in use */
+    int lat_backoff_ms;    /* low buffer target stepped back this much (drops) */
+    int lat_normal_ms;     /* last delay estimate at the default 200 ms target, 0 none */
+    /* backup / restore */
+    int req_reload;        /* restore wrote new settings: reload them */
+    char state_dir[64];    /* /data/hearbridge (tests point it elsewhere) */
+    char mnt_root[32];     /* /mnt (USB drives at <mnt_root>/usbN) */
     long t0_s;             /* monotonic seconds at ctl_init (uptime base) */
 } hb_ctl;
 

@@ -36,6 +36,7 @@
 #include "util.h"
 #include "stop.h"
 #include "btchip.h"
+#include "txpath.h"
 
 enum {
     RING_DEPTH      = 64,
@@ -99,6 +100,7 @@ struct usb_hci {
     struct slot sl[SLOT_COUNT];
     int    tx_slot;              /* SLOT_OUT or SLOT_SPARE */
     long   tx_since;             /* when the in-flight frame was started */
+    hb_txpath tp;                /* spare pipe use (txpath.h) */
     struct ring evq, aclq, txq;
     /* counters for diag */
     unsigned long n_evt, n_acl_in, n_acl_out, n_cmd, n_err, n_switch, n_rearm;
@@ -133,6 +135,22 @@ static void ring_drop(struct ring *r)
     if (!r->count) return;
     r->head = (r->head + 1) % RING_DEPTH;
     r->count--;
+}
+
+/* Remove every frame for ACL handle h, keeping the order of the rest.
+ * keep_head: the oldest frame is in flight on the writer, leave it. */
+static int ring_drop_handle(struct ring *r, int h, int keep_head)
+{
+    unsigned i, o = 0, n = r->count;
+    int gone = 0;
+    for (i = 0; i < n; i++) {
+        struct pkt *p = &r->item[(r->head + i) % RING_DEPTH];
+        if ((i || !keep_head) && hb_acl_frame_handle(p->data, p->len) == h) { gone++; continue; }
+        if (o != i) r->item[(r->head + o) % RING_DEPTH] = *p;
+        o++;
+    }
+    r->count = o;
+    return gone;
 }
 
 static int ring_take(struct ring *r, unsigned char *dst, int cap)
@@ -216,11 +234,27 @@ static void tx_kick(struct usb_hci *u)
         u->tx_since = now_ms();
 }
 
+/* Back onto the primary bulk OUT; the frame in flight on the spare (if
+ * any) stays at the head of txq and goes out again on the primary. */
+static void tx_primary(struct usb_hci *u, const char *why)
+{
+    if (u->tx_slot == SLOT_OUT) return;
+    slot_abort(u, SLOT_SPARE);
+    u->tx_slot = SLOT_OUT;
+    log_line("hci_usb: back on bulk OUT 0x%02x (%s)", u->sl[SLOT_OUT].addr, why);
+    tx_kick(u);
+}
+
 static void tx_watchdog(struct usb_hci *u)
 {
+    if (hb_txpath_check(&u->tp, now_ms())) {
+        tx_primary(u, "the spare pipe completed nothing, not using it again");
+        return;
+    }
     if (!u->sl[u->tx_slot].busy) return;
     if (now_ms() - u->tx_since < STALL_SWITCH_MS) return;
-    if (u->tx_slot != SLOT_OUT || !u->sl[SLOT_SPARE].open) return;
+    if (u->tx_slot != SLOT_OUT) return;
+    if (!hb_txpath_stall(&u->tp, u->sl[SLOT_SPARE].open, now_ms())) return;
     log_line("hci_usb: bulk OUT 0x%02x stuck %d ms, moving to 0x%02x",
              u->sl[SLOT_OUT].addr, STALL_SWITCH_MS, u->sl[SLOT_SPARE].addr);
     slot_abort(u, SLOT_OUT);
@@ -251,6 +285,19 @@ static int reap(struct usb_hci *u)
 
         if (idx >= SLOT_EVT0 && idx < SLOT_ACL0) {
             if (!st && s->len >= 2) {
+                int dh = hb_evt_disc_handle(s->buf, (int)s->len);
+                if (hb_evt_is_nocp(s->buf, (int)s->len)) hb_txpath_nocp(&u->tp);
+                if (dh >= 0) {
+                    /* The controller freed this handle's buffers: drop what
+                     * we still hold for it, and start the next link on the
+                     * primary pipe. */
+                    /* (a frame already in flight finishes on its own: the
+                     * controller takes and discards it) */
+                    int gone = ring_drop_handle(&u->txq, dh, u->sl[u->tx_slot].busy);
+                    if (gone) log_line("hci_usb: %d queued frame(s) for closed handle %#05x dropped", gone, dh);
+                    if (hb_txpath_disc(&u->tp)) tx_primary(u, "link closed");
+                    else tx_kick(u);
+                }
                 acl_track_event(s->buf, (int)s->len, now_ms());   /* every link, any owner */
                 if (s->buf[0] == 0x04 && s->len >= 12 && g_ncreq < CREQ_MAX)
                     memcpy(g_creq[g_ncreq++], s->buf, 12);
@@ -261,7 +308,7 @@ static int reap(struct usb_hci *u)
             if (!st && s->len >= 4) { ring_put(&u->aclq, s->buf, (int)s->len); u->n_acl_in++; got = 1; }
             arm_read(u, idx);
         } else if (idx == u->tx_slot) {
-            if (!st) { ring_drop(&u->txq); u->n_acl_out++; }
+            if (!st) { ring_drop(&u->txq); u->n_acl_out++; hb_txpath_sent(&u->tp); }
             else ring_drop(&u->txq);       /* do not spin on a bad frame */
             tx_kick(u);
         }
@@ -544,6 +591,7 @@ static int try_node(struct usb_hci *u, const char *path)
 
     for (i = SLOT_EVT0; i < SLOT_OUT; i++) arm_read(u, i);
     u->tx_slot = SLOT_OUT;
+    hb_txpath_init(&u->tp);
     hci_scan_pause_enable(mtk);
     hci_set_mediatek(mtk);
     log_line("hci_usb: opened %s (%d event / %d ACL reads in flight)", path,
