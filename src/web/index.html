@@ -434,6 +434,20 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 .logp .evlog{font-size:.95rem}
 .logp .evlog div{padding:.15rem 0}
 }
+/* TV: settings is a large overlay, controller-friendly: big categories, text and controls */
+@media(min-width:1180px) and (min-height:600px){
+.drawer{width:92vw;grid-template-columns:22rem minmax(0,1fr)}
+.side{padding:var(--s5) var(--s4)}
+.navgrp{font-size:.9rem;margin:.3rem .7rem .9rem}
+.tabs{grid-gap:.6rem}
+.tabs button{min-height:4.2rem;padding:.4rem 1.1rem;font-size:1.2rem}
+.tabs .ti{width:1.7rem;height:1.7rem;margin-inline-end:1rem}
+.menufoot{font-size:.9rem}.menufoot b{font-size:.95rem}
+.dmain{padding:var(--s5) 2.2rem}
+.dhead .label{font-size:1.3rem}
+#setclose{min-height:2.9rem;padding:.2rem 1.4rem;font-size:1rem}
+.pages{zoom:1.35;padding-inline-end:var(--s3)}
+}
 @media(max-width:759px){
 .bar{flex-wrap:wrap;gap:.5rem}.brand{order:-1;flex:1 1 100%;margin-bottom:.4rem}#setbtn{margin:0}.bar button{min-height:2.4rem;padding:.2rem .7rem;font-size:.8rem}
 .live{margin-inline-start:auto}

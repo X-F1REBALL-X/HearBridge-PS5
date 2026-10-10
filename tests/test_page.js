@@ -244,5 +244,6 @@ check(/act\('\/api\/game\?do=3&id='\+encodeURIComponent\(id\)\)/.test(html) && /
   check((html.match(/id="tb\d"/g) || []).length === 4 && pg1.indexOf('id="gsave"') > 0 && pg1.indexOf('id="tone"') > 0,
     'page: settings has 4 categories, games live in Sound & games');
 }
+check(/\.drawer\{width:92vw;grid-template-columns:22rem/.test(html) && /\.pages\{zoom:1\.35/.test(html), 'page: TV settings is a large overlay with bigger content');
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);
