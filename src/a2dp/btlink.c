@@ -1419,7 +1419,14 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
                      ev[5], dh);
         }
         if (l->connected && dh == (l->handle & 0x0FFF)) {
+            int was_out = acl_pool_disconnected(&l->pool, now_ms()), was_q = l->txq_n;
             log_line("btlink: disconnected (reason %#04x)", ev[5]);
+            /* The controller dropped this handle's buffers: credits back,
+             * nothing queued for the dead handle goes out later. */
+            l->txq_n = l->txq_media = 0;
+            l->txq_head = 0;
+            if (was_out || was_q)
+                log_line("btlink: %d credit(s) back, %d queued packet(s) flushed", was_out, was_q);
             g_disc_reason = ev[5];
             if (l->acc_n && l->acc_got && !l->enc_on) l->acc_dropped = 1;
             l->connected = 0;
