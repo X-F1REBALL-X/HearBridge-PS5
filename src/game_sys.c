@@ -26,25 +26,36 @@ static int g_init, g_ok;
 static void init(void)
 {
     char how[128];
-    uint32_t h;
+    uint32_t h, hs = 0;
+    int nmods = -1;
     if (g_init) return;
     g_init = 1;
     h = hb_mod_open("libSceSystemService.sprx", how, sizeof how);
     diag_set("libSceSystemService.sprx", "%s", how);
-    if (!h) {
-        diag_set("game detection", "off: libSceSystemService.sprx %s", how);
-        log_line("game: detection off, libSceSystemService.sprx %s", how);
-        return;
+    if (h) {
+        g_appid = (fn_appid)hb_mod_sym(h, NID_SS_RunningBigApp, "sceSystemServiceGetAppIdOfRunningBigApp");
+        if (!g_appid) g_appid = (fn_appid)hb_mod_sym(h, NID_LNC_RunningBigApp, "sceLncUtilGetAppIdOfRunningBigApp");
+        g_title[0] = (fn_title)hb_mod_sym(h, NID_LNC_TitleId, "sceLncUtilGetAppTitleId");
+        g_title[1] = (fn_title)hb_mod_sym(h, NID_SS_TitleId, "sceSystemServiceGetAppTitleId");
     }
-    g_appid = (fn_appid)hb_mod_sym(h, NID_SS_RunningBigApp, "sceSystemServiceGetAppIdOfRunningBigApp");
-    if (!g_appid) g_appid = (fn_appid)hb_mod_sym(h, NID_LNC_RunningBigApp, "sceLncUtilGetAppIdOfRunningBigApp");
-    g_title[0] = (fn_title)hb_mod_sym(h, NID_LNC_TitleId, "sceLncUtilGetAppTitleId");
-    g_title[1] = (fn_title)hb_mod_sym(h, NID_SS_TitleId, "sceSystemServiceGetAppTitleId");
+    if (!g_appid || (!g_title[0] && !g_title[1])) {
+        /* not found through the name: look in every loaded module (the
+         * payload links libSceSystemService, so it is there) */
+        uint32_t m = 0;
+        if (!g_appid) {
+            g_appid = (fn_appid)hb_mod_scan(NID_SS_RunningBigApp, "sceSystemServiceGetAppIdOfRunningBigApp", &m, &nmods);
+            if (!g_appid) g_appid = (fn_appid)hb_mod_scan(NID_LNC_RunningBigApp, "sceLncUtilGetAppIdOfRunningBigApp", &m, &nmods);
+            if (g_appid) hs = m;
+        }
+        if (!g_title[0]) g_title[0] = (fn_title)hb_mod_scan(NID_LNC_TitleId, "sceLncUtilGetAppTitleId", &m, &nmods);
+        if (!g_title[1]) g_title[1] = (fn_title)hb_mod_scan(NID_SS_TitleId, "sceSystemServiceGetAppTitleId", &m, &nmods);
+        if (!hs && (g_title[0] || g_title[1])) hs = m;
+    }
     g_ok = g_appid && (g_title[0] || g_title[1]);
-    diag_set("game detection", "%s (handle %#x; running app %p, title id lnc %p, ss %p)", g_ok ? "on" : "off",
-             h, (void *)g_appid, (void *)g_title[0], (void *)g_title[1]);
-    log_line("game: detection %s (handle %#x, running app %p, lnc title %p, ss title %p)",
-             g_ok ? "on" : "not available on this firmware", h, (void *)g_appid,
+    diag_set("game detection", "%s (handle %#x, module scan %#x of %d; running app %p, title id lnc %p, ss %p)",
+             g_ok ? "on" : "off", h, hs, nmods, (void *)g_appid, (void *)g_title[0], (void *)g_title[1]);
+    log_line("game: detection %s (handle %#x, scan %#x/%d, running app %p, lnc title %p, ss title %p)",
+             g_ok ? "on" : "not available on this firmware", h, hs, nmods, (void *)g_appid,
              (void *)g_title[0], (void *)g_title[1]);
 }
 

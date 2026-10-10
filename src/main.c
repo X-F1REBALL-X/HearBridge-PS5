@@ -3022,8 +3022,6 @@ int main(void)
     CTL_LOCK(&g_ctl);
     games_publish_locked();
     CTL_UNLOCK(&g_ctl);
-    g_game_thr_up = pthread_create(&g_game_thr, NULL, game_thread, NULL) == 0;
-    g_rest_thr_up = pthread_create(&g_rest_thr, NULL, rest_thread, NULL) == 0;
 
     /* Diagnostics: firmware, audio libraries and every USB device
      * (read-only). They run only after the page and the icon are up, so
@@ -3031,6 +3029,14 @@ int main(void)
     sysinfo_collect();
     (void)avcap2_probe();
     (void)hci_usb_survey();
+    /* Game detection and the rest mode watch look their system calls up
+     * here, one after the other: the kernel_dynlib_* helpers are not safe
+     * to run from several threads at once (fw 10.20 lost lookups when the
+     * game thread raced avcap2_probe). The threads start after that. */
+    (void)hb_game_sys_avail();
+    (void)hb_rest_sys_avail();
+    g_game_thr_up = pthread_create(&g_game_thr, NULL, game_thread, NULL) == 0;
+    g_rest_thr_up = pthread_create(&g_rest_thr, NULL, rest_thread, NULL) == 0;
     (void)diag_save();
 
     if (!headset_ini_load(&ini) && !ini.have_addr)
