@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="assets/icon0.png" width="128" alt="HearBridge icon">
-
-# HearBridge PS5
+<img src="docs/img/banner.png" alt="HearBridge PS5">
 
 **Bluetooth headphones for a jailbroken PS5: game and system audio, no dongle.**
 
