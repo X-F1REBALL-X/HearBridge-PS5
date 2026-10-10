@@ -16,6 +16,10 @@
  * needed; 0 when not found. `how` (may be NULL, 96 bytes) says how. */
 uint32_t hb_mod_open(const char *basename, char *how, int howmax);
 
+/* Look for a function in every loaded module (sceKernelGetModuleList);
+ * h_out gets the module, n_out how many modules were looked at (-1 none). */
+intptr_t hb_mod_scan(const char *nid, const char *name, uint32_t *h_out, int *n_out);
+
 /* Address of a function in module `h` by NID, then by name. 0 if missing. */
 intptr_t hb_mod_sym(uint32_t h, const char *nid, const char *name);
 
