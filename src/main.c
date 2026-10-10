@@ -175,6 +175,8 @@ static int accept_one(btlink *link, const headset_ini *ini, int ms)
  * still finishes, short enough that we do not sit for half a minute. */
 #define HB_PAGE_MS 5000
 #define HB_DROPPED_LISTEN_MS 10000   /* page to a just-left headset failed: listen this long */
+#define HB_VOLQ_MS      3000   /* page open, no volume report this long: ask the headset again */
+#define HB_VOLQ_PAGE_MS 5000   /* page counts as open while it polled within this */
 #define HB_BATT_WAIT_MS 8000   /* no battery report by then: "Not shown by this headset" */
 /* After a hang-up right after encryption: wait this long for its own call. */
 #define HB_CALLBACK_MS 2500
@@ -2609,6 +2611,29 @@ stream_setup:
                 btlink_link_quality(link, &rssi, &lqv);
                 g_ctl.battery = btlink_avrcp_battery(link);
                 g_ctl.batt_pct = btlink_hfp_battery(link);
+                {
+                    /* Volume fallback: while the page is open (it polls
+                     * /api/status) and the headset has sent no volume report
+                     * for 3 s, ask it again, at most every 3 s. Page closed:
+                     * no extra traffic (DualSense-friendly). */
+                    static const btlink *vq_link;
+                    static unsigned long vq_polls, vq_reports;
+                    static long vq_page_t, vq_rep_t, vq_last;
+                    unsigned long cmds, rsps, rep;
+                    int refused;
+                    if (vq_link != link) {
+                        vq_link = link; vq_polls = g_ctl.status_polls; vq_reports = 0;
+                        vq_page_t = 0; vq_rep_t = now; vq_last = now;
+                    }
+                    if (g_ctl.status_polls != vq_polls) { vq_polls = g_ctl.status_polls; vq_page_t = now; }
+                    btlink_avrcp_stats(link, &cmds, &rsps, &rep, &refused);
+                    if (rep != vq_reports) { vq_reports = rep; vq_rep_t = now; }
+                    if (vq_page_t && now - vq_page_t < HB_VOLQ_PAGE_MS && now - vq_rep_t >= HB_VOLQ_MS &&
+                        now - vq_last >= HB_VOLQ_MS && btlink_avrcp_requery(link))
+                        vq_last = now;
+                    diag_set("avrcp", "rx commands %lu, responses %lu, volume reports %lu%s", cmds, rsps, rep,
+                             refused ? ", headset refused volume registration" : "");
+                }
                 {
                     /* Nothing from HFP or AVRCP a few seconds into the stream:
                      * the page says the headset does not show it. */

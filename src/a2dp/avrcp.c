@@ -26,6 +26,8 @@
 #define PDU_BATTERY    0x18
 #define PDU_REG_NOTIFY 0x31
 #define PDU_SET_ABSVOL 0x50
+#define PDU_PLAY_STAT  0x30
+#define EV_PLAYBACK    0x01
 #define EV_VOLUME      0x0D
 #define EV_BATT        0x06
 
@@ -36,6 +38,23 @@ int avrcp_reported(const avrcp_state *a)
      * registration is outstanding; the other flags stick after it has
      * shown absolute volume (SetAbsoluteVolume or our registration). */
     return a->remote_abs || a->ct_registered || a->notify_label >= 0 || a->sink_renders;
+}
+
+const char *avrcp_key_name(int key)
+{
+    switch (key) {
+    case 0x41: return "volume up";
+    case 0x42: return "volume down";
+    case 0x43: return "mute";
+    case 0x44: return "play";
+    case 0x45: return "stop";
+    case 0x46: return "pause";
+    case 0x4B: return "forward";
+    case 0x4C: return "backward";
+    case 0x48: return "rewind";
+    case 0x49: return "fast forward";
+    default:   return "";
+    }
 }
 
 void avrcp_init(avrcp_state *a, int volume)
@@ -181,6 +200,8 @@ static void on_response(avrcp_state *a, int label, const unsigned char *av, int 
                 a->ct_registered = (rc == RSP_INTERIM);
                 if (rc == RSP_CHANGED) a->need_register = 1;
                 if (rc == RSP_INTERIM && !a->batt_tried) a->need_batt = 1;
+                a->vol_reports++;
+                a->vol_refused = 0;
                 if ((par[1] & 0x7F) != a->volume || rc == RSP_CHANGED) {
                     a->volume = par[1] & 0x7F;
                     a->changed = 1;
@@ -190,6 +211,7 @@ static void on_response(avrcp_state *a, int label, const unsigned char *av, int 
                          rc == RSP_INTERIM ? "is" : "changed to", a->volume);
             } else {
                 a->ct_registered = 0;
+                a->vol_refused = 1;
                 log_line("avrcp: headset refused VOLUME_CHANGED registration (%#x)", rc);
             }
         } else if (pdu == PDU_SET_ABSVOL && np >= 1) {
@@ -197,6 +219,7 @@ static void on_response(avrcp_state *a, int label, const unsigned char *av, int 
                 a->remote_abs = 1;
                 a->sink_renders = 1;
                 a->volume = par[0] & 0x7F;
+                a->vol_reports++;
                 log_line("avrcp: headset set absolute volume %d/127", a->volume);
             } else {
                 if (!a->ct_registered) a->sink_renders = 0;   /* software gain then */
@@ -231,6 +254,7 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
         if ((av[0] & 0x0F) == RSP_NOT_IMPL && n >= 7 && av[2] == OP_VENDOR) {
             if (av[6] == PDU_SET_ABSVOL && !a->ct_registered) a->sink_renders = 0;
             if (av[6] == PDU_REG_NOTIFY && label == a->batt_label) a->batt_label = -1;
+            else if (av[6] == PDU_REG_NOTIFY) a->vol_refused = 1;
             log_line("avrcp: headset does not implement PDU %#x", av[6]);
             return 0;
         }
@@ -268,8 +292,13 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
             a->volume = v < 0 ? 0 : v > 127 ? 127 : v;
             a->changed = 1;
             a->vol_from_headset++;
+            a->vol_reports++;
             log_line("avrcp: volume key %s -> %d/127", key == 0x41 ? "up" : "down",
                      a->volume);
+        } else if (press) {
+            const char *nm = avrcp_key_name(key);
+            log_line("avrcp: headset key %#x%s%s%s (not used)", key,
+                     nm[0] ? " (" : "", nm, nm[0] ? ")" : "");
         }
         return o + n;
     }
@@ -286,8 +315,12 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
                 return vendor(out, label, 1, RSP_STABLE, pdu, r, 5, max);
             }
             if (np >= 1 && par[0] == 0x03) {       /* events */
-                r[0] = 0x03; r[1] = 1; r[2] = EV_VOLUME;
-                log_line("avrcp: headset asked capabilities -> VOLUME_CHANGED");
+                /* As target we are a plain player: playback status only.
+                 * Absolute volume (VOLUME_CHANGED) belongs to the headset
+                 * side, so it is not offered here; a headset that offers
+                 * it to us as target sends volume reports and keys. */
+                r[0] = 0x03; r[1] = 1; r[2] = EV_PLAYBACK;
+                log_line("avrcp: headset asked capabilities -> PLAYBACK_STATUS_CHANGED");
                 return vendor(out, label, 1, RSP_STABLE, pdu, r, 3, max);
             }
             r[0] = 0x01;                            /* invalid parameter */
@@ -301,14 +334,24 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
                          a->volume);
                 return vendor(out, label, 1, RSP_INTERIM, pdu, r, 2, max);
             }
+            if (ctype == CT_NOTIFY && np >= 1 && par[0] == EV_PLAYBACK) {
+                r[0] = EV_PLAYBACK; r[1] = 0x01;    /* playing */
+                return vendor(out, label, 1, RSP_INTERIM, pdu, r, 2, max);
+            }
             r[0] = 0x01;
             return vendor(out, label, 1, RSP_REJECTED, pdu, r, 1, max);
+        case PDU_PLAY_STAT: {
+            /* length and position unknown (0xFFFFFFFF), playing */
+            unsigned char ps[9] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01 };
+            return vendor(out, label, 1, RSP_STABLE, pdu, ps, 9, max);
+        }
         case PDU_SET_ABSVOL:
             if (np >= 1) {
                 a->volume = par[0] & 0x7F;
                 a->remote_abs = 1;
                 a->changed = 1;
                 a->vol_from_headset++;
+                a->vol_reports++;
                 r[0] = (unsigned char)a->volume;
                 log_line("avrcp: headset SetAbsoluteVolume %d/127", a->volume);
                 return vendor(out, label, 1, RSP_ACCEPTED, pdu, r, 1, max);

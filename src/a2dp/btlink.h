@@ -114,6 +114,12 @@ int  btlink_avrcp_state(const btlink *l);
 int  btlink_avrcp_connect(btlink *l);
 /* Headset battery as AVRCP status 0..4 (avrcp.h AVRCP_BATT_*), -1 unknown. */
 int  btlink_avrcp_battery(const btlink *l);
+/* Ask the headset for its volume again (re-register VOLUME_CHANGED; the
+ * INTERIM answer carries the level). 0 = not sent (no channel, or the
+ * headset refused the registration before). */
+int  btlink_avrcp_requery(btlink *l);
+void btlink_avrcp_stats(const btlink *l, unsigned long *cmds, unsigned long *rsps,
+                        unsigned long *reports, int *refused);
 /* Battery percent the headset reported over HFP (0..100), -1 none yet. */
 int  btlink_hfp_battery(const btlink *l);
 /* Bumped each time the headset itself changed the volume (its buttons/app). */

@@ -104,6 +104,9 @@ struct btlink {
     avrcp_state avrcp;
     hfp_state hfp;            /* HFP AG on inbound RFCOMM: battery only */
     unsigned hfp_scid;        /* RFCOMM channel the hfp state belongs to */
+    int avlog_n;              /* AVRCP rx frames hex-logged in this window */
+    long avlog_t;             /* start of that window */
+    unsigned long avlog_skipped;
     unsigned avrcp_scid;      /* open AVRCP control channel (either side) */
     unsigned in_rx_psm;
     btlink_rx_fn in_rx;
@@ -931,6 +934,27 @@ static void avctp_reply(btlink *l, chan *c, const unsigned char *d, int len)
     unsigned char r[128];
     int n;
 
+    {
+        /* Short hex of what the headset sends (debug volume keys): at most
+         * 6 frames per 5 s, 16 bytes each. */
+        long now = now_ms();
+        if (now - l->avlog_t >= 5000) {
+            if (l->avlog_skipped)
+                log_line("avrcp: rx %lu more frames not shown", l->avlog_skipped);
+            l->avlog_t = now; l->avlog_n = 0; l->avlog_skipped = 0;
+        }
+        if (l->avlog_n < 6) {
+            char hx[3 * 16 + 1];
+            int i, m = len < 16 ? len : 16;
+            for (i = 0; i < m; i++) snprintf(hx + 3 * i, 4, "%02x ", d[i]);
+            hx[3 * m] = 0;
+            log_line("avrcp: rx%s %d bytes: %s%s", c->psm == BTLINK_PSM_AVCTP_BR ? " (browsing)" : "",
+                     len, hx, len > 16 ? "..." : "");
+            l->avlog_n++;
+        } else {
+            l->avlog_skipped++;
+        }
+    }
     if (c->psm == BTLINK_PSM_AVCTP_BR) {
         /* Browsing: no media player, General Reject every PDU. */
         if (len < 4 || (d[0] & 0x02)) return;
@@ -2540,6 +2564,25 @@ int btlink_avrcp_battery(const btlink *l)
 int btlink_hfp_battery(const btlink *l)
 {
     return l ? l->hfp.battery : -1;
+}
+
+int btlink_avrcp_requery(btlink *l)
+{
+    unsigned char r[32];
+    int n;
+    if (!l || !avrcp_open(l) || l->avrcp.vol_refused) return 0;
+    n = avrcp_build_register_volume(&l->avrcp, r, (int)sizeof r);
+    avrcp_send(l, r, n);
+    return n > 0;
+}
+
+void btlink_avrcp_stats(const btlink *l, unsigned long *cmds, unsigned long *rsps,
+                        unsigned long *reports, int *refused)
+{
+    if (cmds) *cmds = l ? l->avrcp.rx_cmds : 0;
+    if (rsps) *rsps = l ? l->avrcp.rx_rsps : 0;
+    if (reports) *reports = l ? l->avrcp.vol_reports : 0;
+    if (refused) *refused = l ? l->avrcp.vol_refused : 0;
 }
 
 int btlink_avrcp_headset_moves(const btlink *l)
