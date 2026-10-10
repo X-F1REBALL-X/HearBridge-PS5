@@ -54,6 +54,9 @@ int main(void)
         CHECK(!hb_dropped_recent(&d, x, 1000 + HB_DROPPED_MS, HB_DROPPED_MS), "dropped: 10 s later it is not");
         CHECK(hb_dropped_recent(&d, x, 30000, HB_DROPPED_PAGE_MS), "dropped: page window is longer (60 s)");
     }
+    CHECK(!hb_drop_is_away(0x08), "drop: supervision timeout (0x08) is link loss, the normal rejoin runs");
+    CHECK(hb_drop_is_away(0x13), "drop: remote user (0x13, case / power button) stays idle");
+    CHECK(!hb_drop_is_away(0x16) && !hb_drop_is_away(0x22), "drop: other reasons rejoin too");
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

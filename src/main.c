@@ -2518,13 +2518,20 @@ stream_setup:
 
         if (hb_stop_requested()) { rc = RUN_STOP; break; }
         if (btlink_pump(link, 1) < 0 || !btlink_is_up(link)) {
-            /* 0x13 remote user / 0x08 supervision: buds went in the case
-             * (or just died). That is a disconnect, not a reason to page. */
+            /* 0x13 remote user: buds went in the case or were switched
+             * off, a disconnect, not a reason to page. 0x08 supervision
+             * timeout is the radio link lost (out of range, interference):
+             * the normal rejoin runs, like any other drop. */
             int dr = btlink_last_disc_reason();
-            if (dr == 0x13 || dr == 0x08) {
-                note_event("Headset turned off or out of range");
+            if (hb_drop_is_away(dr)) {
+                note_event("Headset turned off");
                 set_why("away");
                 rc = RUN_AWAY;
+            } else if (dr == 0x08) {
+                log_line("stream: link lost (supervision timeout), rejoining");
+                note_event("Connection lost");
+                set_why("dropped");
+                rc = RUN_DROPPED;
             } else {
                 note_event("Connection lost");
                 set_why("dropped");
