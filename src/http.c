@@ -3,6 +3,7 @@
  * stream loop applies the requests. Developed by X-F1REBALL-X. */
 #include "http.h"
 #include "webpage.h"
+#include "font_woff2.h"
 #include "diag.h"
 #include "rate.h"
 #include "btchip.h"
@@ -361,6 +362,16 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
                 break;
             }
         return n;
+    }
+
+    if (!strcmp(path, "/font.woff2")) {
+        /* The page font (Inter, Latin), kept by the browser for a week. */
+        int n = snprintf(out, (size_t)max, "HTTP/1.1 200 OK\r\nContent-Type: font/woff2\r\nContent-Length: %d\r\n"
+                         "Cache-Control: public, max-age=604800\r\nConnection: close\r\n\r\n",
+                         (int)sizeof hb_font_woff2);
+        if (n < 0 || n + (int)sizeof hb_font_woff2 > max) return 0;
+        memcpy(out + n, hb_font_woff2, sizeof hb_font_woff2);
+        return n + (int)sizeof hb_font_woff2;
     }
 
     is_api = !strncmp(path, "/api/", 5);

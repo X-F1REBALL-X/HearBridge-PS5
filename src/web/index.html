@@ -9,9 +9,13 @@
 :root{--ink:#f4efe6;--ink2:#cfc9be;--mute:#9a948a;--void:#0c0b0f;--deck:#15131a;--card:#1f1b26;--edge:#2c2833;--edge2:#3a3543;
 --lime:#c8ff3d;--ember:#ff6a2b;--cyan:#3dd8ff;--violet:#b18cff;--blue:#5aa2ff;--teal:#8fc2bb;--rose:#ff7ad9;--warn:#ffb23d;--bad:#ff3d5a;--sk:-12deg;
 --s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.25rem;--gap:var(--s4)}
+/* Inter (SIL OFL), Latin only, served by HearBridge itself (/font.woff2). Other scripts
+   and a failed load fall back to the system fonts below. */
+@font-face{font-family:"HB Inter";src:url(/font.woff2) format("woff2");font-weight:400 900;font-style:normal;font-display:swap;
+unicode-range:U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02C6,U+02DA,U+02DC,U+2018-201E,U+2022,U+2026,U+2032-2033,U+2039-203A,U+20AC,U+2122,U+2190-2193,U+2212,U+2248,U+2264-2265}
 *{box-sizing:border-box}
 html{background:var(--void);font-size:15px}
-body{margin:0;color:var(--ink);font:1rem/1.35 "Bahnschrift","DIN Alternate","Segoe UI",system-ui,sans-serif;
+body{margin:0;color:var(--ink);font:1rem/1.35 "HB Inter","Bahnschrift","DIN Alternate","Segoe UI",system-ui,sans-serif;
 background:repeating-linear-gradient(135deg,rgba(255,255,255,.016) 0 2px,transparent 2px 14px),
 radial-gradient(60vw 50vh at 100% 0,rgba(255,106,43,.13),transparent 60%),
 radial-gradient(50vw 50vh at 0 100%,rgba(200,255,61,.06),transparent 60%),var(--void);background-attachment:fixed}
@@ -23,7 +27,7 @@ radial-gradient(50vw 50vh at 0 100%,rgba(200,255,61,.06),transparent 60%),var(--
 .logo{flex:0 0 auto;width:2.6rem;height:2.6rem;margin-inline-end:var(--s3);display:flex;align-items:center;justify-content:center;color:var(--void);
 background:var(--lime);transform:skewX(var(--sk));box-shadow:0 0 1.2rem rgba(200,255,61,.25)}
 .logo svg{width:1.6rem;height:1.6rem;transform:skewX(calc(var(--sk)*-1))}
-.brand h1{margin:0;font-size:1.55rem;font-weight:900;letter-spacing:.22em;text-transform:uppercase;line-height:1.05;white-space:nowrap}
+.brand h1{font-family:"Bahnschrift","DIN Alternate","Segoe UI",system-ui,sans-serif;margin:0;font-size:1.55rem;font-weight:900;letter-spacing:.22em;text-transform:uppercase;line-height:1.05;white-space:nowrap}
 .brand h1 b{color:var(--lime)}
 .meta{display:flex;align-items:center;margin-top:.2rem}
 .ver{color:var(--void);background:var(--ember);font-size:.72rem;font-weight:800;padding:0 .5em;margin-inline-end:.6em;letter-spacing:.06em;transform:skewX(var(--sk))}
@@ -153,10 +157,10 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .curve svg{position:absolute;top:0;left:0;width:100%;height:100%}
 .eqp.off .curve,.eqp.off .bands{opacity:.4;filter:saturate(.3)}
 .bands{display:grid;grid-gap:.35rem}
-.band{display:grid;grid-template-columns:5.6rem minmax(0,1fr) 3.4rem;grid-gap:var(--s2);align-items:center}
+.band{display:grid;grid-template-columns:6.6rem minmax(0,1fr) 3.8rem;grid-gap:var(--s2);align-items:center}
 .band .bn{font-size:.82rem;font-weight:800;color:var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .band .bn i{display:inline-block;width:.55rem;height:.55rem;margin-inline-end:.4rem;transform:rotate(45deg);background:var(--c)}
-.band .bv{font-weight:900;text-align:end;color:var(--c);direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.band .bv{white-space:nowrap;font-weight:900;text-align:end;color:var(--c);direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 .band input[type=range]{margin:0;height:1.3rem;accent-color:var(--c);direction:ltr}
 .band input[type=range]::-webkit-slider-runnable-track{height:1.3rem;background:var(--trk,var(--void));box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
 .band input[type=range]::-webkit-slider-thumb{height:1.3rem;width:.55rem;background:var(--c);box-shadow:0 0 .6rem var(--c)}
@@ -276,8 +280,8 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 .hsinfo{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);margin:0 0 var(--s1)}
 .hsi{display:inline-flex;align-items:center;gap:var(--s2);font-size:.95rem}.hsi .k{font-weight:700;font-size:.82rem}
 .qs{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));grid-gap:var(--s2);margin:0 0 var(--s3)}
-.qs button{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-height:3.6rem;padding:.3rem 1.3rem;text-align:start;overflow:hidden}
-.qs button b{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:1.05rem;direction:ltr;unicode-bidi:isolate}
+.qs button{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-height:3.6rem;padding:.3rem 1rem;text-align:start;overflow:hidden}
+.qs button b{display:block;max-width:100%;overflow:hidden;white-space:normal;overflow-wrap:anywhere;line-height:1.15;font-size:1.02rem;direction:ltr;unicode-bidi:isolate}
 .qs button small{font-size:.74rem;font-weight:700;color:var(--mute)}
 .qs button.act small{color:rgba(12,11,15,.7)}
 .qs button.cur:before{border-color:rgba(200,255,61,.7)}
@@ -463,7 +467,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 .tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
 .menufoot{display:none}
 .dmain{padding:var(--s3)}
-.band{grid-template-columns:4.8rem minmax(0,1fr) 2.8rem}
+.band{grid-template-columns:5.6rem minmax(0,1fr) 3.6rem}
 .logp .evlog{max-height:14rem}
 }
 </style>
