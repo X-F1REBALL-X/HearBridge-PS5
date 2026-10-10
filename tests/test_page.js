@@ -245,5 +245,10 @@ check(/act\('\/api\/game\?do=3&id='\+encodeURIComponent\(id\)\)/.test(html) && /
     'page: settings has 4 categories, games live in Sound & games');
 }
 check(/\.drawer\{width:92vw;grid-template-columns:22rem/.test(html) && /\.pages\{zoom:1\.35/.test(html), 'page: TV settings is a large overlay with bigger content');
+{
+  const eq = html.slice(html.indexOf('id="eqp"'));
+  check(eq.indexOf('id="eqon"') < eq.indexOf('id="gain"') && eq.indexOf('id="pr0"') < eq.indexOf('id="gain"') && eq.indexOf('id="hs"') < eq.indexOf('id="night"') &&
+    eq.indexOf('id="mute"') < eq.indexOf('id="eqon"'), 'page: Sound panel: EQ first, then volume, then night mode; mute in the header');
+}
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);
