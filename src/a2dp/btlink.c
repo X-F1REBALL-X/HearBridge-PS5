@@ -966,6 +966,7 @@ static void avctp_reply(btlink *l, chan *c, const unsigned char *d, int len)
         return;
     }
     l->avrcp_scid = c->scid;
+    l->avrcp.now_ms = now_ms();
     n = avrcp_input(&l->avrcp, d, len, r, (int)sizeof r);
     if (n > 0) (void)l2_send_raw(l, c->dcid, r, n);
     if (l->avrcp.need_register) {
@@ -2531,6 +2532,7 @@ void btlink_avrcp_set_volume(btlink *l, int vol)
         l->avrcp.volume = vol;
         return;
     }
+    l->avrcp.now_ms = now_ms();
     n = avrcp_build_set_volume(&l->avrcp, vol, r, (int)sizeof r);
     avrcp_send(l, r, n);                       /* we as controller */
     n = avrcp_build_volume_changed(&l->avrcp, r, (int)sizeof r);

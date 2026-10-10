@@ -176,6 +176,13 @@ global.hbTest.req('/api/status');
 check(/absolute volume/.test(el('av').innerHTML) && !/not connected/.test(el('av').innerHTML),
   'page: AVRCP says connected when the headset is reporting volume');
 check(el('hv').textContent === '97%', 'page: headset volume 123/127 is 97%');
+check(el('hvnote').textContent === 'Sets the headset volume' && /Sets the headset volume/.test(el('av').innerHTML) && !/Follows/.test(el('av').innerHTML),
+  'page: headset never moved the volume itself: slider says it sets the headset volume (one way)');
+STATUS.hs_moves = 1; global.hbTest.req('/api/status');
+check(el('hvnote').textContent === 'Follows the headset', 'page: once the headset moved it, the slider says it follows the headset');
+STATUS.hs_moves = 0; STATUS.avrcp = { connected: 1, absolute_volume: 0, notifications: 0, sink_volume: 0 }; global.hbTest.req('/api/status');
+check(el('hvnote').textContent === 'Software volume', 'page: software volume says so');
+STATUS.avrcp = { connected: 0, absolute_volume: 1, notifications: 1, sink_volume: 1 }; global.hbTest.req('/api/status');
 check(/low bitpool/.test(el('xqnote').innerHTML), 'page: says plain SBC will sound better when XQ stays low');
 check(/link dropped/.test(el('evlog').innerHTML), 'page: recent switches and disconnects');
 STATUS.state = 'disconnected'; STATUS.connected = 0; STATUS.why = 'dropped';

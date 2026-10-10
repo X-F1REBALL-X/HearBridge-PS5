@@ -25,6 +25,8 @@ typedef struct {
     unsigned long rx_cmds, rx_rsps;
     unsigned long vol_reports; /* every volume report / key / SetAbsoluteVolume from the headset */
     int vol_refused;       /* headset refused (or does not implement) our VOLUME_CHANGED registration */
+    long now_ms;           /* caller's clock, set before avrcp_input / avrcp_build_set_volume */
+    long our_set_ms;       /* when we last sent SetAbsoluteVolume */
 } avrcp_state;
 
 /* Name of a PASS THROUGH operation id (play, pause, ...), "" unknown. */
@@ -40,6 +42,10 @@ const char *avrcp_battery_key(int status);
 int avrcp_battery_level(int status);
 /* Our registration for EVENT_BATT_STATUS_CHANGED toward the headset. */
 int avrcp_build_register_battery(avrcp_state *a, unsigned char *out, int max);
+
+/* Volume reports this soon after our SetAbsoluteVolume are its echo, not
+ * the headset being turned: they do not count as moved on the headset. */
+#define AVRCP_ECHO_MS 1000
 
 void avrcp_init(avrcp_state *a, int volume);
 

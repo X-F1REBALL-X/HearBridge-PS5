@@ -250,6 +250,7 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 /* headset volume moved on the headset itself */
 .sync{display:inline-block;margin-inline-start:.5rem;padding:0 .4rem;font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--void);background:var(--ember);opacity:0;transition:opacity .4s}
 .sync.on{opacity:1}
+.vnote{display:block;margin-top:.2rem;font-size:.78rem;color:var(--ink2)}
 /* running game strip (equalizer) */
 .game{display:flex;align-items:center;gap:var(--s2);min-width:0;margin:0 0 var(--s2);padding:var(--s1) 0 var(--s1) var(--s2);background:rgba(255,122,217,.06);border:1px solid rgba(255,122,217,.35)}
 .game .gbtns{margin-inline-start:auto}.game.on{background:rgba(255,122,217,.14);border-color:var(--rose)}.game .gbtns button{min-height:2.2rem;min-width:0;padding:.15rem .8rem;font-size:.86rem}
@@ -542,7 +543,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="vol volin"><div class="vrow"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
 <input type="range" id="gain" min="0" max="500" step="10"></div>
 <div class="vrow"><div class="row"><span class="cl"><span data-i18n="headset">Headset volume (AVRCP)</span><span class="sync" id="hsync" data-i18n="fromHeadset">from headset</span></span><span class="big" id="hv">-</span></div>
-<input type="range" id="hs" min="0" max="127" step="1"></div>
+<input type="range" id="hs" min="0" max="127" step="1"><small class="vnote" id="hvnote"></small></div>
 </div>
 <button type="button" class="night" id="night"><span class="nt"><b data-i18n="night">Night mode</b><small data-i18n="nightHint">Quieter explosions, clearer voices</small></span><span class="sw" id="nightsw"></span></button>
 </section>
@@ -780,7 +781,9 @@ $('pk').textContent=S.pkts+' / '+S.frames+(S.backlog?' ('+t('queue')+' '+S.backl
 
 setHtml('fmt',S.sample_rate?chips([[S.codec||'SBC','hi n'],[S.sample_rate+' Hz','n']]):'-');setHtml('fmtd',S.sample_rate?chips([[S.codec||'SBC','hi n'],[S.sample_rate+' Hz','n'],['bitpool '+S.bitpool+(S.bitpool_max>S.bitpool_min?' ('+S.bitpool_min+'-'+S.bitpool_max+')':''),'n'],[S.per_packet+' '+t('perPkt')]]):'-');
 var av=S.avrcp||{},avUp=av.connected||av.absolute_volume||av.notifications||av.sink_volume;
-setHtml('av',!avUp?chips([[t('avrcpNone'),'off']]):chips([[av.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(av.notifications?[[t('notif')]]:[]).concat([[t(av.sink_volume?'volOnHeadset':'volSoftware'),av.sink_volume?'hi':'']])));
+/* one way unless proven: "follows the headset" only after the headset itself moved the volume */
+var vmode=!av.sink_volume?'volSoftware':S.hs_moves>0?'volFollows':'volSetsHeadset';$('hvnote').textContent=avUp?t(vmode):'';
+setHtml('av',!avUp?chips([[t('avrcpNone'),'off']]):chips([[av.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(av.notifications?[[t('notif')]]:[]).concat([[t(vmode),av.sink_volume?'hi':'']])));
 setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
 /* Bluetooth chip: vendor (IDs) */
 var ch=S.chip||{};$('chipv').textContent=ch.vid?(ch.vendor?ch.vendor+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'-';

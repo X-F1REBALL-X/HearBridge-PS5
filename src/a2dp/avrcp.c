@@ -65,6 +65,15 @@ void avrcp_init(avrcp_state *a, int volume)
     a->our_label = 1;
     a->battery = -1;
     a->batt_label = -1;
+    a->our_set_ms = -100000;
+}
+
+/* A volume report right after our own SetAbsoluteVolume is that change
+ * coming back, not someone turning the headset. */
+static int our_echo(const avrcp_state *a)
+{
+    long d = a->now_ms - a->our_set_ms;
+    return d >= 0 && d < AVRCP_ECHO_MS;
 }
 
 const char *avrcp_battery_key(int s)
@@ -153,6 +162,7 @@ int avrcp_build_set_volume(avrcp_state *a, int vol, unsigned char *out, int max)
     if (vol < 0) vol = 0;
     if (vol > 127) vol = 127;
     a->volume = vol;
+    a->our_set_ms = a->now_ms;
     p[0] = (unsigned char)vol;
     return vendor(out, next_label(a), 0, CT_CONTROL, PDU_SET_ABSVOL, p, 1, max);
 }
@@ -203,12 +213,14 @@ static void on_response(avrcp_state *a, int label, const unsigned char *av, int 
                 a->vol_reports++;
                 a->vol_refused = 0;
                 if ((par[1] & 0x7F) != a->volume || rc == RSP_CHANGED) {
+                    int moved = (par[1] & 0x7F) != a->volume;
                     a->volume = par[1] & 0x7F;
                     a->changed = 1;
-                    if (rc == RSP_CHANGED) a->vol_from_headset++;
+                    if (rc == RSP_CHANGED && moved && !our_echo(a)) a->vol_from_headset++;
                 }
-                log_line("avrcp: headset volume %s %d/127",
-                         rc == RSP_INTERIM ? "is" : "changed to", a->volume);
+                log_line("avrcp: headset volume %s %d/127%s",
+                         rc == RSP_INTERIM ? "is" : "changed to", a->volume,
+                         rc == RSP_CHANGED && our_echo(a) ? " (our own change)" : "");
             } else {
                 a->ct_registered = 0;
                 a->vol_refused = 1;
@@ -347,10 +359,10 @@ int avrcp_input(avrcp_state *a, const unsigned char *in, int len,
         }
         case PDU_SET_ABSVOL:
             if (np >= 1) {
+                if ((par[0] & 0x7F) != a->volume && !our_echo(a)) a->vol_from_headset++;
                 a->volume = par[0] & 0x7F;
                 a->remote_abs = 1;
                 a->changed = 1;
-                a->vol_from_headset++;
                 a->vol_reports++;
                 r[0] = (unsigned char)a->volume;
                 log_line("avrcp: headset SetAbsoluteVolume %d/127", a->volume);
