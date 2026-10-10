@@ -41,7 +41,7 @@ check(/if\(lg\.hbFollow\)lg\.scrollTop=lg\.scrollHeight/.test(html) && /this\.hb
 check(/patchList\('devlist'/.test(html) && /patchList\('savedlist'/.test(html) && !/\$\('(devlist|savedlist)'\)\.innerHTML=/.test(html),
   'page: device lists are patched in place (no rebuild per poll, no hover/focus blink)');
 const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], 
-  ['scan', '/api/scan'], ['stop', '/api/stop'], ['clean', '/api/clean']];
+  ['stop', '/api/stop'], ['clean', '/api/clean']];
 for (const [id, path] of actions) {
   calls.length = 0; el(id).onclick();
   const c = calls[0];
@@ -128,6 +128,44 @@ check(calls[0] && /^\/api\/eq\?on=0&/.test(calls[0].p), 'page: EQ toggle -> on=0
 XHR.prototype.send = function () { calls.push({}); this.status = 403; this.responseText = '{"error":"token"}'; this.onload(); };
 el('mute').onclick();
 check(el('msg').textContent.indexOf('Reload') >= 0, 'page: 403 shows the reload hint');
+global.hbTest.draw && global.hbTest.draw();
+check(el('msg').textContent.indexOf('Reload') >= 0 || !global.hbTest.draw, 'page: the reload hint survives the next status draw');
+check(/\.msg\{position:fixed;z-index:(9[1-9]|[1-9]\d\d)/.test(html) && /\.drawer\{position:fixed;z-index:90/.test(html),
+  'page: the error hint shows above the Settings overlay');
+// Page left open over a restart: the old token gets 403, the status carries the
+// new one, the press is sent again with it and goes through.
+{
+  const NEW = '0123456789abcdef0123456789abcdef', seen = [];
+  XHR.prototype.send = function () {
+    seen.push({ m: this.m, p: this.p, t: this.h['X-HB-Token'] });
+    if (this.m === 'POST' && this.h['X-HB-Token'] !== NEW) { this.status = 403; this.responseText = '{"error":"token"}'; }
+    else { this.status = 200; this.responseText = this.m === 'GET' ? JSON.stringify(Object.assign({}, STATUS, { token: NEW })) : '{"ok":1}'; }
+    this.onload();
+  };
+  el('tone').onclick();
+  const posts = seen.filter(c => c.m === 'POST');
+  check(posts.length === 2 && posts[0].t === 'deadbeefdeadbeefdeadbeefdeadbeef' && posts[1].t === NEW && /^\/api\/tone/.test(posts[1].p) &&
+        seen.some(c => c.m === 'GET' && c.p === '/api/status'), 'page: a 403 takes the new token from the status and sends the press again');
+  check(el('msg').textContent === '', 'page: the reload hint goes away once a press goes through');
+  seen.length = 0; el('mute').onclick();
+  check(seen.length === 1 && seen[0].t === NEW, 'page: later presses use the new token right away');
+  ['tb0','tb1','tb2','tb3','tbhome'].forEach(id => { if (!el(id).focus) el(id).focus = function () {}; });
+  // streaming: Scan / Add headset do not scan (shared radio with the DualSense), they say why
+  const toastLog = []; { let v = ''; Object.defineProperty(el('toast'), 'textContent', { get: () => v, set: (x) => { v = x; if (x) toastLog.push(x); } }); }
+  STATUS.state = 'streaming'; STATUS.device = 'Xbox Wireless Headset'; global.hbTest.req('/api/status');
+  seen.length = 0; toastLog.length = 0; el('scan').onclick();
+  check(!seen.some(c => c.m === 'POST') && toastLog.pop() === 'Disconnect Xbox Wireless Headset first to add a new headset',
+        'page: Scan while streaming does not scan, says to disconnect the headset first');
+  seen.length = 0; toastLog.length = 0; el('addhs').onclick();
+  check(!seen.some(c => c.m === 'POST') && /^Disconnect Xbox/.test(toastLog.pop() || ''), 'page: Add headset while streaming says the same');
+  check(/\.toast\{position:fixed;z-index:(9[1-9]|[1-9]\d\d)/.test(html), 'page: that note shows above the Settings overlay');
+  STATUS.state = 'disconnected'; global.hbTest.req('/api/status');
+  seen.length = 0; el('scan').onclick();
+  check(seen.some(c => c.m === 'POST' && c.p === '/api/scan?user=1'), 'page: Scan with no headset streaming asks for a real scan (user=1)');
+  seen.length = 0; el('addhs').onclick();
+  check(seen.some(c => c.p === '/api/scan?user=1'), 'page: Add headset asks for a real scan (user=1)');
+  STATUS.state = 'streaming';
+}
 XHR.prototype.send = function () { calls.push({ m: this.m, p: this.p, h: this.h }); this.status = 200;
   this.responseText = JSON.stringify(STATUS); if (this.onload) this.onload(); };
 STATUS.avrcp = { connected: 0, absolute_volume: 1, notifications: 1, sink_volume: 1 };

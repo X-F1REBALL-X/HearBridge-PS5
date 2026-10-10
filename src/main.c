@@ -334,7 +334,7 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 /* A scan (button or page refresh) runs inquiries back to back for
  * SCAN_WINDOW_S. Each result is written to devices.json as it arrives.
  * The list stays until the next scan. */
-#define SCAN_WINDOW_S 20
+#define SCAN_WINDOW_S 12   /* short: the radio is shared with the DualSense */
 
 static void write_status(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void write_status(const char *fmt, ...)
@@ -471,7 +471,7 @@ static void inquiry_progress(const a2dp_inq_dev *devs, int n)
 
 /* ---- web commands (select.txt) and the saved-device list ------------- */
 enum { CMD_NONE, CMD_ADDR, CMD_INDEX, CMD_SCAN, CMD_RECONNECT, CMD_FORGET_CUR };
-typedef struct { int kind, index; unsigned char addr[6]; } hb_cmd;
+typedef struct { int kind, index, user; unsigned char addr[6]; } hb_cmd;   /* user: Scan button */
 
 static headset_ini g_paired[PAIRED_MAX];
 static int g_npaired;
@@ -510,22 +510,40 @@ static int want_blocks(const unsigned char addr[6])
 /* Saved devices the user disconnected by hand: auto-reconnect leaves them
  * alone until Connect is pressed for them (or HearBridge restarts). */
 static unsigned char g_hold[PAIRED_MAX][6];
+static unsigned char g_hold_man[PAIRED_MAX];   /* 1: Disconnect pressed for it */
 static int g_nhold;
 
-static long g_hold_ms;     /* when the last manual Disconnect hold was set */
-static int held(const unsigned char a[6])
+static long g_hold_ms;     /* when the last hold was set */
+static int hold_idx(const unsigned char a[6])
 {
     int i;
-    for (i = 0; i < g_nhold; i++) if (!memcmp(g_hold[i], a, 6)) return 1;
-    return 0;
+    for (i = 0; i < g_nhold; i++) if (!memcmp(g_hold[i], a, 6)) return i;
+    return -1;
+}
+static int held(const unsigned char a[6])
+{
+    return hold_idx(a) >= 0;
 }
 
-static void hold_add(const unsigned char a[6])
+/* Kept out of auto-accept and background pages right now. A manual
+ * Disconnect holds it until the user picks it again (Connect, Reconnect,
+ * a press on its row); a switch to another headset only for 30 s. */
+static int held_now(const unsigned char a[6], long now)
 {
+    int i = hold_idx(a);
+    return i >= 0 && (g_hold_man[i] || now - g_hold_ms < 30000);
+}
+
+static void hold_add(const unsigned char a[6], int manual)
+{
+    int i = hold_idx(a);
     g_hold_ms = now_ms();
-    if (held(a) || g_nhold >= PAIRED_MAX) return;
+    if (i >= 0) { if (manual) g_hold_man[i] = 1; return; }
+    if (g_nhold >= PAIRED_MAX) return;
+    g_hold_man[g_nhold] = (unsigned char)(manual != 0);
     memcpy(g_hold[g_nhold++], a, 6);
-    log_line("saved: auto-reconnect paused for the disconnected device");
+    log_line("saved: auto-reconnect paused for the disconnected device%s",
+             manual ? " (until it is picked again)" : "");
 }
 
 /* The saved headset we disconnected last (switch / Disconnect) and when.
@@ -549,7 +567,12 @@ static void hold_clear(const unsigned char a[6])
 {
     int i;
     for (i = 0; i < g_nhold; i++)
-        if (!memcmp(g_hold[i], a, 6)) { memmove(g_hold[i], g_hold[i + 1], (size_t)(g_nhold - i - 1) * 6); g_nhold--; return; }
+        if (!memcmp(g_hold[i], a, 6)) {
+            memmove(g_hold[i], g_hold[i + 1], (size_t)(g_nhold - i - 1) * 6);
+            memmove(g_hold_man + i, g_hold_man + i + 1, (size_t)(g_nhold - i - 1));
+            g_nhold--;
+            return;
+        }
 }
 
 
@@ -617,7 +640,7 @@ static int other_saved_calling(const unsigned char addr[6])
         const unsigned char *a = g_paired[i].addr;
         long age;
         if (!memcmp(a, addr, 6)) continue;
-        if (held(a) && now - g_hold_ms < 30000) continue;
+        if (held_now(a, now)) continue;
         age = acl_track_request_age(a, now);
         if (age >= 0 && age < ACL_REQ_PENDING_MS && !acl_track_handle(a)) {
             static long logged;
@@ -634,16 +657,28 @@ static int other_saved_calling(const unsigned char addr[6])
 /* Stop the page / listen in progress for addr: a background attempt yields
  * to any page command; a user attempt yields to a Forget of it, a pick of
  * another device, Scan or Reconnect. */
+static int g_rejoining;                    /* gentle_rejoin runs for g_rejoin_addr */
+static unsigned char g_rejoin_addr[6];
 static int connect_abort(const unsigned char addr[6])
 {
     FILE *f;
     char line[64];
     unsigned char a[6];
-    int stop = 1, reset = 0;
+    int stop = 1, reset = 0, disc = 0;
     CTL_LOCK(&g_ctl);
     reset = g_ctl.req_reset;
+    disc = g_ctl.req_disconnect;
     CTL_UNLOCK(&g_ctl);
     if (reset) return 1;                 /* drop our page, not anyone else's */
+    if (disc) return 1;                  /* Disconnect pressed while it was connecting */
+    if (!g_user_connect && (g_bg_page || (g_rejoining && !memcmp(addr, g_rejoin_addr, 6)))) {
+        /* Disconnect pressed: no background page or rejoin of it goes on */
+        int off;
+        CTL_LOCK(&g_ctl);
+        off = g_ctl.paused || g_ctl.req_disconnect;
+        CTL_UNLOCK(&g_ctl);
+        if (off) return 1;
+    }
     if (g_bg_page && other_saved_calling(addr)) return 1;   /* taken out of its case: it wins */
     if (!cmd_waiting()) return 0;
     if (!g_user_connect) return 1;
@@ -657,6 +692,8 @@ static int connect_abort(const unsigned char addr[6])
             stop = 1;
         else if (!strcmp(line, "scan"))
             stop = 0;                    /* a refresh scan must not cancel this page */
+        else if (!strcmp(line, "scanu"))
+            stop = 1;                    /* the Scan button: the user wants the list */
         else if (headset_parse_addr(line, a))
             stop = 1;                    /* a new press starts again, same headset too */
     }
@@ -742,6 +779,7 @@ static int poll_cmd(hb_cmd *c, headset_ini *ini)
     unlink(SELECT_TXT);
     line[strcspn(line, "\r\n")] = 0;
     if (!strcmp(line, "scan")) c->kind = CMD_SCAN;
+    else if (!strcmp(line, "scanu")) { c->kind = CMD_SCAN; c->user = 1; }
     else if (!strcmp(line, "reconnect")) c->kind = CMD_RECONNECT;
     else if (!strncmp(line, "forget ", 7) && headset_parse_addr(line + 7, c->addr)) {
         int cur = ini->ok && !memcmp(ini->addr, c->addr, 6);
@@ -944,8 +982,8 @@ static int listen_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *p
 }
 
 /* Idle: accept any saved headset that connects in (power on, out of its
- * case). One the user disconnected by hand only after 30 s (a fresh power
- * on, not its instant re-page). 1 = link probed and handed out, *ini is
+ * case). Never one the user disconnected by hand until it is picked again;
+ * one left by a switch only after 30 s. 1 = link probed and handed out, *ini is
  * then that headset (saved as the current one). */
 static int listen_any_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm, int ms)
 {
@@ -954,13 +992,18 @@ static int listen_any_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigne
     btlink *link;
     headset_ini cand;
     for (i = 0; i < g_npaired && n < 8; i++) {
-        if (held(g_paired[i].addr) && now_ms() - g_hold_ms < 30000) continue;
+        if (held_now(g_paired[i].addr, now_ms())) continue;
         memcpy(a[n], g_paired[i].addr, 6);
         memcpy(k[n], g_paired[i].link_key, 16);
         kt[n] = g_paired[i].key_type;
         idx[n++] = i;
     }
-    if (!n) { idle_pump(hci, ms); return 0; }
+    if (!n) {                               /* nobody to listen for: wait, but in */
+        long end = now_ms() + ms;           /* short slices so a press is seen */
+        while (now_ms() < end && !hb_stop_requested() && !cmd_waiting())
+            idle_pump(hci, 50);
+        return 0;
+    }
     link = btlink_create(hci, 1021, 7);
     if (!link) return 0;
     if (!btlink_accept(link, (const unsigned char (*)[6])a, (const unsigned char (*)[16])k, kt, n,
@@ -974,7 +1017,7 @@ static int listen_any_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigne
         hb_cmd c;
         (void)poll_cmd(&c, &cand);
     }
-    if (held(cand.addr)) {                  /* turned on again later: auto-connect is back */
+    if (held(cand.addr)) {                  /* a switch hold that ran out: auto-connect is back */
         hold_clear(cand.addr);
         CTL_LOCK(&g_ctl);
         g_ctl.paused = 0;
@@ -1046,7 +1089,7 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
         in.streaming_other = g_stream_up && memcmp(a, g_stream_addr, 6) != 0;
         in.busy_other = (g_have_target && !in.is_target) ||
                         (g_stream_up && !memcmp(a, g_stream_addr, 6));
-        in.held = held(a) && (g_stream_up || now - g_hold_ms < 30000);
+        in.held = held(a) && (g_stream_up || held_now(a, now));
         in.bg_page = g_bg_page && g_have_target && !in.is_target && !g_stream_up;
         in.just_dropped = in.saved && hb_dropped_recent(&g_dropped, a, now, HB_DROPPED_MS);
         d = hb_connreq_decide(&in);
@@ -1123,7 +1166,7 @@ static int answer_saved_calls(hci_t hci, headset_ini *ini, btlink **linkp, unsig
             accept_drop(hci, g_paired[i].addr);
             continue;
         }
-        if (held(g_paired[i].addr) && now - g_hold_ms < 30000) {
+        if (held_now(g_paired[i].addr, now)) {
             btlink_reject_request(hci, g_paired[i].addr, 0x0D);
             continue;
         }
@@ -1183,6 +1226,7 @@ static int try_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigned *psm,
             remember_device(ini);
             return 1;
         }
+        if (cmd_waiting() || hb_stop_requested()) return 0;   /* stopped by a press, not a timeout */
         note_event("Turn %s off and on to reconnect", nm);
         set_why("powercycle");
         return 0;
@@ -1307,9 +1351,18 @@ static int discover_and_select(a2dp_session *asess, hci_t hci, headset_ini *ini,
     }
     if (!ini->ok) notify("HearBridge: choose a device\nPut it in pairing mode");
     while (now_ms() < t_end) {
+        int disc;
         if (hb_stop_requested()) return 0;
         if (transport_dead(hci)) {
             log_line("select: Bluetooth device went away");
+            return 0;
+        }
+        CTL_LOCK(&g_ctl);
+        disc = g_ctl.req_disconnect;
+        g_ctl.req_disconnect = 0;
+        CTL_UNLOCK(&g_ctl);
+        if (disc) {                       /* Disconnect pressed: stop, stay idle */
+            log_line("select: stopped by Disconnect");
             return 0;
         }
         bg_tick(ini);
@@ -2754,9 +2807,15 @@ stream_setup:
                         memcpy(forget_addr, c.addr, 6);
                         rc = RUN_FORGOT;
                         break;
+                    } else if (c.kind == CMD_SCAN && c.user) {
+                        /* Scan / Add headset while streaming: no inquiry next to
+                         * a live stream (the radio is shared with the DualSense,
+                         * it could drop the pad). The page says the same. */
+                        note_event("Disconnect %s first to add a new headset",
+                                   ini->name[0] ? ini->name : "the headset");
                     } else if (c.kind == CMD_SCAN) {
-                        /* A refresh asks for a scan. Don't drop a live headset for it. */
-                        log_line("scan: headset is up — not dropping it");
+                        /* A page load asks for a refresh scan. Don't drop a live headset for it. */
+                        log_line("scan: refresh scan while the headset is up, not dropping it");
                     } else if (!same && c.kind != CMD_NONE) {
                         log_line("stream: switching on request from the page — closing the current headset first");
                         if (c.kind == CMD_ADDR) want_device(c.addr);
@@ -2825,7 +2884,7 @@ done:
         /* A is fully down (same teardown as Disconnect) and held so it does
          * not call back over B. Now take B's waiting call. */
         int bi = paired_find(g_paired, g_npaired, g_switch_addr);
-        hold_add(switch_from);
+        hold_add(switch_from, 0);
         g_switch_req = 0;
         rc = RUN_SWITCH;
         if (bi >= 0) {
@@ -2906,7 +2965,17 @@ static void bt_failed_wait(const char *status)
 
 
 /* 1 = g_ready is up. 2 = the page asked for something. 0 = stop. */
+static int gentle_rejoin_(hci_t hci, headset_ini *ini);
 static int gentle_rejoin(hci_t hci, headset_ini *ini)
+{
+    int r;
+    memcpy(g_rejoin_addr, ini->addr, 6);
+    g_rejoining = 1;
+    r = gentle_rejoin_(hci, ini);
+    g_rejoining = 0;
+    return r;
+}
+static int gentle_rejoin_(hci_t hci, headset_ini *ini)
 {
     int pages = 0;
     log_line("rejoin: waiting for the headset to connect in");
@@ -2929,6 +2998,21 @@ static int gentle_rejoin(hci_t hci, headset_ini *ini)
             reset = g_ctl.req_reset;
             CTL_UNLOCK(&g_ctl);
             if (reset) return 0;          /* idle path clears our page / ACL */
+            {
+                int off;
+                CTL_LOCK(&g_ctl);
+                off = g_ctl.paused || g_ctl.req_disconnect;
+                g_ctl.req_disconnect = 0;
+                if (off) g_ctl.paused = 1;
+                CTL_UNLOCK(&g_ctl);
+                if (off) {                /* Disconnect while it was coming back */
+                    log_line("rejoin: stopped by Disconnect");
+                    note_event("Disconnected");
+                    set_why("off");
+                    if (ini->ok) hold_add(ini->addr, 1);
+                    return 0;
+                }
+            }
             CTL_LOCK(&g_ctl);
             go = g_ctl.req_connect;
             g_ctl.req_connect = 0;
@@ -3216,7 +3300,7 @@ int main(void)
         CTL_UNLOCK(&g_ctl);
         /* A Disconnect on the page stays idle. A drop does not page hard:
          * listen, a few short pages, then sit until the headset connects in. */
-        if ((r == RUN_PAUSED || paused) && ini.ok && !g_rest_resume) hold_add(ini.addr);
+        if ((r == RUN_PAUSED || paused) && ini.ok && !g_rest_resume) hold_add(ini.addr, 1);
         if (r == RUN_DROPPED) {
             g_want_until = 0;
             notify("HearBridge: connection lost");
@@ -3283,6 +3367,7 @@ int main(void)
                 CTL_LOCK(&g_ctl);
                 go = g_ctl.req_connect;
                 g_ctl.req_connect = 0;
+                g_ctl.req_disconnect = 0;     /* nothing up to disconnect: never carried into the next stream */
                 if (go) g_ctl.paused = 0;
                 CTL_UNLOCK(&g_ctl);
                 if (go && !g_pending.kind) {

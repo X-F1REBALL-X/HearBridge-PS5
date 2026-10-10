@@ -239,7 +239,22 @@ int main(int argc, char **argv)
         }
         CHECK(c.paused == 1, "forget does not resume a paused session");
         post(&c, "/api/scan");
-        CHECK(c.paused == 0, "scan resumes from paused");
+        CHECK(c.paused == 1, "a refresh scan (page load) does not undo a Disconnect");
+        c.req_disconnect = 1;
+        post(&c, "/api/scan?user=1");
+        {
+            char line[64] = "";
+            FILE *f = fopen("build/host/select.txt", "r");
+            if (f) { if (!fgets(line, sizeof line, f)) line[0] = 0; fclose(f); }
+            CHECK(!strcmp(line, "scanu\n"), "the Scan button writes \"scanu\" (a real scan, never next to a live stream)");
+            CHECK(c.paused == 0 && c.req_disconnect == 0, "the Scan button resumes from paused");
+            post(&c, "/api/scan");
+            f = fopen("build/host/select.txt", "r");
+            line[0] = 0;
+            if (f) { if (!fgets(line, sizeof line, f)) line[0] = 0; fclose(f); }
+            CHECK(!strcmp(line, "scanu\n"), "a refresh scan does not erase an unread Scan press");
+            remove("build/host/select.txt");
+        }
     }
     post(&c, "/api/forget?index=1");
     CHECK(!strncmp(out, "HTTP/1.1 400", 12), "forget needs an address");
@@ -250,6 +265,13 @@ int main(int argc, char **argv)
         fputs("{\"devices\":[{\"addr\":\"58:18:62:63:3B:7C\",\"name\":\"WF-1000XM6\",\"kind\":\"headphones\",\"current\":1}]}", f);
         fclose(f);
         strcpy(c.saved_path, "build/host/saved.json");
+    }
+    get(&c, "/api/status");
+    {
+        char want[64];
+        snprintf(want, sizeof want, "\"token\":\"%s\"", c.token);
+        CHECK(strstr(out, want) && !strstr(out, "Access-Control-Allow-Origin"),
+              "status carries this run's token (same origin only) so an old page can recover");
     }
     get(&c, "/api/saved");
     CHECK(strstr(out, "\"current\":1") && strstr(out, "application/json"), "saved: serves saved.json");
