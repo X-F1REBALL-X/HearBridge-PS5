@@ -51,3 +51,8 @@ int hb_dropped_recent(const hb_dropped *d, const unsigned char addr[6], long now
 {
     return d->on && !memcmp(d->addr, addr, 6) && now - d->t >= 0 && now - d->t < within_ms;
 }
+
+int hb_drop_is_away(int reason)
+{
+    return reason == 0x13;
+}

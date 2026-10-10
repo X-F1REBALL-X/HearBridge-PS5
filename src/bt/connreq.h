@@ -45,6 +45,13 @@ void hb_dropped_note(hb_dropped *d, const unsigned char addr[6], long now);
 /* 1 when addr was dropped less than within_ms ago. */
 int  hb_dropped_recent(const hb_dropped *d, const unsigned char addr[6], long now, long within_ms);
 
+/* Why the stream link went down -> what the main loop does next.
+ * 0x13 (remote user terminated): the headset closed it itself (case, power
+ * button), so we stay idle and listen. Everything else, 0x08 supervision
+ * timeout above all, is link loss: the normal gentle rejoin runs. Only a
+ * Disconnect press on the page holds a headset off. */
+int hb_drop_is_away(int reason);
+
 int hb_cod_is_av(unsigned cod);
 int hb_connreq_decide(const hb_cr_in *in);
 const char *hb_connreq_name(int d);
