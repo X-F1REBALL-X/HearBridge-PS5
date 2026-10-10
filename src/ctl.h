@@ -66,6 +66,8 @@ typedef struct {
     unsigned cmd_seq;      /* bumped by the web thread for each select.txt command */
     /* headset extras (stream loop -> web) */
     int battery;           /* AVRCP battery status 0..4, -1 unknown */
+    int batt_pct;          /* HFP battery percent 0..100, -1 unknown */
+    int batt_none;         /* connected a while, the headset reported nothing */
     int hs_moves;          /* volume changes made on the headset itself */
     int link_rssi, link_lq; /* HCI Read RSSI (127 unknown) / Link Quality (-1 unknown) */
     int link_score;        /* 0..100, -1 unknown (linkq.h) */

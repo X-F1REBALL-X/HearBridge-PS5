@@ -174,6 +174,7 @@ static int accept_one(btlink *link, const headset_ini *ini, int ms)
  * second or two; this only bounds a miss. Long enough that a slow page
  * still finishes, short enough that we do not sit for half a minute. */
 #define HB_PAGE_MS 5000
+#define HB_BATT_WAIT_MS 8000   /* no battery report by then: "Not shown by this headset" */
 /* After a hang-up right after encryption: wait this long for its own call. */
 #define HB_CALLBACK_MS 2500
 static int probe_after(hci_t hci, btlink *link, headset_ini *ini, btlink **linkp, unsigned *psm);
@@ -2543,9 +2544,20 @@ stream_setup:
                 int rssi, lqv, dpm = hb_linkq_drops_per_min(&lq, btlink_tx_dropped(link), now);
                 btlink_link_quality(link, &rssi, &lqv);
                 g_ctl.battery = btlink_avrcp_battery(link);
+                g_ctl.batt_pct = btlink_hfp_battery(link);
                 {
-                    int b = g_ctl.battery, warn = hb_batt_alert_step(&balert, avrcp_battery_level(b),
-                                                                    b == AVRCP_BATT_EXTERNAL || b == AVRCP_BATT_FULL);
+                    /* Nothing from HFP or AVRCP a few seconds into the stream:
+                     * the page says the headset does not show it. */
+                    static const btlink *batt_link;
+                    static long batt_since;
+                    if (batt_link != link) { batt_link = link; batt_since = now; }
+                    g_ctl.batt_none = g_ctl.batt_pct < 0 && g_ctl.battery < 0 &&
+                                      now - batt_since > HB_BATT_WAIT_MS;
+                }
+                {
+                    int b = g_ctl.battery,
+                        warn = hb_batt_alert_step(&balert, g_ctl.batt_pct >= 0 ? g_ctl.batt_pct : avrcp_battery_level(b),
+                                                  b == AVRCP_BATT_EXTERNAL || b == AVRCP_BATT_FULL);
                     if (warn) {
                         char evl[HB_EVENT_LEN];
                         g_ctl.batt_alert = warn;

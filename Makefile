@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp
 
 all: ps5
 
@@ -94,7 +94,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -136,13 +136,13 @@ test-rejoin:
 
 test-switch:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_switch_ab.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_switch_ab
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_switch_ab.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/hfp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_switch_ab
 	$(BUILD)/host/test_switch_ab
 
 # L2CAP config pacing on a slow (MediaTek) and a quick (Marvell) link.
 test-cfg:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_cfg_mtk.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_cfg_mtk
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_cfg_mtk.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/hfp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_cfg_mtk
 	$(BUILD)/host/test_cfg_mtk
 
 # Chip profile, scan pause, ACL pipe and the AVDTP PSM fallback.
@@ -214,3 +214,8 @@ test-backup:
 	@mkdir -p $(BUILD)/host
 	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc tests/test_backup.c src/backup.c -o $(BUILD)/host/test_backup
 	$(BUILD)/host/test_backup $(BUILD)/host/backup
+
+test-hfp:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/a2dp tests/test_hfp.c src/a2dp/hfp.c -o $(BUILD)/host/test_hfp
+	$(BUILD)/host/test_hfp

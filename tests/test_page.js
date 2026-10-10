@@ -177,9 +177,23 @@ check(el('chipv').textContent === 'MediaTek (0e8d:3605)', 'page: MediaTek chip')
 STATUS.battery = { status: '', level: -1 };
 global.hbTest.req('/api/status');
 check(el('batv').innerHTML === '-', 'page: battery shows "-" when unknown');
-STATUS.battery = { status: 'low', level: 20 };
+STATUS.battery = { status: 'low', level: 20, pct: -1, none: 0 };
 global.hbTest.req('/api/status');
-check(/Low/.test(el('batv').innerHTML) && /calc\(20%/.test(el('batv').innerHTML), 'page: battery shows state and gauge');
+check(/Low/.test(el('batv').innerHTML) && !/calc\(/.test(el('batv').innerHTML), 'page: AVRCP only: state text, no fake percent gauge');
+STATUS.battery = { status: 'ok', level: 60, pct: -1, none: 0 };
+global.hbTest.req('/api/status');
+check(/OK/.test(el('batv').innerHTML) && !/60/.test(el('batv').innerHTML), 'page: AVRCP "ok" is not shown as 60%');
+STATUS.battery = { status: '', level: -1, pct: 70, none: 0 };
+global.hbTest.req('/api/status');
+check(/calc\(70%/.test(el('batv').innerHTML) && />70%</.test(el('batv').innerHTML), 'page: HFP percent with gauge');
+STATUS.battery = { status: '', level: -1, pct: 8, none: 0 };
+global.hbTest.req('/api/status');
+check(/bat crit/.test(el('batv').innerHTML), 'page: HFP low percent is red');
+STATUS.battery = { status: '', level: -1, pct: -1, none: 1 };
+global.hbTest.req('/api/status');
+check(/Not shown by this headset/.test(el('batm').innerHTML), 'page: nothing reported: "Not shown by this headset"');
+STATUS.battery = { status: '', level: -1, pct: -1, none: 0 };
+global.hbTest.req('/api/status');
 // games: main screen only shows that a game's sound is on; Settings has save / remove
 STATUS.game = { avail: 1, id: '', name: '', profile: 0, active: 0 };
 global.hbTest.req('/api/status');

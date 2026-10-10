@@ -2,6 +2,7 @@
 #include "acl_track.h"
 #include "acl_pool.h"
 #include "avrcp.h"
+#include "hfp.h"
 #include "sdp_server.h"
 #include "hci_cmd.h"
 #include "log.h"
@@ -99,6 +100,8 @@ typedef struct {
 struct btlink {
     hci_t hci;
     avrcp_state avrcp;
+    hfp_state hfp;            /* HFP AG on inbound RFCOMM: battery only */
+    unsigned hfp_scid;        /* RFCOMM channel the hfp state belongs to */
     unsigned avrcp_scid;      /* open AVRCP control channel (either side) */
     unsigned in_rx_psm;
     btlink_rx_fn in_rx;
@@ -551,7 +554,7 @@ static const char *psm_name(unsigned psm)
 {
     switch (psm) {
     case BTLINK_PSM_SDP:      return "(SDP)";
-    case 0x0003:              return "(RFCOMM)";
+    case BTLINK_PSM_RFCOMM:   return "(RFCOMM, hands-free)";
     case BTLINK_PSM_AVCTP:    return "(AVRCP control)";
     case BTLINK_PSM_AVDTP:    return "(AVDTP)";
     case BTLINK_PSM_AVCTP_BR: return "(AVRCP browsing)";
@@ -649,7 +652,8 @@ static void on_signaling(btlink *l, const unsigned char *d, int len)
                 unsigned psm = le16(pl);
                 unsigned their_cid = le16(pl + 2);
                 if (psm == BTLINK_PSM_SDP || psm == BTLINK_PSM_AVDTP ||
-                    psm == BTLINK_PSM_AVCTP || psm == BTLINK_PSM_AVCTP_BR) {
+                    psm == BTLINK_PSM_AVCTP || psm == BTLINK_PSM_AVCTP_BR ||
+                    psm == BTLINK_PSM_RFCOMM) {
                     chan *inc = chan_free_slot(l);
                     if (!inc) {
                         put16(out, 0);
@@ -951,6 +955,19 @@ static void avctp_reply(btlink *l, chan *c, const unsigned char *d, int len)
     }
 }
 
+/* HFP over RFCOMM: frames out on the headset's RFCOMM channel. */
+static void hfp_tx(void *ud, const unsigned char *p, int n)
+{
+    btlink *l = ud;
+    chan *c = l->hfp_scid ? chan_by_scid(l, l->hfp_scid) : NULL;
+    if (c && c->st == CH_OPEN) (void)l2_send_raw(l, c->dcid, p, n);
+}
+
+static void hfp_log(const char *m)
+{
+    log_line("%s", m);
+}
+
 static void on_frame(btlink *l, unsigned cid, const unsigned char *d, int len)
 {
     chan *c;
@@ -970,6 +987,16 @@ static void on_frame(btlink *l, unsigned cid, const unsigned char *d, int len)
     }
     if (c->psm == BTLINK_PSM_AVCTP || c->psm == BTLINK_PSM_AVCTP_BR) {
         avctp_reply(l, c, d, len);
+        return;
+    }
+    if (c->inbound && c->psm == BTLINK_PSM_RFCOMM) {
+        if (l->hfp_scid != c->scid) {          /* new RFCOMM session; battery value kept */
+            int b = l->hfp.battery, bs = l->hfp.battery_seq, src = l->hfp.battery_src;
+            hfp_init(&l->hfp, hfp_tx, l, hfp_log);
+            l->hfp.battery = b; l->hfp.battery_seq = bs; l->hfp.battery_src = src;
+            l->hfp_scid = c->scid;
+        }
+        hfp_input(&l->hfp, d, len);
         return;
     }
     if (c->inbound && !c->rx && l->in_rx && c->psm == l->in_rx_psm) {
@@ -1240,6 +1267,19 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
             l->auth_sent = 0;
             l->t_conn = now_ms();
         }
+        return;
+    }
+
+    if (ev[0] == 0x04 && nEv >= 12 && ev[11] != 0x01 && l->connected &&
+        same_addr(ev + 2, l->addr)) {
+        /* SCO / eSCO from our headset (call audio): never. HFP is only
+         * there for the battery. Reject Synchronous Connection Request,
+         * reason 0x0D (limited resources). */
+        unsigned char rp[7];
+        memcpy(rp, ev + 2, 6);
+        rp[6] = 0x0D;
+        (void)fire_cmd(l->hci, 0x042A, rp, 7);
+        log_line("hfp: headset asked for call audio, refused");
         return;
     }
 
@@ -1567,6 +1607,7 @@ btlink *btlink_create(hci_t hci, int acl_mtu, int acl_buffers)
     if (l->pool.limit < 1) l->pool.limit = 1;
     l->next_scid = 0x0040;
     avrcp_init(&l->avrcp, 64);
+    hfp_init(&l->hfp, hfp_tx, l, hfp_log);
     l->rssi = 127;
     l->lq = -1;
     return l;
@@ -2457,6 +2498,11 @@ int btlink_avrcp_state(const btlink *l)
 int btlink_avrcp_battery(const btlink *l)
 {
     return l ? l->avrcp.battery : -1;
+}
+
+int btlink_hfp_battery(const btlink *l)
+{
+    return l ? l->hfp.battery : -1;
 }
 
 int btlink_avrcp_headset_moves(const btlink *l)

@@ -384,6 +384,20 @@ int main(int argc, char **argv)
         CHECK(n > 11 && r[0] == 0x07 && found == 3, "SDP: Device ID record answers the Xbox query");
     }
     {
+        /* the WF-1000XM6 looks for HFP AG 0x111F: record with RFCOMM channel 1, HFP 1.8 */
+        static const unsigned char ag[] = { 0x06, 0, 3, 0, 15, 0x35, 3, 0x19, 0x11, 0x1F,
+            0x02, 0x00, 0x35, 5, 0x0A, 0, 0, 0xFF, 0xFF, 0 };
+        static const unsigned char rfc[] = { 0x19, 0x00, 0x03, 0x08, 0x01 };
+        static const unsigned char v18[] = { 0x19, 0x11, 0x1E, 0x09, 0x01, 0x08 };
+        unsigned char r[700];
+        int n = sdp_server_handle(ag, (int)sizeof ag, r, (int)sizeof r), f = 0, i;
+        for (i = 0; i + 6 <= n; i++) {
+            if (!memcmp(r + i, rfc, 5)) f |= 1;
+            if (!memcmp(r + i, v18, 6)) f |= 2;
+        }
+        CHECK(n > 11 && r[0] == 0x07 && f == 3, "SDP: HFP AG record (RFCOMM channel 1, HFP 1.8)");
+    }
+    {
         unsigned char rsp[700];
         /* ServiceSearch for AV Remote Control Target 0x110C, max 10 */
         static const unsigned char ss[] = { 0x02, 0, 1, 0, 8, 0x35, 3, 0x19, 0x11, 0x0C, 0, 10, 0 };
