@@ -68,6 +68,7 @@ typedef struct {
     int battery;           /* AVRCP battery status 0..4, -1 unknown */
     unsigned long status_polls; /* /api/status requests: the page is open while it moves */
     int batt_pct;          /* HFP battery percent 0..100, -1 unknown */
+    int batt_src;          /* 0 none, 1 HF indicator (exact), 2 Apple (10 % steps) */
     int batt_none;         /* connected a while, the headset reported nothing */
     int hs_moves;          /* volume changes made on the headset itself */
     int key_vol;           /* earbud next / previous keys change the volume (all headsets, default on) */

@@ -310,6 +310,43 @@ int main(int argc, char **argv)
                 CHECK(a.cur_ms == held && a.link_bad && !downs && !ups2,
                       "auto: then a flood of drops: the level is held, never lowered or raised");
             }
+            /* The 9317a4b console log (Coral CM835): clean at 200 ms, Auto
+             * stepped to 190 and drops flooded at once (350/min); it raised
+             * to 230 and then held it as a link problem. Now: straight back
+             * to 200, the queue trimmed, 200 is the floor for the stream. */
+            {
+                int down_at = -1, back_at = -1, low = 1000, k;
+                hb_lat_auto_init(&a, 200);
+                for (t = 0; t < 400; t++) {
+                    int d = (down_at >= 0 && t - down_at >= 1 && t - down_at < 6) ? 6 : 0;   /* stops once back at 200 */
+                    (void)hb_lat_auto_tick(&a, d, &ch);
+                    if (ch < 0 && down_at < 0) down_at = t;
+                    if (ch > 0 && a.recover && back_at < 0) { back_at = t; a.recover = 0; }
+                }
+                CHECK(down_at > 0 && back_at > down_at && back_at - down_at <= 3 && a.floor_ms == 200,
+                      "auto: drops right after a step down: back to the level that held at once");
+                CHECK(a.cur_ms == 200, "auto: no raise above the level that held, no link-problem hold");
+                for (k = 0; k < 7200; k++) {
+                    (void)hb_lat_auto_tick(&a, 0, &ch);
+                    if (a.cur_ms < low) low = a.cur_ms;
+                }
+                CHECK(low == 200, "auto: never below that level again this stream");
+            }
+            {
+                int first = -1;
+                hb_lat_auto_init(&a, 200);
+                for (t = 0; t < 400 && first < 0; t++) {
+                    (void)hb_lat_auto_tick(&a, t == 15 ? 1 : 0, &ch);
+                    if (ch < 0) first = t;
+                }
+                CHECK(first >= 15 + HB_LAT_AUTO_GOOD_DROP_S, "auto: a stream that dropped steps down only after 90 s clean");
+                hb_lat_auto_init(&a, 200);
+                for (first = -1, t = 0; t < 400 && first < 0; t++) {
+                    (void)hb_lat_auto_tick(&a, 0, &ch);
+                    if (ch < 0) first = t;
+                }
+                CHECK(first > 0 && first < HB_LAT_AUTO_START_S + HB_LAT_AUTO_GOOD_DROP_S, "auto: a clean stream steps down after 45 s");
+            }
             /* A link that needs more than any buffer: never above two steps. */
             hb_lat_auto_init(&a, 200);
             for (t = 0; t < 3600; t++) (void)hb_lat_auto_tick(&a, t % 4 == 0, &ch);

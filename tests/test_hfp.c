@@ -145,6 +145,9 @@ int main(void)
     at_text(&h, 0, t, sizeof t);
     CHECK(!strcmp(t, "\r\n+XAPL=iPhone,2\r\n\r\nOK\r\n"), "at: XAPL answered (battery reporting)");
     hs_at(&h, "AT+IPHONEACCEV=2,1,6,2,0\r", -1);
+    CHECK(h.battery == 100 && h.battery_src == 1, "battery: exact HF indicator kept over a 10 % step Apple report");
+    h.battery_src = 0;     /* a headset that only reports the Apple way */
+    hs_at(&h, "AT+IPHONEACCEV=2,1,6,2,0\r", -1);
     CHECK(h.battery == 70 && h.battery_src == 2, "battery: IPHONEACCEV 6 -> 70%");
     hs_at(&h, "at+iphoneaccev=1,1,9\r", -1);
     CHECK(h.battery == 100, "battery: lower case, 9 -> 100%");

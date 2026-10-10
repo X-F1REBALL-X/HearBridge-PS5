@@ -223,7 +223,9 @@ int hfp_at(hfp_state *h, const char *in, char *out, int max)
         a = c + 15;
         if (num(&a, &n))
             for (i = 0; i < n && num(&a, &k) && num(&a, &v); i++)
-                if (k == 1 && v >= 0 && v <= 9) set_battery(h, (v + 1) * 10, 2);
+                /* 0-9 = 10 % steps: only while no exact HF indicator
+                 * (AT+BIEV, 0-100) has come from this headset. */
+                if (k == 1 && v >= 0 && v <= 9 && h->battery_src != 1) set_battery(h, (v + 1) * 10, 2);
         return snprintf(out, (size_t)max, OK_);
     }
     if (!strcmp(c, "AT+COPS?"))
