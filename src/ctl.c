@@ -66,6 +66,8 @@ void ctl_init(hb_ctl *c, const char *version)
     c->hs_volume = -1;
     c->chip_vid = c->chip_pid = -1;
     c->battery = -1;
+    c->batt_pct = -1;
+    c->batt_none = 0;
     c->link_rssi = 127;
     c->link_lq = -1;
     c->link_score = -1;
@@ -108,6 +110,8 @@ void ctl_clear_link(hb_ctl *c, int drop_device)
     c->hs_volume = -1;
     c->avrcp = 0;
     c->battery = -1;
+    c->batt_pct = -1;
+    c->batt_none = 0;
     c->link_rssi = 127;
     c->link_lq = -1;
     c->link_score = -1;

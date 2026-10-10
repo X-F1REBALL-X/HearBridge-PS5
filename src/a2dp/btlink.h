@@ -9,6 +9,7 @@
 
 #define BTLINK_CID_SIGNALING 0x0001
 #define BTLINK_PSM_SDP       0x0001
+#define BTLINK_PSM_RFCOMM    0x0003  /* HFP AG, battery only */
 #define BTLINK_PSM_AVDTP     0x0019
 #define BTLINK_PSM_AVCTP     0x0017  /* AVRCP control */
 #define BTLINK_PSM_AVCTP_BR  0x001B  /* AVRCP browsing */
@@ -109,6 +110,8 @@ int  btlink_avrcp_state(const btlink *l);
 int  btlink_avrcp_connect(btlink *l);
 /* Headset battery as AVRCP status 0..4 (avrcp.h AVRCP_BATT_*), -1 unknown. */
 int  btlink_avrcp_battery(const btlink *l);
+/* Battery percent the headset reported over HFP (0..100), -1 none yet. */
+int  btlink_hfp_battery(const btlink *l);
 /* Bumped each time the headset itself changed the volume (its buttons/app). */
 int  btlink_avrcp_headset_moves(const btlink *l);
 /* Last HCI Read RSSI (signed, 127 unknown) and Read Link Quality (0..255,

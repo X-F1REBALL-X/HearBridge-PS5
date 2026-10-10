@@ -243,6 +243,7 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 .bat:after{content:"";position:absolute;right:-.3rem;top:.18rem;width:.18rem;height:.35rem;background:var(--ink2)}
 .bat i{position:absolute;left:1px;top:1px;bottom:1px;background:var(--lime)}
 .bat.low i{background:var(--warn)}.bat.crit i{background:var(--bad)}.bat.chg i{background:var(--cyan)}
+.bst.low{color:var(--warn)}.bst.critical{color:var(--bad)}.bnone{color:var(--ink2);font-size:.85em}
 .lq{display:inline-flex;align-items:center;gap:var(--s2)}.lq .bars{height:1.05rem}
 .lq small{font-size:.74rem;font-weight:700;color:var(--ink2)}
 .bars.b2 i.on{background:var(--warn)}.bars.b1 i.on{background:var(--bad)}
@@ -776,8 +777,11 @@ drawEq();drawLat()}
 /* battery, link meter, running game, latency mode */
 var hsMoves=-1,hsT2=0,BATK={ok:'batOk',low:'batLow',critical:'batCritical',charging:'batCharging',full:'batFull'};
 function drawExtras(){var b=S.battery||{},l=S.link||{},g=S.game||{},L=S.lat_extra||{},bh='-',nm=S.night||{};
-if(b.status){var lv=b.level>=0?b.level:100,c=b.status=='low'?' low':b.status=='critical'?' crit':b.status=='charging'?' chg':'';
-bh='<span class="batt"><span class="bat'+c+'"><i style="width:calc('+lv+'% - 2px)"></i></span>'+esc(t(BATK[b.status]))+'</span>'}
+/* a real percent (HFP) gets the gauge; AVRCP alone only says a state */
+if(b.pct>=0){var c=b.status=='charging'?' chg':b.pct<=10?' crit':b.pct<=20?' low':'';
+bh='<span class="batt"><span class="bat'+c+'"><i style="width:calc('+b.pct+'% - 2px)"></i></span>'+b.pct+'%'+(b.status=='charging'?' '+esc(t('batCharging')):'')+'</span>'}
+else if(b.status)bh='<span class="batt bst '+esc(b.status)+'">'+esc(t(BATK[b.status]))+'</span>';
+else if(b.none&&S.connected)bh='<span class="batt bnone">'+esc(t('batNone'))+'</span>';
 setHtml('batv',bh);setHtml('batm',S.connected?bh:'-');
 var lh='-',lm='-';if(l.score>=0){var n=l.score>=80?4:l.score>=55?3:l.score>=30?2:1,bb='<span class="bars b'+n+'">';for(var i=1;i<=4;i++)bb+='<i'+(i<=n?' class="on"':'')+'></i>';bb+='</span>';
 lh='<span class="lq">'+bb+l.score+'%<small>'+(l.lq>=0||l.rssi?'RSSI '+l.rssi+' · ':'')+esc(t('drops').replace('%s',l.drops_min|0))+'</small></span>';
