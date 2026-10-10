@@ -59,7 +59,7 @@ int hb_backup_file_ok(const char *r)
     int i;
     if (!r) return 0;
     if (!strcmp(r, "paired.ini") || !strcmp(r, "headset.ini") || !strcmp(r, "gain") ||
-        !strcmp(r, "games.txt")) return 1;
+        !strcmp(r, "games.txt") || !strcmp(r, "keyvol")) return 1;
     if (strlen(r) != 22 || strncmp(r, "prefs/", 6) || strcmp(r + 18, ".txt")) return 0;
     for (i = 6; i < 18; i++) if (!hexu(r[i])) return 0;
     return 1;
@@ -312,13 +312,13 @@ int hb_backup_find_usb(const char *root, char *dir, int max)
 
 int hb_backup_make(const char *sd, const char *ver, long t, char *json, int jmax)
 {
-    static const char *const fixed[] = { "paired.ini", "headset.ini", "gain", "games.txt" };
+    static const char *const fixed[] = { "paired.ini", "headset.ini", "gain", "games.txt", "keyvol" };
     static char texts[HB_BACKUP_FILES][HB_BACKUP_FILE_MAX + 1];
     char pn[8][32], path[200];
     hb_bfile f[HB_BACKUP_FILES];
     int nf = 0, i, np, n;
 
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < (int)(sizeof fixed / sizeof fixed[0]); i++) {
         snprintf(path, sizeof path, "%s/%s", sd, fixed[i]);
         n = read_all(path, texts[nf], HB_BACKUP_FILE_MAX + 1);
         if (n < 0) continue;

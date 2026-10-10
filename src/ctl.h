@@ -70,6 +70,8 @@ typedef struct {
     int batt_pct;          /* HFP battery percent 0..100, -1 unknown */
     int batt_none;         /* connected a while, the headset reported nothing */
     int hs_moves;          /* volume changes made on the headset itself */
+    int key_vol;           /* earbud next / previous keys change the volume (all headsets, default on) */
+    int key_vol_dirty;     /* write key_vol down */
     int link_rssi, link_lq; /* HCI Read RSSI (127 unknown) / Link Quality (-1 unknown) */
     int link_score;        /* 0..100, -1 unknown (linkq.h) */
     int drops_min;         /* media packets dropped per minute (smoothed) */

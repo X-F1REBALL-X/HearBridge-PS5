@@ -124,6 +124,8 @@ void btlink_avrcp_stats(const btlink *l, unsigned long *cmds, unsigned long *rsp
 int  btlink_hfp_battery(const btlink *l);
 /* Bumped each time the headset itself changed the volume (its buttons/app). */
 int  btlink_avrcp_headset_moves(const btlink *l);
+/* Earbud next / previous track keys step the volume (setting, default on). */
+void btlink_avrcp_seek_volume(btlink *l, int on);
 /* Last HCI Read RSSI (signed, 127 unknown) and Read Link Quality (0..255,
  * -1 unknown) for this link; polled about once a second while it is up. */
 void btlink_link_quality(const btlink *l, int *rssi, int *lq);

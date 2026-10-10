@@ -71,6 +71,7 @@
 #define LOCK_PATH STATE_DIR "/hearbridge.lock"
 #define TONE_PATH STATE_DIR "/tone"          /* exists → 1 kHz test tone */
 #define GAIN_PATH STATE_DIR "/gain"          /* text: linear gain, e.g. 5 */
+#define KEYVOL_PATH STATE_DIR "/keyvol"      /* "0": earbud next / previous keys stay track keys */
 #define DUMP_PATH STATE_DIR "/media_dump.bin"
 #define DUMP_FLAG_PATH STATE_DIR "/media_dump"   /* exists → dump the first media packets (debug) */
 #define NO_TILE_PATH STATE_DIR "/no_tile"      /* exists → never add the home tile */
@@ -1543,6 +1544,24 @@ static int read_gain_pct(void)
     return pct < 0 ? HB_GAIN_DEFAULT_PCT : pct;
 }
 
+/* Earbud next / previous changes volume: on unless the file says 0. */
+static int read_key_vol(void)
+{
+    FILE *f = fopen(KEYVOL_PATH, "r");
+    char buf[8] = "";
+    if (f) { if (!fgets(buf, sizeof buf, f)) buf[0] = 0; fclose(f); }
+    return buf[0] != '0';
+}
+
+static void write_key_vol(int on)
+{
+    FILE *f = fopen(KEYVOL_PATH ".tmp", "w");
+    if (!f) return;
+    fputs(on ? "1\n" : "0\n", f);
+    fclose(f);
+    rename(KEYVOL_PATH ".tmp", KEYVOL_PATH);
+}
+
 static void write_gain_pct(int pct)
 {
     char buf[16];
@@ -1653,8 +1672,9 @@ static void prefs_attach(const unsigned char addr[6])
  * write them down. */
 static void persist_gain_if_dirty(void)
 {
-    int pct = -1, prefs = 0;
+    int pct = -1, prefs = 0, kv = -1;
     CTL_LOCK(&g_ctl);
+    if (g_ctl.key_vol_dirty) { kv = g_ctl.key_vol; g_ctl.key_vol_dirty = 0; }
     if (g_ctl.gain_dirty) {
         pct = g_ctl.gain_pct;
         g_ctl.gain_dirty = 0;
@@ -1667,6 +1687,10 @@ static void persist_gain_if_dirty(void)
     if (g_ctl.prefs_dirty) { prefs_from_ctl(); prefs = 1; g_ctl.prefs_dirty = 0; }
     CTL_UNLOCK(&g_ctl);
     if (prefs) prefs_save();
+    if (kv >= 0) {
+        write_key_vol(kv);
+        log_line("avrcp: earbud next / previous %s", kv ? "change the volume" : "stay track keys");
+    }
     if (pct >= 0) {
         write_gain_pct(pct);
         log_line("volume: base gain %d%% saved", pct);
@@ -1991,6 +2015,7 @@ static void reload_settings(headset_ini *ini)
     } else {
         g_ctl.gain_pct = read_gain_pct();
     }
+    g_ctl.key_vol = read_key_vol();
     CTL_UNLOCK(&g_ctl);
     publish_saved(g_stream_up ? ini : (ini->ok ? ini : NULL));
     log_line("restore: settings reloaded (%d saved headset(s))", g_npaired);
@@ -2629,6 +2654,7 @@ stream_setup:
             }
             g_ctl.avrcp = avst;
             g_ctl.hs_moves = btlink_avrcp_headset_moves(link);
+            btlink_avrcp_seek_volume(link, g_ctl.key_vol);
             CTL_UNLOCK(&g_ctl);
             if (changed) {
                 log_line("stream: headset volume %d/127 -> gain", v);
@@ -3307,6 +3333,7 @@ int main(void)
     snprintf(g_ctl.select_path, sizeof g_ctl.select_path, "%s", SELECT_TXT);
     snprintf(g_ctl.saved_path, sizeof g_ctl.saved_path, "%s", SAVED_JSON);
     g_ctl.gain_pct = read_gain_pct();
+    g_ctl.key_vol = read_key_vol();
     log_line("volume: base gain %d%% (%s)", g_ctl.gain_pct, GAIN_PATH);
     /* The old global mode file is the default for headsets without
      * their own setting yet. */

@@ -64,6 +64,7 @@ void ctl_init(hb_ctl *c, const char *version)
     c->gain_pct = HB_GAIN_DEFAULT_PCT;
     c->req_hs_volume = -1;
     c->hs_volume = -1;
+    c->key_vol = 1;
     c->chip_vid = c->chip_pid = -1;
     c->battery = -1;
     c->batt_pct = -1;

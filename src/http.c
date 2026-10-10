@@ -102,7 +102,7 @@ static int is_write_path(const char *path)
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
         "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean", "/api/night",
-        "/api/hci", "/api/game", "/api/backup", "/api/restore",
+        "/api/hci", "/api/game", "/api/backup", "/api/restore", "/api/keyvol",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -176,7 +176,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d},"
         "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"none\":%d},\"hs_moves\":%d,"
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
-        "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,"
+        "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,\"key_vol\":%d,"
         "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d,\"exact\":%d,\"from\":\"%s\",\"dirty\":%d,\"saved\":%s},\"events\":%s}",
         c->version, c->token, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
@@ -194,7 +194,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->lat_backoff_ms, c->lat_normal_ms,
         avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->batt_pct, c->batt_none, c->hs_moves,
         c->link_score, c->link_rssi == 127 ? 0 : c->link_rssi, c->link_lq, c->drops_min,
-        c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch,
+        c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch, c->key_vol,
         c->game_avail, c->game_id, gname, c->game_profile, c->game_active, c->game_exact, gfrom, c->game_dirty, gl, ev);
 }
 
@@ -581,6 +581,12 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         }
         c->codec_pref = v;
         c->prefs_dirty = 1;
+    } else if (!strcmp(path, "/api/keyvol")) {
+        /* on=0|1: earbud next / previous track keys change the volume
+         * (all headsets, saved in the keyvol file). */
+        if (!query_int(q, "on", &v)) goto bad;
+        c->key_vol = v != 0;
+        c->key_vol_dirty = 1;
     } else if (!strcmp(path, "/api/night")) {
         /* on=0|1: night mode compressor, saved per headset. */
         if (!query_int(q, "on", &v)) goto bad;
