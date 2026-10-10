@@ -250,5 +250,7 @@ check(/\.drawer\{width:92vw;grid-template-columns:22rem/.test(html) && /\.pages\
   check(eq.indexOf('id="eqon"') < eq.indexOf('id="gain"') && eq.indexOf('id="pr0"') < eq.indexOf('id="gain"') && eq.indexOf('id="hs"') < eq.indexOf('id="night"') &&
     eq.indexOf('id="mute"') < eq.indexOf('id="eqon"'), 'page: Sound panel: EQ first, then volume, then night mode; mute in the header');
 }
+check(/@font-face\{font-family:"HB Inter";src:url\(\/font\.woff2\)/.test(html) && /font:1rem\/1\.35 "HB Inter","Bahnschrift"/.test(html) &&
+  /\.brand h1\{font-family:"Bahnschrift"/.test(html) && !/https?:\/\/[^"']*\.(woff2?|ttf)/.test(html), 'page: local Inter font with system fallback, title keeps its font');
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);

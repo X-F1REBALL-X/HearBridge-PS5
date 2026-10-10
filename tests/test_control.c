@@ -540,6 +540,9 @@ int main(int argc, char **argv)
         post(&c, "/api/game?do=3&id=../../x");
         CHECK(!strncmp(out, "HTTP/1.1 400", 12) && !c.req_game_drop[0], "game: remove with a bad id -> 400");
     }
+    get(&c, "/font.woff2");
+    CHECK(!strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "font/woff2") && strstr(out, "max-age=604800") &&
+          strstr(out, "\r\n\r\nwOF2"), "font: /font.woff2 served from the payload, cached");
     printf("%s (%d failures)\n", fails ? "FAILED" : "ALL OK", fails);
     return fails ? 1 : 0;
 }
