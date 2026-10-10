@@ -196,9 +196,8 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .latm .lt1 .v{font-size:1.15rem;color:var(--sl,var(--lime))}
 [dir=rtl] .latm .lname{letter-spacing:0}
 /* connection */
-.conn .cbox{display:grid;grid-template-columns:auto minmax(0,1fr);grid-gap:var(--s4);align-items:center}
 .conn .note{margin:0;font-size:.8rem;line-height:1.3}
-#stop{min-width:13rem}
+#stop{min-width:0}
 /* status: name, compact key/value list, slim level meters */
 .now{order:-2;display:flex;align-items:center;min-width:0;margin-bottom:var(--s3)}
 .nowico{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:2.6rem;height:2.6rem;margin-inline-end:var(--s3);color:var(--void);background:var(--lime);transform:skewX(var(--sk))}
@@ -326,26 +325,35 @@ button.night.on:before{background:linear-gradient(90deg,rgba(177,140,255,.28),rg
 #setbtn .gear{width:1.05rem;height:1.05rem;margin-inline-end:.5rem;vertical-align:-.18rem}
 .brand{flex:1}
 .scrim{position:fixed;z-index:88;top:0;left:0;right:0;bottom:0;background:rgba(6,5,9,.6);display:none}.scrim.show{display:block}
-.drawer{position:fixed;z-index:90;top:0;bottom:0;left:0;width:44rem;max-width:100vw;display:flex;flex-direction:column;padding:var(--s4) var(--s5);
-background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0) 8rem),var(--deck);border-inline-end:2px solid var(--edge2);
-box-shadow:1.5rem 0 3rem rgba(0,0,0,.6);transform:translateX(-105%);visibility:hidden;transition:transform .18s,visibility 0s .18s}
+/* Elf Launcher style side menu: category list on the left, the page on the right */
+.drawer{position:fixed;z-index:90;top:0;bottom:0;left:0;width:min(66rem,100vw);display:grid;grid-template-columns:15rem minmax(0,1fr);
+background:var(--deck);border-inline-end:2px solid var(--edge2);box-shadow:1.5rem 0 3rem rgba(0,0,0,.6);
+transform:translateX(-105%);visibility:hidden;transition:transform .18s,visibility 0s .18s}
 [dir=rtl] .drawer{left:auto;right:0;transform:translateX(105%)}
 .drawer.show{transform:none;visibility:visible;transition:transform .18s}
-.dhead{display:flex;align-items:center;gap:var(--s3);margin-bottom:var(--s3)}.dhead .label{flex:1;margin:0;--acc:var(--ink2)}
+.side{display:flex;flex-direction:column;padding:var(--s4) var(--s3);background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border-inline-end:1px solid var(--edge)}
+.navgrp{margin:.2rem .55rem .5rem;font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+[dir=rtl] .navgrp{letter-spacing:0}
+.tabs{display:grid;grid-template-columns:minmax(0,1fr);grid-gap:.3rem;align-content:start}
+.tabs button{display:flex;align-items:center;width:100%;min-height:2.9rem;padding:.2rem .75rem;text-align:start;font-size:.95rem;font-weight:700;color:var(--ink2);white-space:normal;line-height:1.15}
+.tabs button:before{background:transparent;border-color:transparent}
+.tabs .ti{flex:0 0 auto;width:1.25rem;height:1.25rem;margin-inline-end:.7rem;color:var(--c)}
+.tabs button.on{color:var(--ink)}
+.tabs button.on:before{background:linear-gradient(90deg,rgba(255,255,255,.1),rgba(255,255,255,.02));border-color:var(--c);box-shadow:inset 3px 0 0 var(--c)}
+[dir=rtl] .tabs button.on:before{background:linear-gradient(270deg,rgba(255,255,255,.1),rgba(255,255,255,.02));box-shadow:inset -3px 0 0 var(--c)}
+.menufoot{margin-top:auto;padding:var(--s3) .55rem 0;border-top:1px solid var(--edge);display:flex;flex-direction:column;gap:.2rem;font-size:.76rem;color:var(--mute);line-height:1.3}
+.menufoot b{color:var(--ink2);font-size:.8rem}
+.dmain{display:flex;flex-direction:column;min-width:0;min-height:0;padding:var(--s4) var(--s5)}
+.dhead{display:flex;align-items:center;gap:var(--s3);margin-bottom:var(--s3);padding-bottom:var(--s3);border-bottom:1px solid var(--edge)}
+.dhead .label{flex:1;margin:0;font-size:1rem}
+#setm .dhead .label{--acc:var(--pgc,var(--ink2))}
 button.sm{min-height:2.2rem;padding:.15rem .9rem;font-size:.85rem}
-.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-gap:.3rem;margin-bottom:var(--s3);padding-bottom:var(--s3);border-bottom:1px solid var(--edge)}
-.tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;min-height:3.6rem;padding:.3rem .4rem;font-size:.86rem;font-weight:700;color:var(--ink2);white-space:normal;line-height:1.1;text-align:center}
-.tabs button:before{background:transparent;border-color:var(--edge)}
-.tabs .ti{width:1.3rem;height:1.3rem;color:var(--c)}
-.tabs button.on{color:var(--ink)}.tabs button.on:before{background:rgba(255,255,255,.05);border-color:var(--c);box-shadow:inset 0 -3px 0 var(--c)}
 .pages{flex:1;min-height:0;overflow-y:auto;padding:4px var(--s1) var(--s3) 4px}
 .pg{display:none}.pg.on{display:block}
 .pg .sub:first-child,.pg>.note:first-child{margin-top:0}
 .pg .list{max-height:none;overflow:visible}
 .pg .note{font-size:.88rem;line-height:1.35;margin:0 0 var(--s3)}
 .pg .btns{margin-top:var(--s3)}
-.pg .curve{height:7rem}
-.pg .bands{grid-gap:.5rem}.pg .band{grid-template-columns:6rem minmax(0,1fr) 3.6rem}
 .pg .game{padding:var(--s2) var(--s3);margin:0}
 .game.none{background:none;border-style:dashed;border-color:var(--edge2)}.game.none b{color:var(--mute);font-weight:700}
 #pg0{--acc:var(--lime)}#pg2{--acc:var(--rose)}#pg3{--acc:var(--warn)}
@@ -356,14 +364,16 @@ button.sm{min-height:2.2rem;padding:.15rem .9rem;font-size:.85rem}
 .vrow{margin:0 0 var(--s2)}.vrow:last-child{margin-bottom:0}
 .vrow .big{font-size:1.7rem}
 .vrow input[type=range]{margin-top:.3rem}
-/* connection (main) */
-.conn .seg{margin-bottom:var(--s2)}
-.conn .note{margin:0 0 var(--s2);font-size:.8rem;line-height:1.3}
-.conn .chiprow{display:flex;align-items:baseline;gap:var(--s3);margin:var(--s1) 0 var(--s3);padding-top:var(--s2);border-top:1px solid var(--edge);font-size:.8rem}
+/* connection (main): compact, Stop is a small button in the header */
+.conn .seg{margin-bottom:var(--s1)}
+.conn .note{margin:0 0 var(--s1);font-size:.78rem;line-height:1.3}
+.conn .note:empty{display:none}
+.conn .chiprow{display:flex;align-items:baseline;gap:var(--s3);margin:var(--s2) 0 0;padding-top:var(--s2);border-top:1px solid var(--edge);font-size:.8rem}
 .conn .chiprow .diag{margin-inline-start:auto}
-.conn .cbox{display:grid;grid-template-columns:auto minmax(0,1fr);grid-gap:var(--s3);align-items:center;margin-top:auto}
-.conn .cbox button{min-height:2.5rem}
-.conn .sub:first-of-type{margin-top:0}
+/* equalizer on the main screen, under the presets */
+.eqbox{margin:var(--s2) 0 var(--s3);padding:var(--s2) var(--s3);background:rgba(177,140,255,.05);border:1px solid rgba(177,140,255,.22)}
+.eqbox .curve{height:5rem}
+.eqp.off .eqbox{opacity:.55}
 /* status + log (main): the old colourful look */
 .status .kv>*{min-height:2rem}
 .status .meters{margin-top:var(--s3)}
@@ -377,28 +387,39 @@ button.sm{min-height:2.2rem;padding:.15rem .9rem;font-size:.85rem}
 .eqp .presets button{min-height:2.5rem}
 button.night{min-height:3.4rem}
 .latp .note{margin:var(--s2) 0 0;font-size:.8rem}
-/* tablet: two columns */
-@media(min-width:760px){
-.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.c3{grid-column:1/-1}
+/* tablet: two columns; phone: one. Panels keep a sensible order. */
+@media(max-width:1179px),(max-height:599px){
+.col{display:contents}
+.hs{order:1}.vol{order:2}.latp{order:3}.eqp{order:4}.conn{order:5}.status{order:6}.logp{order:7}
 }
-/* TV: three columns on one screen; busy panels (sound, connection, log) get the room */
+@media(min-width:760px) and (max-width:1179px){
+.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.eqp,.logp{grid-column:1/-1}
+}
+/* TV: three columns on one screen.
+   left: volume, latency, connection; middle: sound with the equalizer;
+   right: status, headset, a small log */
 @media(min-width:1180px) and (min-height:600px){
 html{font-size:12px;font-size:clamp(11px,min(.9vw,1.62vh),24px)}
 .wrap{height:100vh}
-.grid{flex:1;min-height:0;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr) minmax(0,1.1fr)}
-.c3{grid-column:auto}
+.grid{flex:1;min-height:0;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr) minmax(0,1.05fr)}
 .col{min-height:0}
 .panel{flex:0 0 auto}
-.c1 .hs{flex:1 1 auto;display:flex;flex-direction:column}.c1 .hs .qs{flex:1 1 auto;max-height:none;align-content:start}.c1 .hs>.btns{margin-top:auto}.c2 .conn{flex:1 1 auto}.c3 .logp{flex:1 1 0;min-height:0}
-.eqp{flex:0 0 auto}
+.c1>.panel{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-evenly}
+.c1 .phead{margin-bottom:0}.c1 .latp>.label{margin-bottom:0}
+.c2 .eqp{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+.c2 .eqbox{flex:1 1 0;min-height:0;display:flex;flex-direction:column;justify-content:space-between}.c2 .eqbox .curve{flex:0 1 7rem;min-height:3.5rem}
+.c2 .bands{flex:1 1 auto;align-content:space-evenly;grid-gap:.4rem}
+.c2 .band input[type=range],.c2 .band input[type=range]::-webkit-slider-runnable-track,.c2 .band input[type=range]::-webkit-slider-thumb{height:1.7rem}
+.c2 .band .bn{font-size:.9rem}.c2 .band .bv{font-size:1.05rem}
+.c3 .hs{flex:0 0 auto}.c3 .logp{flex:1 1 0;min-height:7rem}
 .big{font-size:2rem}.vrow .big{font-size:1.7rem}
 .latp .latm{padding:var(--s2) var(--s3)}.latp .lt1 .v{font-size:1.4rem}
 .latp .latm .big{font-size:2rem}.latp .lbar{height:.85rem}
 .vol input[type=range],.vol input[type=range]::-webkit-slider-runnable-track,.vol input[type=range]::-webkit-slider-thumb,.vol input[type=range]::-moz-range-track,.vol input[type=range]::-moz-range-progress,.vol input[type=range]::-moz-range-thumb,
 .latp input[type=range],.latp input[type=range]::-webkit-slider-runnable-track,.latp input[type=range]::-webkit-slider-thumb,.latp input[type=range]::-moz-range-track,.latp input[type=range]::-moz-range-progress,.latp input[type=range]::-moz-range-thumb{height:1.7rem}
-.qs{overflow-y:auto;padding:4px;margin:-4px -4px var(--s2)}
-#latnote{display:none}
+.qs{overflow-y:auto;max-height:12rem;padding:4px;margin:-4px -4px var(--s2)}
+.status .kv>*{min-height:1.8rem}
 }
 @media(max-width:759px){
 .bar{flex-wrap:wrap;gap:.5rem}.brand{order:-1;flex:1 1 100%;margin-bottom:.4rem}#setbtn{margin:0}.bar button{min-height:2.4rem;padding:.2rem .7rem;font-size:.8rem}
@@ -408,14 +429,16 @@ html{font-size:12px;font-size:clamp(11px,min(.9vw,1.62vh),24px)}
 .kv{grid-template-columns:minmax(0,1fr)}.kv>.k{min-height:0;padding:var(--s2) 0 0;border-bottom:0}.kv>.v,.kv>.chips{min-height:0;padding:var(--s1) 0 var(--s2)}
 .dl button{min-width:0}
 .meters{grid-template-columns:1fr;grid-gap:var(--s2)}
-.conn .cbox{grid-template-columns:1fr}
 .conn .seg{grid-auto-flow:row;grid-template-columns:1fr 1fr}
-#stop{width:100%;min-width:0}
 .msg,.toast{top:.6rem}
-.drawer{width:100vw;padding:var(--s3)}
+.drawer{width:100vw;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+.side{padding:var(--s3);border-inline-end:0;border-bottom:1px solid var(--edge)}
 .tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+.menufoot{display:none}
+.dmain{padding:var(--s3)}
 .eqp .presets{grid-template-columns:1fr 1fr}
-.logp .evlog{max-height:16rem}
+.band{grid-template-columns:4.8rem minmax(0,1fr) 2.8rem}
+.logp .evlog{max-height:14rem}
 }
 </style>
 </head>
@@ -430,13 +453,6 @@ html{font-size:12px;font-size:clamp(11px,min(.9vw,1.62vh),24px)}
 <div class="msg" id="msg"></div><div class="toast" id="toast"></div>
 <main class="grid">
 <div class="col c1">
-<section class="panel hs" id="hspanel"><p class="label" data-i18n="headsetPanel">Headset</p>
-<div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
-<div class="hsinfo"><span class="hsi"><span class="k" data-i18n="battery">Battery</span><span class="v" id="batm">-</span></span><span class="hsi"><span class="k" data-i18n="signal">Signal</span><span class="v" id="lqm">-</span></span></div>
-<p class="sub" data-i18n="switchHs">Switch headset</p>
-<div class="qs" id="qs"></div>
-<div class="btns hsb"><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div>
-</section>
 <section class="panel vol"><div class="phead"><p class="label" data-i18n="volume">Volume</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div>
 <div class="vrow"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
 <input type="range" id="gain" min="0" max="500" step="10"></div>
@@ -450,23 +466,30 @@ html{font-size:12px;font-size:clamp(11px,min(.9vw,1.62vh),24px)}
 <div class="lkeys" id="lkeys"></div></div>
 <p class="k note" id="latnote" data-i18n="latHint">Lower: less delay. Higher: fewer dropouts when the radio is busy. Saved for this headset.</p>
 </section>
+<section class="panel conn"><div class="phead"><p class="label" data-i18n="connection">Connection</p><button id="stop" class="red sm" data-i18n="stop">Stop HearBridge</button></div>
+<div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
+<p class="k note cno" id="codecno"></p>
+<p class="k note cno" id="xqnote"></p>
+<div class="chiprow"><span class="k" data-i18n="chip">Chip</span><span class="v" id="chipv">-</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div>
+</section>
 </div>
 <div class="col c2">
 <section class="panel eqp" id="eqp"><p class="label" data-i18n="sound">Sound</p>
 <div class="gline" id="gline" style="display:none"><span class="gic sm" id="glic"></span><span id="gltxt">-</span></div>
 <div class="eqhead" id="eqhead"><span class="cl" data-i18n="equalizer">Equalizer</span><button id="eqon" data-i18n="eqOff">Off</button></div>
 <div class="presets"><button id="pr0" data-i18n="prFlat">Flat</button><button id="pr1" data-i18n="prBassBoost">Bass boost</button><button id="pr2" data-i18n="prBassCut">Bass cut</button><button id="pr3" data-i18n="prTreble">Treble boost</button><button id="pr4" data-i18n="prVoice">Voice / footsteps</button><button id="prc" data-i18n="eqCustom">Custom</button></div>
+<div class="eqbox"><div class="curve"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eqg" x1="0" x2="1" y1="0" y2="0">
+<stop offset="0" stop-color="#8f6bff"/><stop offset=".5" stop-color="#b18cff"/><stop offset="1" stop-color="#d4b8ff"/></linearGradient></defs>
+<path id="eqfill" fill="url(#eqg)" fill-opacity=".18" d=""/><path id="eqline" fill="none" stroke="url(#eqg)" stroke-width="2.5" vector-effect="non-scaling-stroke" d=""/></svg></div>
+<div class="bands">
+<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqBass">Bass</span></span><input type="range" id="eq0" min="-12" max="12" step="1"><span class="bv" id="eqv0">0</span></div>
+<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqLowMid">Low mid</span></span><input type="range" id="eq1" min="-12" max="12" step="1"><span class="bv" id="eqv1">0</span></div>
+<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqMid">Mid</span></span><input type="range" id="eq2" min="-12" max="12" step="1"><span class="bv" id="eqv2">0</span></div>
+<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqPresence">Presence</span></span><input type="range" id="eq3" min="-12" max="12" step="1"><span class="bv" id="eqv3">0</span></div>
+<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqTreble">Treble</span></span><input type="range" id="eq4" min="-12" max="12" step="1"><span class="bv" id="eqv4">0</span></div>
+</div>
+</div>
 <button type="button" class="night" id="night"><span class="nt"><b data-i18n="night">Night mode</b><small data-i18n="nightHint">Quieter explosions, clearer voices</small></span><span class="sw" id="nightsw"></span></button>
-</section>
-<section class="panel conn"><p class="label" data-i18n="connection">Connection</p>
-<p class="sub" data-i18n="codec">Codec</p>
-<div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
-<p class="k note cno" id="codecno"></p>
-<p class="k note cno" id="xqnote"></p>
-<p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p>
-<div class="chiprow"><span class="k" data-i18n="chip">Chip</span><span class="v" id="chipv">-</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div>
-<div class="cbox"><button id="stop" class="red" data-i18n="stop">Stop HearBridge</button>
-<p class="k note" data-i18n="footer">Closing this page leaves HearBridge running.</p></div>
 </section>
 </div>
 <div class="col c3">
@@ -486,6 +509,13 @@ html{font-size:12px;font-size:clamp(11px,min(.9vw,1.62vh),24px)}
 </div>
 <p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p>
 </section>
+<section class="panel hs" id="hspanel"><p class="label" data-i18n="headsetPanel">Headset</p>
+<div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
+<div class="hsinfo"><span class="hsi"><span class="k" data-i18n="battery">Battery</span><span class="v" id="batm">-</span></span><span class="hsi"><span class="k" data-i18n="signal">Signal</span><span class="v" id="lqm">-</span></span></div>
+<p class="sub" data-i18n="switchHs">Switch headset</p>
+<div class="qs" id="qs"></div>
+<div class="btns hsb"><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div>
+</section>
 <section class="panel logp"><p class="label" data-i18n="log">Log</p>
 <div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section>
 </div>
@@ -493,13 +523,17 @@ html{font-size:12px;font-size:clamp(11px,min(.9vw,1.62vh),24px)}
 </div>
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="setm" role="dialog" aria-modal="true" aria-label="Settings">
-<div class="dhead"><p class="label" data-i18n="settings">Settings</p><button type="button" id="setclose" class="sm" data-i18n="close">Close</button></div>
+<div class="side"><p class="navgrp" data-i18n="settings">Settings</p>
 <nav class="tabs" id="tabs">
 <button type="button" id="tb0" style="--c:var(--lime)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg><span data-i18n="tabHeadsets">Headsets</span></button>
-<button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="equalizer">Equalizer</span></button>
+<button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="sound">Sound</span></button>
 <button type="button" id="tb2" style="--c:var(--rose)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10a5 5 0 0 1 4.6 7l-1 2.3a2.5 2.5 0 0 1-4.2.6L14.6 15H9.4l-1.8 1.9a2.5 2.5 0 0 1-4.2-.6l-1-2.3A5 5 0 0 1 7 7z" fill="currentColor"/></svg><span data-i18n="tabGames">Games</span></button>
 <button type="button" id="tb3" style="--c:var(--warn)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 9l5 5 5-5M4 17v4h16v-4" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="bkTitle">Backup &amp; restore</span></button>
 </nav>
+<div class="menufoot"><b>HearBridge PS5</b><span data-i18n="footer">Closing this page leaves HearBridge running.</span></div>
+</div>
+<div class="dmain">
+<div class="dhead"><p class="label" id="pgtitle">-</p><button type="button" id="setclose" class="sm" data-i18n="close">Close</button></div>
 <div class="pages">
 <div class="pg" id="pg0" style="--acc:var(--lime)">
 <button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
@@ -509,17 +543,8 @@ html{font-size:12px;font-size:clamp(11px,min(.9vw,1.62vh),24px)}
 </div>
 <div class="pg" id="pg1" style="--acc:var(--violet)">
 <p class="k note" id="eqhint" data-i18n="eqHint">Saved for this headset.</p>
-<div class="curve"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eqg" x1="0" x2="1" y1="0" y2="0">
-<stop offset="0" stop-color="#8f6bff"/><stop offset=".5" stop-color="#b18cff"/><stop offset="1" stop-color="#d4b8ff"/></linearGradient></defs>
-<path id="eqfill" fill="url(#eqg)" fill-opacity=".18" d=""/><path id="eqline" fill="none" stroke="url(#eqg)" stroke-width="2.5" vector-effect="non-scaling-stroke" d=""/></svg></div>
-<div class="bands">
-<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqBass">Bass</span></span><input type="range" id="eq0" min="-12" max="12" step="1"><span class="bv" id="eqv0">0</span></div>
-<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqLowMid">Low mid</span></span><input type="range" id="eq1" min="-12" max="12" step="1"><span class="bv" id="eqv1">0</span></div>
-<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqMid">Mid</span></span><input type="range" id="eq2" min="-12" max="12" step="1"><span class="bv" id="eqv2">0</span></div>
-<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqPresence">Presence</span></span><input type="range" id="eq3" min="-12" max="12" step="1"><span class="bv" id="eqv3">0</span></div>
-<div class="band" style="--c:var(--violet)"><span class="bn"><i></i><span data-i18n="eqTreble">Treble</span></span><input type="range" id="eq4" min="-12" max="12" step="1"><span class="bv" id="eqv4">0</span></div>
-</div>
 <div class="btns"><button id="tone" data-i18n="tone">Test tone</button><button id="clean" data-i18n="clean">Clean sound</button></div>
+<p class="sub" data-i18n="codec">Codec</p><p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p>
 </div>
 <div class="pg" id="pg2" style="--acc:var(--rose)">
 <p class="k note" data-i18n="gamesHint">Save the sound you like for a game. It turns on by itself when that game starts, and your usual sound comes back when it closes.</p>
@@ -536,6 +561,7 @@ html{font-size:12px;font-size:clamp(11px,min(.9vw,1.62vh),24px)}
 <input type="file" id="bkfile" accept=".json,application/json" style="display:none">
 </div>
 </div>
+</div>
 </aside>
 <script>
 var I18N=/*I18N*/;
@@ -546,7 +572,7 @@ function info(c){for(var i=0;i<I18N.langs.length;i++)if(I18N.langs[i].code==c)re
 function setLang(c){var L=info(c);LANG=L.code;try{localStorage.setItem('hb_lang',LANG)}catch(e){}
 document.documentElement.lang=LANG;document.documentElement.dir=L.rtl?'rtl':'ltr';
 var n=document.querySelectorAll('[data-i18n]');for(var i=0;i<n.length;i++)n[i].textContent=t(n[i].getAttribute('data-i18n'));
-var o=$('langlist').getElementsByTagName('button');for(var i2=0;i2<o.length;i2++)o[i2].className='langopt'+(o[i2].getAttribute('data-code')==LANG?' on':'');$('langlist').className='';if(S)draw()}
+var o=$('langlist').getElementsByTagName('button');for(var i2=0;i2<o.length;i2++)o[i2].className='langopt'+(o[i2].getAttribute('data-code')==LANG?' on':'');$('langlist').className='';if(typeof TAB=='number')setTab(TAB);if(S)draw()}
 function buildLangs(){var h='',i,L;for(i=0;i<I18N.langs.length;i++){L=I18N.langs[i];
 h+='<button type="button" class="langopt" role="menuitem" data-code="'+L.code+'"'+(L.rtl?' dir="rtl"':'')+'><span>'+L.name+'</span></button>'}
 $('langlist').innerHTML=h;var b=$('langlist').getElementsByTagName('button');
@@ -741,7 +767,7 @@ var toastT=0;function toast(m){$('toast').textContent=m;clearTimeout(toastT);toa
 $('gsave').onclick=function(){if(!this.disabled)act('/api/game?do=1')};
 $('night').onclick=function(){act('/api/night?on='+(S&&S.night&&S.night.on?0:1))};
 /* settings overlay */
-var TAB=0,NTAB=4;function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}}
+var TAB=0,NTAB=4;function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}var ts=$('tb'+n).getElementsByTagName?$('tb'+n).getElementsByTagName('span'):[];$('pgtitle').textContent=ts.length?ts[0].textContent:'';$('setm').style.setProperty&&$('setm').style.setProperty('--pgc',['var(--lime)','var(--violet)','var(--rose)','var(--warn)'][n])}
 function setOpen(n){$('setm').className='drawer show';$('scrim').className='scrim show';setTab(n==null?TAB:n);$('tb'+TAB).focus();if(TAB==3)bkCheck()}
 function setClose(){$('setm').className='drawer';$('scrim').className='scrim';$('setbtn').focus()}
 $('scrim').onclick=setClose;

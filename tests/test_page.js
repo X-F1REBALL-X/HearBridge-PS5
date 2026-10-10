@@ -72,8 +72,18 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150',
 {
   const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
   check(main.indexOf('id="savedlist"') < 0 && main.indexOf('id="devlist"') < 0 &&
-        main.indexOf('id="eq0"') < 0 && main.indexOf('id="bkdo"') < 0 && main.indexOf('id="gsave"') < 0,
-        'page: device lists, EQ bands, game profiles and backup stay in Settings');
+        main.indexOf('id="bkdo"') < 0 && main.indexOf('id="gsave"') < 0,
+        'page: device lists, game profiles and backup stay in Settings');
+  check(main.indexOf('id="eqp"') < main.indexOf('id="eq0"') && main.indexOf('id="eq4"') > 0 && main.indexOf('id="eqline"') > 0,
+        'page: the full equalizer (5 bands + curve) is on the main screen, in Sound');
+  const c1 = main.slice(main.indexOf('class="col c1"'), main.indexOf('class="col c2"'));
+  const c3 = main.slice(main.indexOf('class="col c3"'));
+  check(c1.indexOf('class="panel conn"') > 0 && c1.indexOf('id="codecnote"') < 0 && /id="stop" class="red sm"/.test(c1),
+        'page: connection is compact (codec, chip, small stop button)');
+  check(c3.indexOf('class="panel status"') < c3.indexOf('id="hspanel"') && c3.indexOf('id="hspanel"') < c3.indexOf('class="panel logp"'),
+        'page: right column is status, headset, log');
+  check(/class="side"><p class="navgrp"/.test(html) && /class="dmain"/.test(html) && /id="pgtitle"/.test(html),
+        'page: settings side menu (categories left, page right)');
   check(main.indexOf('id="qs"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="gain"') > 0 && main.indexOf('id="hs"') > 0 &&
         main.indexOf('id="lat"') > 0 && main.indexOf('id="lbar"') > 0 && main.indexOf('id="pr0"') > 0 && main.indexOf('id="night"') > 0,
         'page: main screen has headset switch, battery, volume, latency + meter, EQ presets and night mode');
