@@ -177,6 +177,70 @@ int hb_lat_effective(const hb_lat_backoff *b, int target)
     return e > HB_QUEUE_LOW_MS ? HB_QUEUE_LOW_MS : e;
 }
 
+int hb_lat_auto_clamp(int ms)
+{
+    if (ms <= 0) return HB_QUEUE_LOW_MS;
+    return ms < HB_LAT_AUTO_MIN_MS ? HB_LAT_AUTO_MIN_MS : ms > HB_LAT_AUTO_MAX_MS ? HB_LAT_AUTO_MAX_MS : ms;
+}
+
+void hb_lat_auto_init(hb_lat_auto *a, int start_ms)
+{
+    a->cur_ms = hb_lat_auto_clamp(start_ms);
+    a->fail_ms = 0;
+    a->drops = a->win_s = a->good_s = a->safe_ms = 0;
+    a->ignore_s = HB_LAT_AUTO_START_S;
+}
+
+int hb_lat_auto_tick(hb_lat_auto *a, int d, int *changed)
+{
+    if (changed) *changed = 0;
+    if (d < 0) d = 0;
+    if (a->ignore_s > 0) {
+        a->ignore_s--;
+        return a->cur_ms;
+    }
+    if (d > 0) {
+        a->good_s = 0;
+        if (!a->drops) a->win_s = 0;
+        a->drops += d;
+        if (a->drops >= HB_LAT_AUTO_BAD_DROPS) {
+            if (a->cur_ms > a->fail_ms) a->fail_ms = a->cur_ms;
+            a->drops = 0;
+            if (a->cur_ms < HB_LAT_AUTO_MAX_MS) {
+                /* A probe below the floor failed: straight back to the level
+                 * that held, not a full step above it. */
+                if (a->safe_ms > a->cur_ms && a->safe_ms <= a->cur_ms + HB_LAT_AUTO_UP_MS)
+                    a->cur_ms = a->safe_ms;
+                else
+                    a->cur_ms += HB_LAT_AUTO_UP_MS;
+                a->safe_ms = 0;
+                if (a->cur_ms > HB_LAT_AUTO_MAX_MS) a->cur_ms = HB_LAT_AUTO_MAX_MS;
+                a->ignore_s = HB_LAT_AUTO_SETTLE_S;
+                if (changed) *changed = 1;
+            }
+        }
+        return a->cur_ms;
+    }
+    if (a->drops && ++a->win_s >= HB_LAT_AUTO_BAD_WIN_S) a->drops = 0;   /* an odd drop: forgiven */
+    a->good_s++;
+    if (a->cur_ms <= HB_LAT_AUTO_MIN_MS) return a->cur_ms;
+    if (a->cur_ms - HB_LAT_AUTO_DOWN_MS <= a->fail_ms) {
+        /* At the floor: stay, but try below it after a long clean stretch. */
+        if (a->good_s < HB_LAT_AUTO_REPROBE_S) return a->cur_ms;
+        a->fail_ms = 0;
+        a->safe_ms = a->cur_ms;
+    } else if (a->good_s < HB_LAT_AUTO_GOOD_S) {
+        return a->cur_ms;
+    }
+    a->cur_ms -= HB_LAT_AUTO_DOWN_MS;
+    if (a->cur_ms < HB_LAT_AUTO_MIN_MS) a->cur_ms = HB_LAT_AUTO_MIN_MS;
+    a->good_s = 0;
+    a->drops = 0;
+    a->ignore_s = HB_LAT_AUTO_SETTLE_S;
+    if (changed) *changed = -1;
+    return a->cur_ms;
+}
+
 int hb_lat_backoff_tick(hb_lat_backoff *b, int target, int dpm)
 {
     int t = hb_latency_clamp(target);

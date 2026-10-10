@@ -90,6 +90,23 @@ int main(int argc, char **argv)
     hb_prefs_default(&p);
     CHECK(hb_prefs_load(dir, addr, &p) && hb_prefs_hs_volume(&p) == 100 && hb_prefs_gain(&p) == 250,
           "load: volume kept, gain default");
+    {
+        hb_prefs r;
+        char b2[512];
+        hb_prefs_default(&r);
+        CHECK(hb_prefs_lat_auto(&r), "latency auto: on for a new headset");
+        hb_prefs_parse(&r, "latency_ms=90\n");
+        CHECK(!hb_prefs_lat_auto(&r), "latency auto: an older file with a moved slider keeps the slider");
+        hb_prefs_default(&r);
+        hb_prefs_parse(&r, "latency_ms=200\n");
+        CHECK(hb_prefs_lat_auto(&r), "latency auto: an older file at the default gets auto");
+        hb_prefs_parse(&r, "lat_auto=off\nlat_learned=5000\n");
+        CHECK(!hb_prefs_lat_auto(&r) && r.lat_learned == 400, "latency auto: off kept, learned value clamped");
+        r.lat_auto = 1;
+        r.lat_learned = 130;
+        CHECK(hb_prefs_format(&r, b2, (int)sizeof b2) > 0 && strstr(b2, "lat_auto=on\n") &&
+              strstr(b2, "lat_learned=130\n"), "latency auto: written to the file");
+    }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);
     return fails != 0;
 }

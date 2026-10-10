@@ -97,6 +97,8 @@ typedef struct {
     char games_hsname[32][4][32];
     unsigned char games_hs_cur[32][4];   /* it is the headset in use */
     int lat_backoff_ms;    /* low buffer target stepped back this much (drops) */
+    int latency_auto;      /* adaptive latency on (per headset); the slider is manual */
+    int lat_auto_ms;       /* adaptive latency: target in effect now, 0 = not streaming */
     int lat_normal_ms;     /* last delay estimate at the default 200 ms target, 0 none */
     /* backup / restore */
     int req_reload;        /* restore wrote new settings: reload them */

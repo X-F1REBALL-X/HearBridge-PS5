@@ -115,4 +115,35 @@ int  hb_lat_backoff_tick(hb_lat_backoff *b, int target_ms, int drops_per_min);
 /* Target in effect without a tick (after the slider moved). */
 int  hb_lat_effective(const hb_lat_backoff *b, int target_ms);
 
+/* Adaptive latency ("Auto", per headset): the buffer target goes down in
+ * small steps while the link stays drop-free and back up at once when it
+ * drops (a radio stall longer than the buffer). The lowest level that
+ * dropped is remembered, so it settles just above it instead of swinging;
+ * after a long clean stretch it tries below once more (conditions change).
+ * May go above the 200 ms default when even that drops. Fed once a second
+ * with the packets dropped in that second. */
+#define HB_LAT_AUTO_MIN_MS     60
+#define HB_LAT_AUTO_MAX_MS    400
+#define HB_LAT_AUTO_UP_MS      40   /* step up after drops */
+#define HB_LAT_AUTO_DOWN_MS    10   /* step down after a clean stretch */
+#define HB_LAT_AUTO_BAD_DROPS   3   /* drops within HB_LAT_AUTO_BAD_WIN_S: step up */
+#define HB_LAT_AUTO_BAD_WIN_S  20
+#define HB_LAT_AUTO_GOOD_S     45   /* clean seconds before each step down */
+#define HB_LAT_AUTO_REPROBE_S 1800  /* clean at the floor this long: try below it */
+#define HB_LAT_AUTO_SETTLE_S    3   /* after a change: the queue drains to the new cap */
+#define HB_LAT_AUTO_START_S    10   /* stream start: link setup drops do not count */
+typedef struct {
+    int cur_ms;       /* target in effect */
+    int fail_ms;      /* highest level that dropped (0 = none known) */
+    int drops, win_s; /* drops in the current bad window, its age */
+    int good_s;       /* clean seconds since the last drop / change */
+    int ignore_s;     /* seconds left whose drops are not counted */
+    int safe_ms;      /* level held clean before a probe below the floor (0 none) */
+} hb_lat_auto;
+/* start_ms: the level learned last time for this headset (0 = 200 ms). */
+void hb_lat_auto_init(hb_lat_auto *a, int start_ms);
+/* Once a second. Returns the target in effect; *changed set to -1 / 0 / +1. */
+int  hb_lat_auto_tick(hb_lat_auto *a, int dropped_this_s, int *changed);
+int  hb_lat_auto_clamp(int ms);
+
 #endif

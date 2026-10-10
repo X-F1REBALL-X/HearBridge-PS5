@@ -57,6 +57,9 @@ check(/Headset <em>130 ms/.test(el('lkeys').innerHTML) && /Queue <em>20 ms/.test
 calls.length = 0; el('lat').value = 120; el('lat').onchange.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=120' && calls[0].h['X-HB-Token'], 'page: latency slider -> POST with token');
 check(/id="lat" min="40" max="200" step="1"/.test(html), 'page: slider goes 40-200 ms in 1 ms steps');
+calls.length = 0; el('latauto').onclick();
+check(calls[0] && calls[0].m === 'POST' && /^\/api\/latency\?auto=[01]$/.test(calls[0].p) && calls[0].h['X-HB-Token'], 'page: the Auto button toggles adaptive latency');
+check(/data-i18n="codecAuto">Auto<\/button><input type="range" id="lat"/.test(html), 'page: Auto sits next to the latency slider (existing translations)');
 calls.length = 0; el('lat').value = 150; el('lat').oninput.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150', 'page: moving the slider posts the buffer target');
 {

@@ -1611,6 +1611,7 @@ static void prefs_from_ctl(void)
 {
     g_prefs.codec = g_ctl.codec_pref;
     g_prefs.latency_ms = g_ctl.latency_ms;
+    g_prefs.lat_auto = g_ctl.latency_auto != 0;
     if (g_game_applied[0]) return;     /* EQ and night belong to the game profile now */
     g_prefs.night = g_ctl.night;
     g_prefs.eq_on = g_ctl.eq_on;
@@ -1624,6 +1625,7 @@ static void prefs_to_ctl(void)
 {
     g_ctl.codec_pref = g_prefs.codec;
     g_ctl.latency_ms = hb_latency_clamp(g_prefs.latency_ms);
+    g_ctl.latency_auto = hb_prefs_lat_auto(&g_prefs);
     g_ctl.night = g_prefs.night;
     g_ctl.eq_on = g_prefs.eq_on;
     memcpy(g_ctl.eq_db, g_prefs.eq_db, sizeof g_ctl.eq_db);
@@ -1682,6 +1684,7 @@ static void prefs_attach(const unsigned char addr[6])
          * A value already saved above is left alone. */
         hb_prefs_new_headset(&g_prefs);
         g_ctl.latency_ms = g_prefs.latency_ms;
+        g_ctl.latency_auto = g_prefs.lat_auto = 1;   /* adaptive for a new headset */
         g_ctl.gain_pct = hb_prefs_gain(&g_prefs);   /* not set for it yet: 250 */
         CTL_UNLOCK(&g_ctl);
         prefs_save();
@@ -2290,6 +2293,9 @@ static int run_session(a2dp_session *asess, hci_t hci, headset_ini *ini)
     unsigned char switch_from[6];        /* RUN_SWITCH_IN: the headset we leave */
     hb_linkq lq;                         /* drops per minute for the link meter */
     hb_lat_backoff bo;                   /* low buffer target: step back on drops */
+    hb_lat_auto la;                      /* adaptive latency (Auto): lowest drop-free buffer */
+    int la_on = 0;
+    long la_drops = 0;
     int hs_dirty = 0, lat_n = 0;
     long lat_sum = 0;
 
@@ -2480,10 +2486,17 @@ stream_setup:
     pk.rate_hz = scfg.sample_rate;
     hb_linkq_init(&lq);
     hb_lat_backoff_init(&bo);
+    hb_lat_auto_init(&la, g_prefs_have ? g_prefs.lat_learned : 0);
+    la_drops = btlink_tx_dropped(link);
     CTL_LOCK(&g_ctl);
-    pk.queue_ms = hb_latency_clamp(g_ctl.latency_ms);
+    la_on = g_ctl.latency_auto;
+    pk.queue_ms = la_on ? la.cur_ms : hb_latency_clamp(g_ctl.latency_ms);
+    g_ctl.lat_auto_ms = la_on ? la.cur_ms : 0;
     g_ctl.lat_backoff_ms = 0;
     CTL_UNLOCK(&g_ctl);
+    if (la_on)
+        log_line("latency: auto, starting at %d ms (%s)", la.cur_ms,
+                 g_prefs_have && g_prefs.lat_learned ? "learned for this headset" : "default");
     packer_size(&pk);
     {
         /* Media queue from the first packet (tune_link() keeps it in step). */
@@ -2657,7 +2670,14 @@ stream_setup:
             {
                 /* Buffer target in effect: the slider, stepped back while a
                  * low target makes the link drop (hb_lat_backoff). */
-                int want_q = hb_lat_effective(&bo, g_ctl.latency_ms);
+                int want_q;
+                if (g_ctl.latency_auto != la_on) {
+                    la_on = g_ctl.latency_auto;
+                    hb_lat_auto_init(&la, g_prefs_have ? g_prefs.lat_learned : 0);
+                    la_drops = btlink_tx_dropped(link);
+                }
+                want_q = la_on ? la.cur_ms : hb_lat_effective(&bo, g_ctl.latency_ms);
+                g_ctl.lat_auto_ms = la_on ? la.cur_ms : 0;
                 if (want_q != pk.queue_ms) {
                     pk.queue_ms = want_q;
                     lat_changed = 1;
@@ -2898,6 +2918,28 @@ stream_setup:
                 g_ctl.link_score = hb_linkq_score(rssi, lqv, dpm,
                                                   btlink_tx_backlog(link) > HB_RATE_SLACK ? btlink_tx_backlog(link) - HB_RATE_SLACK : 0,
                                                   btlink_media_cap(link));
+                if (la_on) {
+                    /* Auto: one step per status second, from the packets
+                     * dropped since the last one. */
+                    long dr = btlink_tx_dropped(link);
+                    int ch, was = la.cur_ms;
+                    (void)hb_lat_auto_tick(&la, dr >= la_drops ? (int)(dr - la_drops) : 0, &ch);
+                    la_drops = dr;
+                    g_ctl.lat_auto_ms = la.cur_ms;
+                    if (ch) {
+                        log_line("latency: auto %d -> %d ms (%s)", was, la.cur_ms,
+                                 ch > 0 ? "drops" : "clean link, trying lower");
+                        if (ch > 0) {
+                            char evl[HB_EVENT_LEN];
+                            snprintf(evl, sizeof evl, "Audio dropped, latency raised to %d ms (Auto)", la.cur_ms);
+                            ctl_event_locked(&g_ctl, evl);
+                        }
+                        if (g_prefs_have && g_prefs.lat_learned != la.cur_ms) {
+                            g_prefs.lat_learned = la.cur_ms;   /* next time it starts here */
+                            hs_dirty = 1;
+                        }
+                    }
+                }
                 {
                     int was = bo.extra_ms;
                     (void)hb_lat_backoff_tick(&bo, g_ctl.latency_ms, dpm);
