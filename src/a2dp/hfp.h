@@ -57,11 +57,19 @@ typedef struct {
     int battery;                  /* 0..100, -1 unknown */
     int battery_seq;              /* bumped on every new value */
     int battery_src;              /* 0 none, 1 BIEV, 2 IPHONEACCEV */
+    int closing;                  /* our close: 1 DISC on the DLC sent, 2 DISC on DLCI 0 sent */
 } hfp_state;
 
 void hfp_init(hfp_state *h, hfp_send_fn send, void *ud, hfp_log_fn log);
 /* One L2CAP SDU from the RFCOMM channel (one RFCOMM frame). */
 void hfp_input(hfp_state *h, const unsigned char *d, int len);
+
+/* Clean close from our side (before the L2CAP channel goes): DISC on the
+ * hands-free DLC, its UA, then DISC on DLCI 0. 1 = a close was started,
+ * 0 = nothing open. Feed the answers through hfp_input. */
+int  hfp_close(hfp_state *h);
+/* 1 once nothing is open (or our close finished). */
+int  hfp_closed(const hfp_state *h);
 
 /* RFCOMM helpers (exposed for the tests). */
 unsigned char rfc_fcs(const unsigned char *p, int n);

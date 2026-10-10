@@ -264,6 +264,12 @@ check(/#setbtn\{min-height:3\.6rem;min-width:13rem;[^}]*margin-inline-start:2\.6
 check(/visibility:hidden;pointer-events:none/.test(html) && /\.drawer\.show\{[^}]*pointer-events:auto/.test(html) && /\.scrim\{[^}]*pointer-events:none/.test(html),
     'page: closed drawer and scrim do not catch clicks');
 check(/getGamepads/.test(html) && /buttons\[9\]/.test(html) && /ContextMenu/.test(html), 'page: Options / menu key opens Settings');
+// just-left headset that will not answer pages: ask for a power cycle (state chip)
+STATUS.why = 'powercycle'; STATUS.state = 'disconnected';
+global.hbTest.req('/api/status');
+check(/Turn the headset off and on to reconnect/.test(el('state').textContent), 'page: power cycle hint when a just-left headset does not answer');
+STATUS.why = ''; STATUS.state = 'streaming';
+global.hbTest.req('/api/status');
 // Home category replaces the Close button
 check(!/id="setclose"/.test(html) && /<nav class="tabs" id="tabs">\n<button type="button" id="tbhome"/.test(html) && /\$\('tbhome'\)\.onclick=setClose/.test(html),
     'page: Home at the top of the settings menu closes it, no Close button');

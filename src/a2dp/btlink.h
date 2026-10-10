@@ -64,6 +64,10 @@ extern int (*btlink_press_is_for)(const unsigned char addr[6]);
 extern int (*btlink_saved_peer)(const unsigned char addr[6]);
 /* Reject_Connection_Request for addr (reason 0x0D-0x0F); clears tracking. */
 void btlink_reject_request(hci_t hci, const unsigned char addr[6], unsigned char reason);
+/* Accept an incoming ACL request outside any link (to close it cleanly). */
+void btlink_accept_request(hci_t hci, const unsigned char addr[6], int stay_peripheral);
+/* HCI Disconnect for a raw handle (one we accepted only to close it). */
+void btlink_hci_disconnect(hci_t hci, unsigned handle, unsigned char reason);
 /* 1 if this link was accepted from the headset (it called us). */
 int  btlink_is_incoming(const btlink *l);
 /* Idle: page scan on once (on=1), restored once (on=0). */

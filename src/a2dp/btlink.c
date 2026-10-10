@@ -46,6 +46,8 @@ enum {
 #define T_REBIND_SETTLE  300      /* media re-config done -> SUSPEND/START */
 #define REBIND_MAX       2        /* own CFG_REQs answering a peer re-config */
 #define CFG_OPT_MAX    16
+#define HFP_CLOSE_WAIT_MS 600     /* our RFCOMM close: both UAs */
+#define DISC_RSP_WAIT_MS  1000    /* L2CAP DISC_RSPs before the HCI Disconnect */
 
 typedef enum { CH_CLOSED = 0, CH_CONNECTING, CH_CONFIG, CH_OPEN } chan_state;
 
@@ -1686,6 +1688,27 @@ void btlink_reject_request(hci_t hci, const unsigned char addr[6], unsigned char
     log_line("btlink: turned down a connection from saved %s (reason %#04x)", astr, reason);
 }
 
+void btlink_accept_request(hci_t hci, const unsigned char addr[6], int stay_peripheral)
+{
+    unsigned char ap[7];
+    char astr[18];
+    memcpy(ap, addr, 6);
+    ap[6] = stay_peripheral ? 0x01 : 0x00;
+    (void)fire_cmd(hci, 0x0409, ap, 7);    /* Accept Connection Request */
+    acl_track_request_clear(addr);
+    hci_addr_str(addr, astr);
+    log_line("btlink: accepted a connection from saved %s (to close it cleanly)", astr);
+}
+
+void btlink_hci_disconnect(hci_t hci, unsigned handle, unsigned char reason)
+{
+    unsigned char dp[3];
+    put16(dp, handle & 0x0FFF);
+    dp[2] = reason;
+    (void)fire_cmd(hci, 0x0406, dp, 3);    /* Disconnect */
+    log_line("btlink: closing ACL %#05x (reason %#04x)", handle & 0x0FFF, reason);
+}
+
 int btlink_is_incoming(const btlink *l)
 {
     return l && l->acc_got != 0;
@@ -2073,16 +2096,30 @@ void btlink_disconnect(btlink *l)
 
     if (!l) return;
     if (l->connected) {
-        /* Graceful order: every channel still up (AVRCP, SDP, anything the
-         * AVDTP teardown left) gets its DISC_REQ, then up to 200 ms for the
-         * DISC_RSPs, then the HCI Disconnect (0x13). */
+        /* Graceful order (audio was torn down by the caller): HFP's RFCOMM
+         * closed inside (DISC on the DLC, DISC on DLCI 0, each answered by
+         * UA), then AVRCP's L2CAP channels, then the rest (AVDTP, RFCOMM,
+         * SDP), up to 1 s for the DISC_RSPs, then the HCI Disconnect
+         * (0x13). Pulling RFCOMM without its DISC made the Xbox Wireless
+         * Headset drop the link and sulk. */
         long w;
+        chan *rc = l->hfp_scid ? chan_by_scid(l, l->hfp_scid) : NULL;
+        if (rc && rc->st == CH_OPEN && hfp_close(&l->hfp)) {
+            w = now_ms() + HFP_CLOSE_WAIT_MS;
+            while (!hfp_closed(&l->hfp) && l->connected && now_ms() < w)
+                if (btlink_pump(l, 20) < 0) break;
+            if (!hfp_closed(&l->hfp))
+                log_line("hfp: no answer to our close in %d ms, closing the channel anyway", HFP_CLOSE_WAIT_MS);
+        }
+        for (i = 0; i < BTLINK_CHAN_MAX; i++)
+            if (l->ch[i].psm == BTLINK_PSM_AVCTP || l->ch[i].psm == BTLINK_PSM_AVCTP_BR)
+                chan_close_disc(l, &l->ch[i]);
         for (i = 0; i < BTLINK_CHAN_MAX; i++) chan_close_disc(l, &l->ch[i]);
-        w = now_ms() + 200;
+        w = now_ms() + DISC_RSP_WAIT_MS;
         while (l->disc_wait > 0 && l->connected && now_ms() < w)
             if (btlink_pump(l, 20) < 0) break;
-        if (l->disc_wait > 0)
-            log_line("l2cap: %d DISC_RSP not seen in 200 ms — disconnecting anyway", l->disc_wait);
+        if (l->disc_wait > 0 && l->connected)
+            log_line("l2cap: %d DISC_RSP not seen in %d ms, disconnecting anyway", l->disc_wait, DISC_RSP_WAIT_MS);
     }
     l->disc_wait = 0;
     for (i = 0; i < BTLINK_CHAN_MAX; i++)
