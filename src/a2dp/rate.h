@@ -27,6 +27,7 @@ typedef struct {
     int cap;               /* temporary ceiling after congestion at cap+1 (0 = none) */
     long t_cap;            /* when that ceiling was set */
     long t_late;           /* since when packets beyond the slack wait (-1 none) */
+    long hold_until;       /* a dip: stay at the floor until then */
 } hb_rate;
 
 /* lo/hi = configured bitpool range, start = first bitpool. hi is capped at
@@ -52,6 +53,9 @@ int hb_rate_settled(const hb_rate *r, long now_ms);
 /* The link stays slow although the queue looks calm (credits returned
  * without headroom): restart the calm period. */
 void hb_rate_not_calm(hb_rate *r, long now_ms);
+/* A dip (linktune.h): the floor right away and until `until`, no step up;
+ * the calm period starts when the hold ends. */
+void hb_rate_hold_floor(hb_rate *r, long now_ms, long until);
 
 /* Whole SBC frames per media packet that fit the peer's L2CAP MTU:
  * RTP header 12 + SBC media header 1 + n * frame_len <= mtu, n <= 15

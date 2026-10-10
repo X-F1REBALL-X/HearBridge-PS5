@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp test-linktune
 
 all: ps5
 
@@ -94,7 +94,7 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp test-linktune
 
 test-acl:
 	@mkdir -p $(BUILD)/host
@@ -219,3 +219,10 @@ test-hfp:
 	@mkdir -p $(BUILD)/host
 	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/a2dp tests/test_hfp.c src/a2dp/hfp.c -o $(BUILD)/host/test_hfp
 	$(BUILD)/host/test_hfp
+
+# Frames/packet tuner: slow link grows packets, bursty credits shrink them,
+# a dip freezes the size with the bitpool at its floor, recovery after 10 s.
+test-linktune:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp tests/test_linktune.c src/a2dp/linktune.c src/a2dp/rate.c -o $(BUILD)/host/test_linktune
+	$(BUILD)/host/test_linktune
