@@ -2851,8 +2851,20 @@ stream_setup:
             {
                 int pkt_ms = pk.per_pkt * pk.samples_per * 1000 / pk.rate_hz;
                 int q10 = pk.bl_n > 0 ? (int)(pk.bl_sum * 10 / pk.bl_n) : 0;
-                hb_latency_estimate(&lat, pkt_ms, q10, (int)btlink_acl_gap_avg(link),
-                                    av.delay_on ? av.sink_delay_x10 : 0);
+                /* The sink's delay report survives a re-setup of the same
+                 * headset (SET_CONFIGURATION clears it and many sinks only
+                 * report once): a OnePlus Buds Pro 3 showed 308 ms, then
+                 * the 150 ms default. Only another headset forgets it. */
+                static unsigned char sink_addr[6];
+                static int sink_last_x10;
+                int sx = av.delay_on ? av.sink_delay_x10 : 0;
+                if (memcmp(sink_addr, ini->addr, 6)) {
+                    memcpy(sink_addr, ini->addr, 6);
+                    sink_last_x10 = 0;
+                }
+                if (sx > 0) sink_last_x10 = sx;
+                else sx = sink_last_x10;
+                hb_latency_estimate(&lat, pkt_ms, q10, (int)btlink_acl_gap_avg(link), sx);
                 pk.bl_sum = pk.bl_n = 0;
             }
             log_line("stream: pkts=%ld sbc=%ld reads ok=%ld empty=%ld peak=%.4f "
@@ -2937,36 +2949,6 @@ stream_setup:
                 g_ctl.link_score = hb_linkq_score(rssi, lqv, dpm,
                                                   btlink_tx_backlog(link) > HB_RATE_SLACK ? btlink_tx_backlog(link) - HB_RATE_SLACK : 0,
                                                   btlink_media_cap(link));
-                {
-                    /* A saved headset the console's own stack holds while we
-                     * stream (a read pause let it take one): it shares the
-                     * radio and the HCI event pipe with our stream, so
-                     * completion events (credits) go missing and audio
-                     * drops. Saved headsets are ours: close that link. */
-                    static long last_close;
-                    unsigned own = btlink_handle(link);
-                    int i;
-                    if (!g_switch_req && !g_accdrop.on && now - last_close > 30000) {
-                        for (i = 0; i < g_npaired; i++) {
-                            unsigned h;
-                            const char *nm = g_paired[i].name[0] ? g_paired[i].name : "a saved headset";
-                            if (!memcmp(g_paired[i].addr, ini->addr, 6)) continue;
-                            h = acl_track_any_handle(g_paired[i].addr);
-                            if (!h || h == own) continue;
-                            log_line("stream: %s is connected to the console's own Bluetooth (handle %#05x) - "
-                                     "closing it, it takes airtime and credits from the stream", nm, h);
-                            btlink_hci_disconnect(hci, h, 0x13);
-                            {
-                                char evl[HB_EVENT_LEN];
-                                snprintf(evl, sizeof evl, "Disconnected %s from the PS5 itself", nm);
-                                (void)hb_utf8_clean(evl);
-                                ctl_event_locked(&g_ctl, evl);
-                            }
-                            last_close = now;
-                            break;
-                        }
-                    }
-                }
                 if (la_on) {
                     /* Auto: one step per status second, from the packets
                      * dropped since the last one. */

@@ -292,14 +292,24 @@ int main(int argc, char **argv)
                 (void)hb_lat_auto_tick(&a, 8, &ch);
                 if (ch > 0) ups++;
             }
-            CHECK(a.cur_ms == 200 && a.link_bad, "auto: a huge drop rate is a link problem, the buffer stays at 200 ms");
-            /* Stalls first (one raise), then the link falls apart: the
-             * raise is undone. */
+            CHECK(a.cur_ms <= 200 + HB_LAT_AUTO_UP_MS && ups <= 1 && a.link_bad,
+                  "auto: a huge drop rate is a link problem, at most one step (before the window fills), then held");
+            /* Stalls first (raised), then the link falls apart: held where
+             * it is (a smaller buffer would only drop more), no more raises.
+             * The bad944d console log: 240 -> 200 under a flood made it worse. */
             hb_lat_auto_init(&a, 200);
             for (t = 0; t < 60; t++) (void)hb_lat_auto_tick(&a, t % 3 == 0, &ch);
             CHECK(a.cur_ms > 200, "auto: occasional stalls raise the buffer");
-            for (t = 0; t < 30; t++) (void)hb_lat_auto_tick(&a, 5, &ch);
-            CHECK(a.cur_ms == 200 && a.link_bad, "auto: then a flood of drops: the raise is undone (it did not help)");
+            {
+                int held = a.cur_ms, downs = 0, ups2 = 0;
+                for (t = 0; t < 120; t++) {
+                    (void)hb_lat_auto_tick(&a, 5, &ch);
+                    if (ch < 0) downs++;
+                    if (ch > 0) ups2++;
+                }
+                CHECK(a.cur_ms == held && a.link_bad && !downs && !ups2,
+                      "auto: then a flood of drops: the level is held, never lowered or raised");
+            }
             /* A link that needs more than any buffer: never above two steps. */
             hb_lat_auto_init(&a, 200);
             for (t = 0; t < 3600; t++) (void)hb_lat_auto_tick(&a, t % 4 == 0, &ch);

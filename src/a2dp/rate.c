@@ -203,6 +203,7 @@ static void lat_auto_changed(hb_lat_auto *a)
 {
     memset(a->win, 0, sizeof a->win);
     a->good_s = 0;
+    a->since_s = 0;
     a->ignore_s = HB_LAT_AUTO_SETTLE_S;
 }
 
@@ -217,23 +218,23 @@ int hb_lat_auto_tick(hb_lat_auto *a, int d, int *changed)
     }
     a->win[a->wi] = d;
     a->wi = (a->wi + 1) % HB_LAT_AUTO_WIN_S;
+    a->since_s++;
     sum = lat_auto_sum(a);
     if (sum >= HB_LAT_AUTO_LINK_DROPS) {
         /* Far more than a stall: the link cannot carry the stream. A
-         * bigger buffer would only add delay, so undo our raises. */
+         * bigger buffer would only add delay, so no more raises; a smaller
+         * one could only drop more, so the level is held as it is. */
         a->link_bad = 1;
         a->good_s = 0;
-        if (a->cur_ms > a->start_ms) {
-            a->cur_ms = a->start_ms;
-            lat_auto_changed(a);
-            if (changed) *changed = -1;
-        }
         return a->cur_ms;
     }
     if (sum == 0) a->link_bad = 0;
     if (d > 0) {
         a->good_s = 0;
-        if (sum >= HB_LAT_AUTO_BAD_DROPS && !a->link_bad) {
+        /* A further raise only after a full window at the raised level:
+         * if the drops go on at a link-sized rate it never comes. */
+        if (sum >= HB_LAT_AUTO_BAD_DROPS && !a->link_bad &&
+            (a->cur_ms <= a->start_ms || a->since_s >= HB_LAT_AUTO_WIN_S)) {
             if (a->cur_ms > a->fail_ms) a->fail_ms = a->cur_ms;
             top = a->start_ms + HB_LAT_AUTO_MAX_RAISES * HB_LAT_AUTO_UP_MS;
             if (top > HB_LAT_AUTO_MAX_MS) top = HB_LAT_AUTO_MAX_MS;

@@ -147,6 +147,7 @@ typedef struct {
     int ignore_s;     /* seconds left whose drops are not counted */
     int safe_ms;      /* level held clean before a probe below the floor (0 none) */
     int link_bad;     /* drop rate too high for a buffer to help */
+    int since_s;      /* counted seconds since the last change */
 } hb_lat_auto;
 /* start_ms: the level learned last time for this headset (0 = 200 ms). */
 void hb_lat_auto_init(hb_lat_auto *a, int start_ms);
