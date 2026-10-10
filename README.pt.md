@@ -45,3 +45,5 @@ Pausa da busca no MediaTek, correção do pipe USB e ferramenta de depuração H
 ## Licença
 
 GPL-3.0-or-later. Veja [LICENSE](LICENSE) e [NOTICE](NOTICE).
+
+[Apoie o projeto no Ko-fi](https://ko-fi.com/xf1reballx). O projeto continua gratuito e de código aberto.

@@ -45,3 +45,5 @@ MediaTek Scan-Pause und USB-Pipe-Fix sowie HCI-Debug-Tool von [ZiZc3](https://gi
 ## Lizenz
 
 GPL-3.0-or-later. Siehe [LICENSE](LICENSE) und [NOTICE](NOTICE).
+
+[Das Projekt auf Ko-fi unterstützen](https://ko-fi.com/xf1reballx). Das Projekt bleibt kostenlos und Open Source.

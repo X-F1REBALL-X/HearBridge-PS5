@@ -45,3 +45,5 @@ Pausa del escaneo en MediaTek, arreglo de la tubería USB y herramienta de depur
 ## Licencia
 
 GPL-3.0-or-later. Ver [LICENSE](LICENSE) y [NOTICE](NOTICE).
+
+[Apoya el proyecto en Ko-fi](https://ko-fi.com/xf1reballx). El proyecto sigue siendo gratuito y de código abierto.

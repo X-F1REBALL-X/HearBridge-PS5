@@ -45,3 +45,5 @@ make test
 ## Лицензия
 
 GPL-3.0-or-later. См. [LICENSE](LICENSE) и [NOTICE](NOTICE).
+
+[Поддержать проект на Ko-fi](https://ko-fi.com/xf1reballx). Проект остаётся бесплатным и с открытым исходным кодом.
