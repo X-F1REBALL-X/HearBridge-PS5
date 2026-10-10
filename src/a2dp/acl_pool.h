@@ -29,6 +29,10 @@ void acl_pool_credit(acl_pool *p, int n, int from_event, long now);
 void acl_pool_fallback(acl_pool *p, long now);
 /* A packet went to the controller. */
 void acl_pool_sent(acl_pool *p, long now);
+/* Disconnection Complete for this link: the controller freed every buffer
+ * the handle held, so all outstanding credits come back at once. Returns
+ * how many were outstanding. */
+int acl_pool_disconnected(acl_pool *p, long now);
 
 /* Media pacing clock: returns the due time of the next packet and
  * advances the clock by dur_ms. A clock in the past (backlog) is

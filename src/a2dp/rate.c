@@ -43,6 +43,7 @@ void hb_rate_init(hb_rate *r, int lo, int hi, int start, long now_ms)
     r->cap = 0;
     r->t_cap = -100000;
     r->t_late = -1;
+    r->hold_until = -100000;
 }
 
 void hb_rate_set_ceiling(hb_rate *r, int cfg_hi, int ceil)
@@ -58,6 +59,17 @@ void hb_rate_not_calm(hb_rate *r, long now_ms)
     r->t_calm = now_ms;
 }
 
+void hb_rate_hold_floor(hb_rate *r, long now_ms, long until)
+{
+    r->hold_until = until;
+    if (r->cur != r->lo) {
+        r->cur = r->lo;
+        r->t_down = now_ms;
+        r->downs++;
+    }
+    r->t_calm = until;
+}
+
 int hb_rate_update(hb_rate *r, long now, int queue, int qmax, long drops)
 {
     int dropped = drops > r->last_drops, step = 0;
@@ -65,6 +77,12 @@ int hb_rate_update(hb_rate *r, long now, int queue, int qmax, long drops)
     long late_ms = 0;
 
     r->last_drops = drops;
+    if (now < r->hold_until) {            /* a dip: floor, nothing else */
+        r->cur = r->lo;
+        r->t_calm = r->hold_until;
+        r->t_late = -1;
+        return r->cur;
+    }
     if (room < 2) room = 2;
     /* Late packets only count once they persist: bursty completion events
      * (e.g. a 96 ms gap) fill the queue for a moment and it drains again
@@ -144,4 +162,44 @@ void hb_latency_estimate(hb_latency *o, int pkt_ms, int queue_x10, int radio_gap
     o->sink_reported = sink_x10 > 0;
     o->sink_ms = sink_x10 > 0 ? (sink_x10 + 5) / 10 : HB_SINK_TYPICAL_MS;
     o->total_ms = o->capture_ms + o->packet_ms + o->queue_ms + o->radio_ms + o->sink_ms;
+}
+
+void hb_lat_backoff_init(hb_lat_backoff *b)
+{
+    b->extra_ms = b->bad_s = b->good_s = 0;
+}
+
+int hb_lat_effective(const hb_lat_backoff *b, int target)
+{
+    int t = hb_latency_clamp(target), e;
+    if (t >= HB_QUEUE_LOW_MS) return t;
+    e = t + b->extra_ms;
+    return e > HB_QUEUE_LOW_MS ? HB_QUEUE_LOW_MS : e;
+}
+
+int hb_lat_backoff_tick(hb_lat_backoff *b, int target, int dpm)
+{
+    int t = hb_latency_clamp(target);
+    if (t >= HB_QUEUE_LOW_MS) {               /* default buffer: nothing to step back */
+        hb_lat_backoff_init(b);
+        return t;
+    }
+    if (dpm >= HB_LAT_BAD_DPM) {
+        b->good_s = 0;
+        if (++b->bad_s >= HB_LAT_BAD_S && t + b->extra_ms < HB_QUEUE_LOW_MS) {
+            b->extra_ms += HB_LAT_STEP_MS;
+            b->bad_s = 0;
+        }
+    } else if (dpm == 0) {
+        b->bad_s = 0;
+        if (++b->good_s >= HB_LAT_GOOD_S && b->extra_ms > 0) {
+            b->extra_ms -= HB_LAT_STEP_MS;
+            if (b->extra_ms < 0) b->extra_ms = 0;
+            b->good_s = 0;
+        }
+    } else {
+        b->bad_s = 0;
+    }
+    if (t + b->extra_ms > HB_QUEUE_LOW_MS) b->extra_ms = HB_QUEUE_LOW_MS - t;
+    return hb_lat_effective(b, t);
 }

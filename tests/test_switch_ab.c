@@ -80,7 +80,12 @@ static int f_event(void *s, unsigned char *d, int cap)
     return n;
 }
 static int f_acl(void *s, unsigned char *d, int cap) { (void)s; (void)d; (void)cap; return 0; }
-static int f_pump(void *s, int ms) { (void)s; (void)ms; return evh != evt; }
+static int real_pump;             /* block like the USB transport when idle */
+static int f_pump(void *s, int ms) { (void)s; if (real_pump && evh == evt && ms > 0) usleep((useconds_t)ms * 1000); return evh != evt; }
+
+/* A page command written cmd_at: the abort hook (main's connect_abort) says stop. */
+static long cmd_at;
+static int abort_after(const unsigned char a[6]) { (void)a; return cmd_at && now_ms() >= cmd_at; }
 static int f_send(void *s, const unsigned char *f, int n) { (void)s; (void)f; (void)n; return 1; }
 static const hci_ops OPS = { f_acl, f_event, f_pump, f_cmd, f_send, NULL, NULL };
 
@@ -219,6 +224,37 @@ int main(void)
         CHECK(again >= 0 && opargs[again][6] == 0x01, "dropped accept: the next call is taken as peripheral");
         btlink_disconnect(b);
         btlink_destroy(b);
+        alarm(0);
+    }
+    /* Listen states (the 10 s just-left listen, rejoin sit mode): nobody
+     * calls, a Scan / Forget / Disconnect press comes 100 ms in. The listen
+     * must end within ~200 ms of the press, not at its own timeout. */
+    {
+        unsigned char ab[1][6], kb[1][16], ktb[1] = { 4 };
+        int which = -1, ok;
+        long late;
+        memcpy(ab[0], A, 6); memcpy(kb[0], key, 16);
+        signal(SIGALRM, hung);
+        alarm(20);
+        real_pump = 1;
+        btlink_abort_connect = abort_after;
+        b = btlink_create(hci, 1021, 7);
+        t0 = now_ms();
+        cmd_at = t0 + 100;
+        ok = btlink_accept(b, (const unsigned char (*)[6])ab, (const unsigned char (*)[16])kb, ktb, 1, 10000, &which);
+        late = now_ms() - cmd_at;
+        printf("     listen: press handled %ld ms after it came\n", late);
+        CHECK(!ok && late >= 0 && late < 200, "listen: a press during a 10 s listen is handled within 200 ms");
+        btlink_destroy(b);
+        cmd_at = 0;
+        b = btlink_create(hci, 1021, 7);
+        t0 = now_ms();
+        ok = btlink_accept(b, (const unsigned char (*)[6])ab, (const unsigned char (*)[16])kb, ktb, 1, 300, &which);
+        dt = now_ms() - t0;
+        CHECK(!ok && dt >= 280, "listen: without a press it waits its full time");
+        btlink_destroy(b);
+        btlink_abort_connect = NULL;
+        real_pump = 0;
         alarm(0);
     }
     printf(fails ? "FAILED (%d)\n" : "ALL OK (0 failures)\n", fails);

@@ -17,10 +17,9 @@ pt:['O HearBridge não está em execução.','Carregue primeiro o HearBridge-PS5
 ru:['HearBridge не запущен.','Сначала загрузите HearBridge-PS5.elf через ELF-загрузчик, затем снова откройте эту плитку.','Повторить'],
 ja:['HearBridge が起動していません。','先に ELF ローダーで HearBridge-PS5.elf を読み込み、もう一度このアイコンを開いてください。','再試行'],
 zh:['HearBridge 未运行。','请先用 ELF 加载器加载 HearBridge-PS5.elf，然后再次打开此图标。','重试'],
-it:['HearBridge non è in esecuzione.','Carica prima HearBridge-PS5.elf con il tuo loader ELF, poi riapri questa icona.','Riprova'],
-he:['HearBridge לא פועל.','טענו קודם את HearBridge-PS5.elf עם טוען ה-ELF, ואז פתחו שוב את האריח הזה.','נסו שוב']};
+it:['HearBridge non è in esecuzione.','Carica prima HearBridge-PS5.elf con il tuo loader ELF, poi riapri questa icona.','Riprova']};
 var c=null;try{c=localStorage.getItem('hb_lang')}catch(e){}if(!T[c])c=(navigator.language||'en').slice(0,2);if(!T[c])c='en';
-var L=T[c];if(c=='ar'||c=='he')document.documentElement.dir='rtl';
+var L=T[c];if(c=='ar')document.documentElement.dir='rtl';
 function probe(){var x=new XMLHttpRequest();x.open('GET',U+'api/status',true);x.timeout=2500;
 x.onload=function(){if(x.status==200)location.href=U;else fail()};x.onerror=x.ontimeout=fail;x.send()}
 function fail(){document.getElementById('m').textContent=L[0];document.getElementById('h').textContent=L[1];document.getElementById('b').textContent=L[2]}

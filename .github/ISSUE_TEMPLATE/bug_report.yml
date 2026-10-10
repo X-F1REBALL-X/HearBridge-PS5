@@ -37,7 +37,7 @@ body:
     attributes:
       label: Bluetooth chip
       description: >-
-        Shown in the **Chip** row at the bottom of the Status panel on the page, or in the log line `usb: ... is XXXX:YYYY`. See [Which chip do I have?](https://github.com/X-F1REBALL-X/HearBridge-PS5#which-chip-do-i-have)
+        Shown as **Chip** in Settings, Details on the page, or in the log line `usb: ... is XXXX:YYYY`.
       options:
         - Marvell/NXP (1286:...)
         - MediaTek (0e8d:...)
@@ -50,6 +50,7 @@ body:
     attributes:
       label: Which HearBridge file did you run?
       options:
+        - HearBridge-PS5-1.3.0.elf
         - HearBridge-PS5-1.2.0.elf
         - HearBridge-PS5-1.1.0.elf
         - HearBridge-PS5-1.1.0-mtk-test.elf (MediaTek test build)

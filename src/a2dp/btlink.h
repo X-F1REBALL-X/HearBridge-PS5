@@ -9,6 +9,7 @@
 
 #define BTLINK_CID_SIGNALING 0x0001
 #define BTLINK_PSM_SDP       0x0001
+#define BTLINK_PSM_RFCOMM    0x0003  /* HFP AG, battery only */
 #define BTLINK_PSM_AVDTP     0x0019
 #define BTLINK_PSM_AVCTP     0x0017  /* AVRCP control */
 #define BTLINK_PSM_AVCTP_BR  0x001B  /* AVRCP browsing */
@@ -63,6 +64,10 @@ extern int (*btlink_press_is_for)(const unsigned char addr[6]);
 extern int (*btlink_saved_peer)(const unsigned char addr[6]);
 /* Reject_Connection_Request for addr (reason 0x0D-0x0F); clears tracking. */
 void btlink_reject_request(hci_t hci, const unsigned char addr[6], unsigned char reason);
+/* Accept an incoming ACL request outside any link (to close it cleanly). */
+void btlink_accept_request(hci_t hci, const unsigned char addr[6], int stay_peripheral);
+/* HCI Disconnect for a raw handle (one we accepted only to close it). */
+void btlink_hci_disconnect(hci_t hci, unsigned handle, unsigned char reason);
 /* 1 if this link was accepted from the headset (it called us). */
 int  btlink_is_incoming(const btlink *l);
 /* Idle: page scan on once (on=1), restored once (on=0). */
@@ -107,6 +112,26 @@ void btlink_avrcp_set_volume(btlink *l, int vol);
 int  btlink_avrcp_volume(btlink *l, int *changed);
 int  btlink_avrcp_state(const btlink *l);
 int  btlink_avrcp_connect(btlink *l);
+/* Headset battery as AVRCP status 0..4 (avrcp.h AVRCP_BATT_*), -1 unknown. */
+int  btlink_avrcp_battery(const btlink *l);
+/* Ask the headset for its volume again (re-register VOLUME_CHANGED; the
+ * INTERIM answer carries the level). 0 = not sent (no channel, or the
+ * headset refused the registration before). */
+int  btlink_avrcp_requery(btlink *l);
+void btlink_avrcp_stats(const btlink *l, unsigned long *cmds, unsigned long *rsps,
+                        unsigned long *reports, int *refused);
+/* Battery percent the headset reported over HFP (0..100), -1 none yet. */
+int  btlink_hfp_battery(const btlink *l);
+/* Bumped each time the headset itself changed the volume (its buttons/app). */
+int  btlink_avrcp_headset_moves(const btlink *l);
+/* Earbud next / previous track keys step the volume (setting, default on). */
+void btlink_avrcp_seek_volume(btlink *l, int on);
+/* A volume key changed the level: send SetAbsoluteVolume with the latest
+ * level, at most every AVRCP_KEY_SEND_MS. Call every loop turn. */
+void btlink_avrcp_key_flush(btlink *l);
+/* Last HCI Read RSSI (signed, 127 unknown) and Read Link Quality (0..255,
+ * -1 unknown) for this link; polled about once a second while it is up. */
+void btlink_link_quality(const btlink *l, int *rssi, int *lq);
 
 void btlink_set_rx(btlink *l, unsigned scid, btlink_rx_fn fn, void *ud);
 /* Config-stuck limit for non-media channels (0 = default 8 s). */

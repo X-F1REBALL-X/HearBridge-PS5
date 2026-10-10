@@ -215,8 +215,20 @@ int main(int argc, char **argv)
     {   /* latency slider + estimate */
         hb_latency L;
         int t, fit = 1;
-        CHECK(hb_latency_clamp(10) == 60 && hb_latency_clamp(5000) == 200 && hb_latency_clamp(180) == 180,
-              "latency target clamps to 60..200 ms");
+        CHECK(hb_latency_clamp(10) == 40 && hb_latency_clamp(5000) == 200 && hb_latency_clamp(180) == 180,
+              "latency target clamps to 40..200 ms");
+        {
+            hb_lat_backoff b;
+            int k, e = 0;
+            hb_lat_backoff_init(&b);
+            CHECK(hb_lat_backoff_tick(&b, 200, 50) == 200 && b.extra_ms == 0, "backoff: nothing at the 200 ms default");
+            for (k = 0; k < 60; k++) e = hb_lat_backoff_tick(&b, 40, 0);
+            CHECK(e == 40, "backoff: calm link stays at the low setting");
+            for (k = 0; k < 30; k++) e = hb_lat_backoff_tick(&b, 40, 20);
+            CHECK(e > 40 && e <= 200, "backoff: drops step the buffer up, never past 200 ms");
+            for (k = 0; k < 600; k++) e = hb_lat_backoff_tick(&b, 40, 0);
+            CHECK(e == 40 && b.extra_ms == 0, "backoff: calm again, back to the user's setting");
+        }
         CHECK(hb_latency_frames_cap(200, 48000, 128) == 0 && hb_latency_frames_cap(1000, 48000, 128) == 0,
               "200 ms and up: packets stay MTU-sized");
         for (t = 60; t < 200; t += 10) {

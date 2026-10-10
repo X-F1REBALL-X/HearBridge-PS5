@@ -49,6 +49,13 @@ int main(int argc, char **argv)
     CHECK(hb_prefs_format(&p, buf, sizeof buf) > 0 && strstr(buf, "gain=250\ngain_user=1\n") &&
           strstr(buf, "latency_ms=200\n"), "format: gain the user set and the 200 ms default");
 
+    hb_prefs_default(&q);
+    CHECK(!q.night, "night mode off by default");
+    hb_prefs_parse(&q, "night=on\n");
+    CHECK(q.night && hb_prefs_format(&q, buf, sizeof buf) > 0 && strstr(buf, "night=on\n"), "night mode saved per headset");
+    hb_prefs_parse(&q, "night=off\n");
+    CHECK(!q.night && hb_prefs_format(&q, buf, sizeof buf) > 0 && !strstr(buf, "night="), "night mode off: no line");
+
     /* Gain: remembered only when the user set it for this headset. */
     hb_prefs_default(&q);
     CHECK(hb_prefs_gain(&q) == 250 && hb_prefs_hs_volume(&q) == 64,
