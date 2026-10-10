@@ -174,6 +174,12 @@ void hci_scan_check(hci_t hci)
 {
     unsigned char cc[16], v = 0x02;
     int cc_len = 0;
+    /* Only where we pause scanning ourselves (MediaTek). Elsewhere page
+     * scan is the system's: on the Marvell CFI-1016A it is off while idle,
+     * and forcing the system's interlaced scan (~210 ms window every
+     * ~420 ms) on for the whole run starved the audio link (Coral CM835:
+     * 400 drops/min at a 240 ms buffer vs 15 on 1.3.0). */
+    if (!g_scan_pause_on) return;
     if (!hci_cmd_sync(hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) || cc_len < 7)
         return;
     if (cc[6] & 0x02) return;
