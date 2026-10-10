@@ -264,6 +264,13 @@ STATUS.game.dirty = 0; STATUS.game.exact = 0; STATUS.game.from = 'WF-1000XM6';
 global.hbTest.req('/api/status');
 check(/ASTRO BOT \(from WF-1000XM6\)/.test(el('gltxt').textContent), 'page: says when the profile comes from another headset');
 {
+  const sv = STATUS.game.saved;
+  STATUS.game.saved = [{ id: 'PPSA01325', name: 'ASTRO BOT', hs: [{ a: '58:18:62:63:3B:7C', n: 'WF-1000XM6', cur: 0 }] }];
+  global.hbTest.req('/api/status');
+  check(el('gdrop').style.display === 'none', 'page: borrowing another headset profile: Remove is hidden (it would not be ours to delete)');
+  STATUS.game.saved = sv; global.hbTest.req('/api/status');
+}
+{
   const gl = el('glist').innerHTML;
   check(/class="hchip cur"><button type="button" data-gpick="PPSA01325" data-hs="D8:E2:DF:F7:D7:44"/.test(gl) && /Xbox Wireless Headset/.test(gl) &&
     /data-ghdel="PPSA01325" data-hs="58:18:62:63:3B:7C"/.test(gl) && /<svg viewBox/.test(gl), 'page: game card shows a chip with icon and name per saved headset');

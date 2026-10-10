@@ -839,7 +839,7 @@ static const char HB_WEBPAGE[] =
     "$('gupd').disabled=!(gon&&g.dirty);$('gupd').className='gup'+(gon&&g.dirty?' on':'');\n"
     "$('game').className='game'+(gon?(g.active?' on':''):' none');gIcon($('gic'),gon?g.id:'',g.name);gIcon($('glic'),gon&&g.active?g.id:'',g.name);drawGames(g);$('gname').textContent=gon?(g.name||g.id):t(g.avail===0?'gameNoDetect':'noGame');$('gon').style.display=gon&&g.active?'':'none';\n"
     "var own=0,SL=g.saved||[];for(var si=0;si<SL.length;si++)if(SL[si].id==g.id)for(var hi=0;hi<(SL[si].hs||[]).length;hi++)if(SL[si].hs[hi].cur)own=1;\n"
-    "var gsOn=gon&&(!own||!!g.dirty);$('gsave').textContent=t(own?'gameUpdate':'gameSave');$('gsave').disabled=!gsOn;$('gsave').className=gsOn?'act':'no';$('gdrop').style.display=gon&&g.profile?'':'none';\n"
+    "var gsOn=gon&&(!own||!!g.dirty);$('gsave').textContent=t(own?'gameUpdate':'gameSave');$('gsave').disabled=!gsOn;$('gsave').className=gsOn?'act':'no';$('gdrop').style.display=gon&&own?'':'none';\n"
     "$('night').className='night'+(nm.on?' on':'');\n"
     "/* low headset battery: a toast once per heads-up (20 %, then 10 %) */\n"
     "var ba=S.batt_alert||{};if(ba.seq>0&&ba.level){var seen=-1;try{seen=parseInt(localStorage.getItem('hb_batt_seq'),10)}catch(e){}\n"
