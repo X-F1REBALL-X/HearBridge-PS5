@@ -219,5 +219,11 @@ check(/toast\(t\('battToast'\)\.replace\('%s',ba\.level\)\)/.test(html) && /hb_b
 check(/src="\/api\/gameicon\?id='\+encodeURIComponent\(id\)/.test(html) && /onerror="this\.parentNode\.removeChild\(this\)"/.test(html) &&
   /<i>'\+esc\(L\)/.test(html) && /id="glist"/.test(html), 'page: games show the console icon, letter tile when missing');
 check(/act\('\/api\/game\?do=3&id='\+encodeURIComponent\(id\)\)/.test(html) && /gListSig/.test(html), 'page: saved games list, remove by id, redrawn only on change');
+{
+  const bc = (html.match(/class="band" style="--c:var\(--(\w+)\)"/g) || []).map(x => x.replace(/.*--(\w+)\).*/, '$1'));
+  check(bc.length === 5 && new Set(bc).size === 5 && /EQCOL=\['#ff6a2b','#ffb23d','#c8ff3d','#3dd8ff','#ff7ad9'\]/.test(html),
+    'page: each EQ band has its own color (slider, fill, value)');
+  check(/\.c3\{order:1\}\.c2\{order:2\}\.c1\{order:3\}/.test(html), 'page: TV columns: status/headset/log left, sound middle, volume/latency/connection right');
+}
 console.log(fails ? `FAILED (${fails})` : 'ALL OK (0 failures)');
 process.exit(fails ? 1 : 0);
