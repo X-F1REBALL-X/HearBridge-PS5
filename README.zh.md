@@ -45,3 +45,5 @@ MediaTek 扫描暂停与 USB 管道修复，以及 HCI 调试工具，作者 [Zi
 ## 许可证
 
 GPL-3.0-or-later。参见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
+
+[在 Ko-fi 上支持本项目](https://ko-fi.com/xf1reballx)。本项目将继续免费并保持开源。

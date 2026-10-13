@@ -52,4 +52,6 @@ make test
 
 GPL-3.0-or-later. انظر [LICENSE](LICENSE) و[NOTICE](NOTICE).
 
+[ادعم المشروع على Ko-fi](https://ko-fi.com/xf1reballx). يبقى المشروع مجانيًا ومفتوح المصدر.
+
 </div>
