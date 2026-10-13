@@ -92,20 +92,26 @@ int main(void)
     hci_scan_resume(h);
     CHECK(nops == 0 && scan_val == 2, "scan: default profile never touches Scan_Enable");
 
-    /* mediatek: read, off, restore; nested pauses restore once */
-    reset(2);
+    /* mediatek (#34): only inquiry scan is paused, page scan stays on so a
+     * pad can always page the console; nested pauses restore once */
+    reset(3);
     hci_scan_pause_enable(1);
     hci_scan_pause(h, "pairing");
-    CHECK(nops == 2 && ops[0] == HB_OP_READ_SCAN_ENABLE && ops[1] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 0,
-          "scan: mediatek reads Scan_Enable, then turns scanning off");
+    CHECK(nops == 2 && ops[0] == HB_OP_READ_SCAN_ENABLE && ops[1] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 2,
+          "scan: mediatek reads Scan_Enable, then turns inquiry scan off (page scan kept)");
     hci_scan_pause(h, "connect");
     CHECK(nops == 2, "scan: a nested pause sends nothing");
     hci_scan_resume(h);
-    CHECK(nops == 2 && scan_val == 0, "scan: inner resume keeps scanning off");
+    CHECK(nops == 2 && scan_val == 2, "scan: inner resume keeps inquiry scan off");
     hci_scan_resume(h);
-    CHECK(nops == 3 && ops[2] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 2, "scan: outer resume puts the system value back");
+    CHECK(nops == 3 && ops[2] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 3, "scan: outer resume puts the system value back");
     hci_scan_resume(h);
     CHECK(nops == 3, "scan: an extra resume does nothing");
+
+    reset(2);
+    hci_scan_pause(h, "pairing");
+    hci_scan_resume(h);
+    CHECK(scan_val == 2 && nops <= 2, "scan: page scan only (PS5 default) is never turned off");
 
     reset(0);
     hci_scan_pause(h, "scan");
