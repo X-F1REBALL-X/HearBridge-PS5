@@ -131,6 +131,12 @@ void hci_scan_pause(hci_t hci, const char *why)
     if (hci_cmd_sync(hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) && cc_len >= 7)
         g_scan_saved = cc[6];
     if (g_scan_saved == 0) return;      /* nothing to pause */
+    /* #34: only inquiry scan is paused. Page scan (bit 1) stays as the system
+     * set it, so a controller can always page the console back in, and a
+     * copy killed mid-pause (process manager, SIGKILL: no atexit) cannot
+     * leave the console unreachable for pads. */
+    off = (unsigned char)(g_scan_saved > 0 ? (g_scan_saved & 0x02) : 0x02);
+    if (off == g_scan_saved) return;    /* nothing to pause */
     if (hci_cmd_sync(hci, HB_OP_WRITE_SCAN_ENABLE, &off, 1, NULL, NULL, 0))
         log_line("scan: system page/inquiry scan paused for %s (was %d)", why ? why : "-", g_scan_saved);
     else

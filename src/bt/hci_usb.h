@@ -22,6 +22,14 @@ int hci_usb_chip(int *vid, int *pid);
  * event the controller sends, and once per pump with ev NULL. Set by main. */
 extern void (*hci_usb_conn_req_hook)(hci_t hci, const unsigned char *ev, int n);
 
+/* #34: stop reading the shared event / ACL pipes for ms, so the system
+ * stack gets every packet of a device that is not ours (a pad calling in). */
+void hci_usb_yield(int ms);
+
+/* #34: what our own link needs now, so only that many reads stay armed on
+ * the pipes we share with the system (see hci_usb.c, share mode). */
+void hci_usb_hint(int streaming, int connecting, int sticky);
+
 /* Diagnostics: open every /dev/ugen* node read-only, log and report (diag.h)
  * its VID:PID, names, interfaces (class/subclass/protocol) and endpoints,
  * then close it again. Nothing is sent to any device. Call before

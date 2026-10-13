@@ -221,9 +221,67 @@ static void slot_abort(struct usb_hci *u, int idx)
     u->sl[idx].busy = 0;
 }
 
+/* #34 share mode. ugen cannot peek: a read we keep armed takes the next
+ * packet off the pipe whatever its handle or address, and nothing can hand it
+ * back to the system stack. So "only our link's traffic" is approximated by
+ * keeping as few reads armed as our own link needs right now; the system's
+ * own pending reads then take the rest (the DualSense's HID reports, its
+ * link events and connection requests):
+ *   - our command just sent (HB_FULL_MS), or connecting / pairing / a saved
+ *     headset rejoining (sticky): every event read; ACL reads in full only
+ *     while connecting (L2CAP / AVDTP setup needs every packet),
+ *   - streaming: SHARE_EVT event and SHARE_ACL ACL reads,
+ *   - idle (no link of ours): SHARE_EVT event reads, no ACL read at all.
+ * Lost Number Of Completed Packets are covered by the timed refill. */
+enum { SHARE_EVT = 4, SHARE_ACL = 2, HB_FULL_MS = 8000 };
+static long g_full_until;
+static int  g_hint_stream, g_hint_busy, g_hint_sticky;
+static int  g_mode_evt = -1, g_mode_acl = -1;   /* reads armed per kind now */
+static long g_yield_until2;               /* mirror of the yield (declared before reap) */
+
+void hci_usb_hint(int streaming, int connecting, int sticky)
+{
+    g_hint_stream = streaming;
+    g_hint_busy = connecting;
+    g_hint_sticky = sticky;
+}
+
+static void want_counts(int *ne, int *na)
+{
+    int full = now_ms() < g_full_until;
+    if (now_ms() < g_yield_until2) { *ne = *na = 0; return; }
+    *ne = (full || g_hint_busy || g_hint_sticky) ? READS_EVT : SHARE_EVT;
+    *na = (full || g_hint_busy) ? READS_ACL : g_hint_stream ? SHARE_ACL : 0;
+}
+
+static int slot_wanted(int idx)
+{
+    int ne, na;
+    want_counts(&ne, &na);
+    if (idx >= SLOT_EVT0 && idx < SLOT_ACL0) return idx - SLOT_EVT0 < ne;
+    if (idx >= SLOT_ACL0 && idx < SLOT_OUT) return idx - SLOT_ACL0 < na;
+    return 1;
+}
+
 static void arm_read(struct usb_hci *u, int idx)
 {
+    if (!slot_wanted(idx)) return;
     (void)slot_go(u, idx, HCI_PKT_MAX, USB_FS_FLAG_SINGLE_SHORT_OK);
+}
+
+/* Applies the current counts; extra reads are cancelled on the way down. */
+static void share_step(struct usb_hci *u)
+{
+    int ne, na, k;
+    want_counts(&ne, &na);
+    if (ne == g_mode_evt && na == g_mode_acl) return;
+    g_mode_evt = ne;
+    g_mode_acl = na;
+    for (k = SLOT_EVT0; k < SLOT_OUT; k++)
+        if (u->sl[k].busy && !slot_wanted(k)) slot_abort(u, k);
+    log_line("hci_usb: reads armed: %d event / %d ACL (%s)", ne, na,
+             now_ms() < g_full_until ? "our command" : g_hint_busy ? "connecting" :
+             g_hint_sticky ? "headset rejoin" : g_hint_stream ? "streaming, shared" : "idle, shared");
 }
 
 /* Hand the oldest queued ACL frame to the active writer, if it is idle. */
@@ -267,6 +325,34 @@ static void tx_watchdog(struct usb_hci *u)
 }
 
 /* Drain every finished transfer. Returns 1 if new input was queued. */
+/* #34 yield state (see hci_usb_yield). */
+static long g_yield_until;
+static int  g_yielding;
+static unsigned long g_yields;
+
+/* #34 debug: ACL frames we took, per handle, logged every 10 s. A handle
+ * that is not our headset's is traffic the system lost (a pad's HID). */
+static int  g_acl_h[4], g_acl_c[4];
+static long g_acl_t0;
+static void acl_in_note(int h)
+{
+    int i;
+    long now = now_ms();
+    for (i = 0; i < 4; i++) {
+        if (g_acl_c[i] && g_acl_h[i] == h) { g_acl_c[i]++; break; }
+        if (!g_acl_c[i]) { g_acl_h[i] = h; g_acl_c[i] = 1; break; }
+    }
+    if (!g_acl_t0) g_acl_t0 = now;
+    if (now - g_acl_t0 >= 10000) {
+        log_line("hci_usb: ACL in taken in %ld ms: %#05x x%d, %#05x x%d, %#05x x%d, %#05x x%d (%s)",
+                 now - g_acl_t0, g_acl_h[0], g_acl_c[0], g_acl_h[1], g_acl_c[1],
+                 g_acl_h[2], g_acl_c[2], g_acl_h[3], g_acl_c[3],
+                 g_mode_acl >= READS_ACL ? "full" : "shared");
+        memset(g_acl_c, 0, sizeof g_acl_c);
+        g_acl_t0 = now;
+    }
+}
+
 static int reap(struct usb_hci *u)
 {
     struct usb_fs_complete c;
@@ -306,10 +392,13 @@ static int reap(struct usb_hci *u)
                     memcpy(g_creq[g_ncreq++], s->buf, 12);
                 ring_put(&u->evq, s->buf, (int)s->len); u->n_evt++; got = 1;
             }
-            arm_read(u, idx);
+            if (!g_yielding) arm_read(u, idx);
         } else if (idx >= SLOT_ACL0 && idx < SLOT_OUT) {
-            if (!st && s->len >= 4) { ring_put(&u->aclq, s->buf, (int)s->len); u->n_acl_in++; got = 1; }
-            arm_read(u, idx);
+            if (!st && s->len >= 4) {
+                acl_in_note(hb_acl_frame_handle(s->buf, (int)s->len));
+                ring_put(&u->aclq, s->buf, (int)s->len); u->n_acl_in++; got = 1;
+            }
+            if (!g_yielding) arm_read(u, idx);
         } else if (idx == u->tx_slot) {
             if (!st) { ring_drop(&u->txq); u->n_acl_out++; hb_txpath_sent(&u->tp); }
             else ring_drop(&u->txq);       /* do not spin on a bad frame */
@@ -352,6 +441,43 @@ static void creq_flush(struct usb_hci *u)
     busy = 0;
 }
 
+/* #34: the system stack reads the same pipes, and every read we keep armed
+ * takes packets it needs. When a device that is not ours calls in (a pad),
+ * its Connection Request was already taken by us and cannot be handed back,
+ * so we stop reading for a while: the pad's next page, its Link Key Request,
+ * Connection Complete and HID data all reach the system. */
+
+void hci_usb_yield(int ms)
+{
+    long until = now_ms() + (ms > 0 ? ms : 0);
+    if (until > g_yield_until) g_yield_until = until;
+    g_yield_until2 = g_yield_until;
+    g_yields++;
+    log_line("hci_usb: another device is calling the console - reads off for %d ms so the system answers it (#%lu)",
+             ms, g_yields);
+}
+
+/* 1 while yielding: every read cancelled, nothing re-armed. */
+static int yield_step(struct usb_hci *u)
+{
+    int k;
+    if (now_ms() < g_yield_until) {
+        if (!g_yielding) {
+            g_yielding = 1;
+            for (k = SLOT_EVT0; k < SLOT_OUT; k++) slot_abort(u, k);
+            (void)reap(u);
+        }
+        return 1;
+    }
+    if (g_yielding) {
+        g_yielding = 0;
+        for (k = SLOT_EVT0; k < SLOT_OUT; k++)
+            if (u->sl[k].open && !u->sl[k].busy) arm_read(u, k);
+        log_line("hci_usb: reads back on");
+    }
+    return 0;
+}
+
 static int op_pump(void *self, int wait_ms)
 {
     struct usb_hci *u = self;
@@ -360,11 +486,24 @@ static int op_pump(void *self, int wait_ms)
     /* Stop file / signal: report "transport gone" so every loop unwinds
      * to its cleanup path (links closed, USB released). */
     if (hb_stop_requested()) return -1;
+    share_step(u);
+    while (yield_step(u)) {
+        long left;
+        (void)reap(u);
+        if (u->dead) return -1;
+        if (u->evq.count || u->aclq.count) return 1;
+        left = until - now_ms();
+        if (left <= 0) return 0;
+        usleep((useconds_t)(left > 50 ? 50 : left) * 1000);
+        if (hb_stop_requested()) return -1;
+    }
     for (;;) {
         struct pollfd pf;
         long left;
         int got = reap(u), k;
         creq_flush(u);
+        share_step(u);
+        if (g_yielding || now_ms() < g_yield_until) return got || u->evq.count || u->aclq.count;
         /* A read whose re-arm failed (EBUSY/transient error) would leave
          * the event or ACL pipe silent for good: re-arm idle readers. */
         for (k = SLOT_EVT0; k < SLOT_OUT; k++)
@@ -393,6 +532,7 @@ static int op_cmd(void *self, unsigned op, const void *args, int nargs)
     unsigned char pkt[3 + 255];
     struct usb_ctl_request rq;
     if (u->dead || nargs < 0 || nargs > 255) return 0;
+    g_full_until = now_ms() + HB_FULL_MS;   /* #34: our command, its answers need every read */
     hcidbg_cmd(op, args, nargs);
     put16(pkt, op);
     pkt[2] = (unsigned char)nargs;
