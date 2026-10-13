@@ -45,3 +45,5 @@ MediaTek のスキャン一時停止と USB パイプの修正、HCI デバッ�
 ## ライセンス
 
 GPL-3.0-or-later。[LICENSE](LICENSE) と [NOTICE](NOTICE) を参照。
+
+[Ko-fi でプロジェクトを支援](https://ko-fi.com/xf1reballx)。このプロジェクトはこれからも無料のオープンソースです。

@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="assets/icon0.png" width="128" alt="HearBridge icon">
-
-# HearBridge PS5
+<img src="docs/img/banner.png" alt="HearBridge PS5">
 
 **Bluetooth headphones for a jailbroken PS5: game and system audio, no dongle.**
 
@@ -45,3 +43,5 @@ MediaTek scan-pause and USB pipe fix, plus HCI debug tool, by [ZiZc3](https://gi
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+[Support the project on Ko-fi](https://ko-fi.com/xf1reballx). The project stays free and open source.
