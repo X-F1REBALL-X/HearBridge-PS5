@@ -88,9 +88,13 @@ static int dev_rank(uint32_t cod, const char *name)
             minor == 0x0D || minor == 0x0E || minor == 0x0F || minor == 0x10)
             return -1;
     }
-    /* Phones and computers are never audio sinks for us. */
-    if (major == 1 || major == 2)
+    /* #34 allowlist: phones, computers and game controllers are never
+     * listed, whatever their name says (controllers always win). */
+    if (major == 1 || major == 2) return -1;
+    if (major == 5 && ((minor & 0x0F) == 0x01 || (minor & 0x0F) == 0x02)) return -1;
+    if (has(name, "Wireless Controller") || has(name, "DualSense") || has(name, "DUALSHOCK"))
         return -1;
-    /* Earbuds with odd CoD values: trust a headphone-like name. */
+    /* Earbuds with an odd CoD (AirPods 0x001f00, Galaxy / OnePlus Buds):
+     * only by a headphone-like name. */
     return hb_dev_name_hints_headphones(name) ? 3 : -1;
 }

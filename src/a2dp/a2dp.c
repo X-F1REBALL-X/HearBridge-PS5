@@ -1,4 +1,5 @@
 #include "a2dp.h"
+#include "blocklist.h"
 #include "../rejoin.h"
 #include "devclass.h"
 #include "../utf8.h"
@@ -1133,6 +1134,10 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
 {
     int r;
     if (!s) return 0;
+    if (target && hb_block_has(target->addr)) {   /* #34: never pair a blocked address */
+        log_line("pair: blocked address, not pairing");
+        return 0;
+    }
     hci_scan_pause(s->hci, "pairing");
     r = pair_paged(s, target, out);
     hci_scan_resume(s->hci);

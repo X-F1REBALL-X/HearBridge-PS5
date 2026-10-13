@@ -24,6 +24,7 @@
 #include "sysinfo.h"
 #include "hci_cmd.h"
 #include "hci_usb.h"
+#include "blocklist.h"
 #include "hcidbg.h"
 #include "btchip.h"
 #include "acl_track.h"
@@ -419,6 +420,13 @@ static void write_devices(const a2dp_inq_dev *found, const int *order, int n)
     for (i = 0; i < n; i++) {
         const a2dp_inq_dev *d = &found[order[i]];
         char astr[18];
+        if (hb_block_auto(d->addr, d->cod, d->name)) {
+            char ba[18];
+            hci_addr_str(d->addr, ba);
+            log_line("blocklist: %s CoD %06x \"%s\" is a game controller - auto-blocked", ba,
+                     (unsigned)d->cod, d->name);
+        }
+        if (hb_block_has(d->addr)) continue;            /* #34: blocklist */
         if (hb_dev_rank(d->cod, d->name) < 0) continue;   /* never list TVs, phones, car kits */
         hci_addr_str(d->addr, astr);
         fprintf(f, "%s\n    {\"index\": %d, \"addr\": \"%s\", \"name\": ",
@@ -1099,6 +1107,8 @@ static int set_target(const unsigned char *a)
     return had;
 }
 
+#define HB_YIELD_MS 8000
+
 static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
 {
     long now = now_ms();
@@ -1110,7 +1120,15 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
         char astr[18];
         if (ev[11] != 0x01) return;                  /* SCO/eSCO: not ours */
         memset(&in, 0, sizeof in);
-        in.is_av = hb_cod_is_av(cod);
+        if (hb_block_auto(a, cod, NULL)) {
+            hci_addr_str(a, astr);
+            log_line("blocklist: %s CoD %06x is a game controller - auto-blocked", astr, cod);
+        }
+        in.blocked = hb_block_has(a);
+        /* Audio class, or a saved headset (earbuds with an odd CoD were
+         * allowed by name when paired) that is not a controller. */
+        in.is_av = hb_cod_is_av(cod) ||
+                   (si >= 0 && !hb_block_is_controller(cod, g_paired[si].name));
         in.saved = si >= 0;
         in.forgotten = hb_forgot_has(a);
         in.is_target = g_have_target && !memcmp(a, g_target, 6);
@@ -1122,7 +1140,8 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
         in.just_dropped = in.saved && hb_dropped_recent(&g_dropped, a, now, HB_DROPPED_MS);
         d = hb_connreq_decide(&in);
         hci_addr_str(a, astr);
-        log_line("conn-req: %s CoD %06x%s%s -> %s", astr, cod,
+        log_line("conn-req: %s CoD %06x%s%s%s -> %s", astr, cod,
+                 in.blocked ? " blocked" : "",
                  in.saved ? " saved" : in.forgotten ? " forgotten" : "",
                  in.is_target ? " (target)" : "", hb_connreq_name(d));
         switch (d) {
@@ -1133,11 +1152,20 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
             memcpy(g_switch_addr, a, 6);
             g_switch_req = 1;
             break;
-        default: break;                               /* TAKE: accepted by the state machine; LEAVE: system */
+        case HB_CR_LEAVE:
+            /* #34: not ours (a pad): we already took its request off the
+             * pipe, so get out of the way for its retry and its pairing. */
+            hci_usb_yield(HB_YIELD_MS);
+            break;
+        default: break;                               /* TAKE: accepted by the state machine */
         }
         return;
     }
     {
+        /* #34: tell the transport what our link needs (fewer reads armed =
+         * more of the pad's traffic reaches the system). Sticky: a saved
+         * headset that dropped is rejoining, so its call-back is caught. */
+        hci_usb_hint(g_stream_up, g_have_target, g_rejoining);
         /* Safety net: a call from one of ours that nobody took within 5 s
          * is turned down (busy) before it blocks pages for ~25 s. */
         static long last;
@@ -1333,6 +1361,11 @@ static int try_pick(a2dp_session *asess, hci_t hci, const hb_cmd *c,
     int i;
     g_user_connect = 1;
     memset(&pick, 0, sizeof pick);
+    if (hb_block_has(c->kind == CMD_INDEX && c->index >= 0 && c->index < n ? found[order[c->index]].addr : c->addr)) {
+        log_line("select: that address is on the blocklist - not connecting");
+        write_status("error %s -", conn_fail_label(0));
+        return 0;
+    }
     if (c->kind == CMD_INDEX) {
         if (c->index < 0 || c->index >= n) return 0;
         pick = found[order[c->index]];
@@ -1352,9 +1385,12 @@ static int try_pick(a2dp_session *asess, hci_t hci, const hb_cmd *c,
         }
         for (i = 0; i < n; i++)
             if (!memcmp(found[order[i]].addr, c->addr, 6)) pick = found[order[i]];
-        if (memcmp(pick.addr, c->addr, 6)) {       /* not in the last scan */
-            memcpy(pick.addr, c->addr, 6);
-            pick.psrm = 0x01;
+        if (memcmp(pick.addr, c->addr, 6) || hb_dev_rank(pick.cod, pick.name) < 0) {
+            /* #34: not in the last scan as an audio sink (class unknown or a
+             * pad): never page / pair it. */
+            log_line("select: refusing a device that is not a known audio sink");
+            write_status("error %s -", conn_fail_label(0));
+            return 0;
         }
     }
     publish_saved(NULL);                           /* the old one is no longer current */
@@ -2039,6 +2075,7 @@ static void reload_settings(headset_ini *ini)
     CTL_UNLOCK(&g_ctl);
     if (!reload) return;
     g_npaired = paired_load(PAIRED_INI, g_paired, PAIRED_MAX);
+    log_line("blocklist: %d entries loaded from %s", hb_block_load(NULL), HB_BLOCK_PATH);
     if (!g_stream_up) {
         headset_ini fresh;
         memset(&fresh, 0, sizeof fresh);
