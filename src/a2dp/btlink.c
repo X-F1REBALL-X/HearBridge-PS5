@@ -1,4 +1,5 @@
 #include "btlink.h"
+#include "blocklist.h"
 #include "acl_track.h"
 #include "acl_pool.h"
 #include "avrcp.h"
@@ -1343,6 +1344,7 @@ static void on_event(btlink *l, const unsigned char *ev, int nEv)
         /* Requests this link does not take are answered by the
          * transport hook (main: accept / switch / reject), not here. */
         if (!l->acc_n || l->connected || l->acc_got) return;
+        if (hb_block_has(ev + 2)) return;   /* #34: the system's, never accepted */
         for (k = 0; k < l->acc_n; k++) {
             if (!same_addr(ev + 2, l->acc_addr[k])) continue;
             {
@@ -2718,6 +2720,10 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
 {
     int r;
     if (!l || !addr) return 0;
+    if (hb_block_has(addr)) {               /* #34: never page a blocked address */
+        log_line("btlink: not paging a blocked address");
+        return 0;
+    }
     hci_scan_pause(l->hci, "connect");
     r = connect_paged(l, addr, psrm, clock_offset, link_key, key_type, name_inout, name_max, timeout_ms);
     hci_scan_resume(l->hci);

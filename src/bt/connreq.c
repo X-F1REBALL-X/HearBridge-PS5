@@ -3,14 +3,26 @@
 
 #include <string.h>
 
+/* #34 allowlist: only Audio/Video major class AND a headphone / headset /
+ * speaker minor class. Everything else (DualSense / DS4 = Peripheral 0x05
+ * gamepad, phones, PCs, TVs) is never touched: left to the system. */
 int hb_cod_is_av(unsigned cod)
 {
-    return ((cod >> 8) & 0x1F) == 0x04;
+    unsigned major = (cod >> 8) & 0x1F, minor = (cod >> 2) & 0x3F;
+    if (major != 0x04) return 0;
+    switch (minor) {
+    case 0x01: case 0x02: case 0x05: case 0x06: case 0x07: case 0x0A: return 1;
+    default: return 0;
+    }
 }
 
 int hb_connreq_decide(const hb_cr_in *in)
 {
     if (!in) return HB_CR_LEAVE;
+    if (in->blocked) return HB_CR_LEAVE;               /* #34: blocklist, always the system's */
+    /* #34: not an audio sink -> never ours, whatever the saved list or the
+     * current target says (a pad must always reach the system). */
+    if (!in->is_av) return HB_CR_LEAVE;
     if (in->is_target) return HB_CR_TAKE;             /* the one the user pressed */
     if (in->forgotten) return HB_CR_REJECT_UNKNOWN;
     if (in->saved) {
@@ -24,7 +36,6 @@ int hb_connreq_decide(const hb_cr_in *in)
         if (in->busy_other && !in->bg_page) return HB_CR_REJECT_BUSY;
         return HB_CR_TAKE;
     }
-    if (!in->is_av) return HB_CR_LEAVE;               /* pads, phones, PCs */
     return HB_CR_REJECT_UNKNOWN;                      /* audio device we do not know */
 }
 

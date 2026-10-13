@@ -15,6 +15,7 @@ typedef struct {
     int streaming_other;  /* we stream to another headset */
     int busy_other;       /* connecting / pairing another device */
     int bg_page;          /* ...but only a background page nobody pressed for */
+    int blocked;          /* #34: on the blocklist (manual or an auto-detected pad) */
     int just_dropped;     /* we disconnected it a moment ago (switch / Disconnect) */
 } hb_cr_in;
 

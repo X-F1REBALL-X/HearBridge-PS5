@@ -60,7 +60,7 @@ test-control:
 	cmp -s $(BUILD)/host/webpage.h src/webpage.h || (echo "src/webpage.h is stale: make webpage"; false)
 	python3 scripts/gen_font.py assets/fonts/inter-latin.woff2 $(BUILD)/host/font_woff2.h
 	cmp -s $(BUILD)/host/font_woff2.h src/font_woff2.h || (echo "src/font_woff2.h is stale: make webpage"; false)
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp -Isrc/bt tests/test_control.c src/http.c src/gameprof.c src/bt/btchip.c src/diag.c src/ctl.c src/gain.c src/a2dp/eq.c src/a2dp/rate.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/backup.c -lpthread -lm -o $(BUILD)/host/test_control
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp -Isrc/bt tests/test_control.c src/bt/blocklist.c src/http.c src/gameprof.c src/bt/btchip.c src/diag.c src/ctl.c src/gain.c src/a2dp/eq.c src/a2dp/rate.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/backup.c -lpthread -lm -o $(BUILD)/host/test_control
 	$(BUILD)/host/test_control $(BUILD)/host/status.json
 	python3 -c "import json;d=json.load(open('$(BUILD)/host/status.json'));print('ok   status JSON parses,', len(d), 'keys')"
 
@@ -141,13 +141,13 @@ test-rejoin:
 
 test-switch:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_switch_ab.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/hfp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_switch_ab
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_switch_ab.c src/bt/blocklist.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/hfp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_switch_ab
 	$(BUILD)/host/test_switch_ab
 
 # L2CAP config pacing on a slow (MediaTek) and a quick (Marvell) link.
 test-cfg:
 	@mkdir -p $(BUILD)/host
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_cfg_mtk.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/hfp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_cfg_mtk
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt -Isrc/a2dp tests/test_cfg_mtk.c src/bt/blocklist.c src/bt/connreq.c src/a2dp/btlink.c src/bt/acl_track.c src/a2dp/acl_pool.c src/a2dp/avrcp.c src/a2dp/hfp.c src/a2dp/sdp_server.c src/bt/hci_cmd.c src/util.c -o $(BUILD)/host/test_cfg_mtk
 	$(BUILD)/host/test_cfg_mtk
 
 # Chip profile, scan pause, ACL pipe and the AVDTP PSM fallback.

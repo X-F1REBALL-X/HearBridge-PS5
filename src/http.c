@@ -11,6 +11,7 @@
 #include "avrcp.h"
 #include "version.h"
 #include "gameprof.h"
+#include "blocklist.h"
 #ifndef HB_HTTP_HOST_TEST
 #include "hcidbg.h"
 #endif
@@ -102,7 +103,7 @@ static int is_write_path(const char *path)
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
         "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean", "/api/night",
-        "/api/hci", "/api/game", "/api/backup", "/api/restore", "/api/keyvol",
+        "/api/hci", "/api/game", "/api/backup", "/api/restore", "/api/keyvol", "/api/block",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -454,6 +455,23 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
             n = (int)strlen(dj);
         }
         return respond(out, max, 200, "application/json", dj, n);
+    }
+    if (!strcmp(path, "/api/blocked")) {
+        /* #34 blocklist: {"blocked":[{"addr":..,"auto":0|1}]} */
+        char bj[1200];
+        int n = hb_block_json(bj, (int)sizeof bj);
+        if (n < 0) return respond(out, max, 500, "application/json", "{\"error\":\"list\"}", 16);
+        return respond(out, max, 200, "application/json", bj, n);
+    }
+    if (!strcmp(path, "/api/block")) {
+        /* addr=XX:XX:XX:XX:XX:XX&on=1 blocks, on=0 unblocks (saved at once). */
+        unsigned char ba[6];
+        const char *a = q ? strstr(q, "addr=") : NULL;
+        if (!a || !hb_block_parse(a + 5, ba) || !query_int(q, "on", &v))
+            return respond(out, max, 400, "application/json", "{\"error\":\"bad\"}", 15);
+        if (!(v ? hb_block_add(ba) : hb_block_remove(ba)))
+            return respond(out, max, 409, "application/json", "{\"error\":\"full or not saved\"}", 29);
+        return respond(out, max, 200, "application/json", "{\"ok\":1}", 8);
     }
     if (!strcmp(path, "/api/select") || !strcmp(path, "/api/forget") ||
         !strcmp(path, "/api/scan") || !strcmp(path, "/api/reconnect")) {

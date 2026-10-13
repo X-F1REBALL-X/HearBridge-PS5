@@ -77,6 +77,9 @@ int main(void)
     CHECK(hb_dev_rank(0x000000, "OnePlus Buds Ace 2") == 3 && hb_dev_rank(0x001f00, "AirPods Pro") == 3 &&
           hb_dev_rank(0x1f00, "WF-1000XM6") == 3 && hb_dev_rank(0x0, "Galaxy Earbuds") == 3 &&
           hb_dev_rank(0x0, "Headset X") == 3, "odd CoD but headphone-like name: listed");
+    CHECK(hb_dev_rank(0x002508, "Wireless Controller") < 0 && hb_dev_rank(0x002508, "Headset pad") < 0 &&
+          hb_dev_rank(0x001f00, "DualSense Wireless Controller") < 0 && hb_dev_rank(0x000000, "DUALSHOCK 4 Headset") < 0,
+          "#34: controllers never listed, whatever the name");
     CHECK(!strcmp(hb_dev_kind(0x000000, "OnePlus Buds Ace 2"), "headphones"), "name hint gets the headphones icon");
     /* Saved list */
     h = mk(0xA1, "WF-1000XM6", 0x240418); paired_put(L, &n, PAIRED_MAX, &h);
