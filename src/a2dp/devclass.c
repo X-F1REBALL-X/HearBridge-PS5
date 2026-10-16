@@ -47,7 +47,8 @@ static int has(const char *h, const char *n)
 
 int hb_dev_name_hints_headphones(const char *name)
 {
-    static const char *hint[] = { "buds", "wf-", "wh-", "airpods", "pods", "ear", "head" };
+    static const char *hint[] = { "buds", "wf-", "wh-", "airpods", "pods", "ear", "head",
+                                  "freeclip", "freebuds" };  /* #32 Huawei FreeClip / FreeBuds */
     unsigned i;
     for (i = 0; i < sizeof hint / sizeof *hint; i++)
         if (has(name, hint[i])) return 1;

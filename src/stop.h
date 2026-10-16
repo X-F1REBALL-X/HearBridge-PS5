@@ -4,7 +4,7 @@
 
 #define HB_STOP_PATH "/data/hearbridge/stop"
 
-/* 1 once a stop was requested (stop file seen or SIGTERM/SIGINT/SIGHUP).
+/* 1 once a stop was requested (stop file seen or SIGTERM/SIGINT; SIGHUP and SIGPIPE are ignored).
  * The file is checked at most every ~500 ms; cheap to call often. */
 int  hb_stop_requested(void);
 

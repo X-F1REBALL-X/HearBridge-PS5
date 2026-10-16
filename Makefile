@@ -1,7 +1,7 @@
 # HearBridge PS5: Bluetooth headphones (A2DP) on a jailbroken PS5.
 #
 #   make test                 host tests (cc, ffmpeg, python3 + numpy)
-#   make ps5                  builds dist/HearBridge-PS5-<version>.elf
+#   make ps5                  builds dist/HearBridge-<version>.elf
 #   make send PS5_HOST=ip     builds and sends it to the console's ELF loader
 #
 # PS5_PAYLOAD_SDK must point at an unpacked ps5-payload-sdk release
@@ -26,7 +26,7 @@ endif
 	$(MAKE) -f ps5.mk PS5_PAYLOAD_SDK=$(PS5_PAYLOAD_SDK)
 
 send: ps5
-	$(PS5_PAYLOAD_SDK)/bin/prospero-deploy -h $(PS5_HOST) -p $(PS5_PORT) dist/HearBridge-PS5-$(VERSION).elf
+	$(PS5_PAYLOAD_SDK)/bin/prospero-deploy -h $(PS5_HOST) -p $(PS5_PORT) dist/HearBridge-$(VERSION).elf
 
 clean:
 	rm -rf $(BUILD) dist

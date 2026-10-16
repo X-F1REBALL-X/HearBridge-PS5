@@ -3,6 +3,8 @@
  * stream loop applies the requests. Developed by X-F1REBALL-X. */
 #include "http.h"
 #include "webpage.h"
+#include "start_html.h"
+#include "tile.h"
 #include "font_woff2.h"
 #include "diag.h"
 #include "rate.h"
@@ -217,6 +219,55 @@ static int respond(char *out, int max, int code, const char *ctype,
     return n + blen;
 }
 
+/* Like respond(), but without Cache-Control: WebKit's AppCache must be free
+ * to keep /start and its manifest (a no-store answer can stop it caching). */
+static int respond_cacheable(char *out, int max, const char *ctype, const char *body, int blen)
+{
+    int n = snprintf(out, (size_t)max,
+        "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n",
+        ctype, blen);
+    if (n < 0 || n + blen > max) return 0;
+    memcpy(out + n, body, (size_t)blen);
+    return n + blen;
+}
+
+/* Probe endpoints for the tile page (src/web/start.html). The page asks the
+ * same question several ways (XHR, fetch, image, script, frame) because it is
+ * not known which of them the console browser lets through without network.
+ * Answers carry CORS * so the localhost probe works too. Each hit is counted
+ * and shown in /api/diag ("tile probes"), which tells from the console side
+ * which request kinds arrive while the system has no network. */
+static int g_probe_page, g_probe_xhr, g_probe_fetch, g_probe_img, g_probe_loc, g_probe_js, g_probe_frame;
+
+static void probe_diag(void)
+{
+    diag_set("tile probes", "page %d, xhr %d, fetch %d, img %d, img-localhost %d, script %d, frame %d",
+             g_probe_page, g_probe_xhr, g_probe_fetch, g_probe_img, g_probe_loc, g_probe_js, g_probe_frame);
+}
+
+static int respond_probe(char *out, int max, const char *ctype, const char *body, int blen)
+{
+    int n = snprintf(out, (size_t)max,
+        "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
+        "Access-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        ctype, blen);
+    if (n < 0 || n + blen > max) return 0;
+    memcpy(out + n, body, (size_t)blen);
+    return n + blen;
+}
+
+/* AppCache manifest for the tile's /start page. The comment line changes with
+ * the version and with the page itself, so WebKit refreshes its copy. */
+static int appcache_manifest(char *o, int max)
+{
+    unsigned h = 2166136261u;
+    size_t i;
+    for (i = 0; i < HB_START_HTML_LEN; i++) h = (h ^ hb_start_html[i]) * 16777619u;
+    return snprintf(o, (size_t)max,
+        "CACHE MANIFEST\n# HearBridge %s tile %s page %08x\n\nCACHE:\n/start\n\nNETWORK:\n*\n",
+        HEARBRIDGE_VERSION, HB_TILE_VERSION, h);
+}
+
 static long wall_s(void)
 {
     struct timespec ts;
@@ -384,6 +435,41 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
                 break;
             }
         return n;
+    }
+
+    if (!strcmp(path, "/start")) {
+        g_probe_page++;
+        probe_diag();
+        /* Tile landing page: opens the control page when HearBridge is up,
+         * else says to load the ELF first (offline copy via /hb.appcache). */
+        return respond_cacheable(out, max, "text/html; charset=utf-8",
+                                 (const char *)hb_start_html, HB_START_HTML_LEN);
+    }
+    if (!strcmp(path, "/ping") || !strcmp(path, "/ping.js") || !strcmp(path, "/ping.gif") ||
+        !strcmp(path, "/ping.html")) {
+        static const unsigned char gif[] = {
+            0x47,0x49,0x46,0x38,0x39,0x61,0x01,0x00,0x01,0x00,0x80,0x00,0x00,0x00,0x00,0x00,
+            0xff,0xff,0xff,0x21,0xf9,0x04,0x01,0x00,0x00,0x00,0x00,0x2c,0x00,0x00,0x00,0x00,
+            0x01,0x00,0x01,0x00,0x00,0x02,0x02,0x44,0x01,0x00,0x3b };
+        int ext = !strcmp(path, "/ping.js") ? 1 : !strcmp(path, "/ping.gif") ? 2 : !strcmp(path, "/ping.html") ? 3 : 0;
+        if (q && strstr(q, "h=l")) g_probe_loc++;
+        else if (q && strstr(q, "m=xhr")) g_probe_xhr++;
+        else if (q && strstr(q, "m=fetch")) g_probe_fetch++;
+        else if (q && strstr(q, "m=img")) g_probe_img++;
+        else if (q && strstr(q, "m=js")) g_probe_js++;
+        else if (q && strstr(q, "m=frame")) g_probe_frame++;
+        probe_diag();
+        if (ext == 1) return respond_probe(out, max, "application/javascript", "window.hbUp=1;", 14);
+        if (ext == 2) return respond_probe(out, max, "image/gif", (const char *)gif, (int)sizeof gif);
+        if (ext == 3) return respond_probe(out, max, "text/html; charset=utf-8",
+                                           "<!doctype html><title>hb</title>hb-ok", 37);
+        return respond_probe(out, max, "text/plain", "hb-ok", 5);
+    }
+    if (!strcmp(path, "/hb.appcache")) {
+        char m[256];
+        int ml = appcache_manifest(m, sizeof m);
+        if (ml < 0 || ml >= (int)sizeof m) return respond(out, max, 500, "text/plain", "manifest\n", 9);
+        return respond_cacheable(out, max, "text/cache-manifest", m, ml);
     }
 
     if (!strcmp(path, "/font.woff2")) {
@@ -739,6 +825,15 @@ static int g_srv = -1;
 static volatile int g_quit;
 static pthread_t g_thr;
 static hb_ctl *g_c;
+static int g_port = HB_HTTP_PORT;
+static int g_rebinds;
+static int g_started;
+
+/* A peer that vanished (link down, cable pulled) must never kill the payload
+ * with SIGPIPE: stop.c ignores it, and every send here also says so. */
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
 
 static void console_ip(char *ip, size_t n)
 {
@@ -760,7 +855,7 @@ static int send_all(int fd, const char *b, int n)
 {
     int off = 0;
     while (off < n) {
-        int w = (int)send(fd, b + off, (size_t)(n - off), 0);
+        int w = (int)send(fd, b + off, (size_t)(n - off), MSG_NOSIGNAL);
         if (w <= 0) return -1;
         off += w;
     }
@@ -799,6 +894,9 @@ static void serve_one(int fd)
     struct timeval tv = { 2, 0 };
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
+#ifdef SO_NOSIGPIPE
+    { int one = 1; setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof one); }
+#endif
     while (got < (int)sizeof req - 1) {
         n = (int)recv(fd, req + got, sizeof req - 1 - (size_t)got, 0);
         if (n <= 0) break;
@@ -833,70 +931,145 @@ static void serve_one(int fd)
     {
         int off = 0;
         while (off < n) {
-            int w = (int)send(fd, out + off, (size_t)(n - off), 0);
+            int w = (int)send(fd, out + off, (size_t)(n - off), MSG_NOSIGNAL);
             if (w <= 0) break;
             off += w;
         }
     }
 }
 
+/* Listening socket on port (all interfaces, so 127.0.0.1 always works, with or
+ * without a network link). wait_ms: how long to retry while the port is
+ * still held by a copy that is closing (#25). -1 and errno on failure. */
+static int listen_on(int port, int wait_ms, int *err)
+{
+    int one = 1, wait;
+    for (wait = 0; ; wait += 250) {
+        struct sockaddr_in a;
+        int s = socket(AF_INET, SOCK_STREAM, 0), e;
+        if (s < 0) { if (err) *err = errno; return -1; }
+        setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+        memset(&a, 0, sizeof a);
+        a.sin_family = AF_INET;
+        a.sin_port = htons((unsigned short)port);
+        a.sin_addr.s_addr = htonl(INADDR_ANY);
+        if (bind(s, (struct sockaddr *)&a, sizeof a) == 0 && listen(s, 8) == 0) return s;
+        e = errno;
+        close(s);
+        if (err) *err = e;
+        if (e != EADDRINUSE || wait >= wait_ms) return -1;
+        usleep(250 * 1000);
+    }
+}
+
+/* Close and open the listener again on the same port. */
+static int relisten(const char *why)
+{
+    int err = 0, s;
+    log_line("http: listener on :%d unhealthy (%s): opening it again", g_port, why);
+    if (g_srv >= 0) close(g_srv);
+    g_srv = -1;
+    s = listen_on(g_port, 3000, &err);
+    g_rebinds++;
+    diag_set("http listener", "reopened %d time(s), last reason: %s, %s", g_rebinds, why,
+             s >= 0 ? "ok" : "FAILED");
+    if (s < 0) {
+        log_line("http: cannot reopen :%d (errno %d), will retry", g_port, err);
+        return -1;
+    }
+    g_srv = s;
+    log_line("http: listener on :%d reopened", g_port);
+    return 0;
+}
+
+static long mono_s(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long)ts.tv_sec;
+}
+
+/* The control page must keep answering over loopback whatever the network
+ * does (cable pulled, DHCP renewed, link back): a failing accept/select, or a
+ * change of the console's network address (link down/up), opens a fresh
+ * listening socket. (A loopback connect probe would need imports that older
+ * firmware builds do not have.) */
 static void *srv_main(void *arg)
 {
+    long next_check = mono_s() + 3, next_beat = mono_s() + 30;
+    char ip[48], last_ip[48];
+    int errs = 0;
     (void)arg;
+    console_ip(last_ip, sizeof last_ip);
     while (!g_quit) {
         fd_set rs;
         struct timeval tv = { 0, 500000 };
-        int fd;
+        int fd, r;
+        if (g_srv < 0) {
+            if (relisten("no socket") != 0) { usleep(1000 * 1000); continue; }
+        }
         FD_ZERO(&rs);
         FD_SET(g_srv, &rs);
-        if (select(g_srv + 1, &rs, NULL, NULL, &tv) <= 0) continue;
-        fd = accept(g_srv, NULL, NULL);
-        if (fd < 0) continue;
-        serve_one(fd);
-        close(fd);
+        r = select(g_srv + 1, &rs, NULL, NULL, &tv);
+        if (r < 0 && errno != EINTR) {
+            if (++errs >= 3) { relisten("select failed"); errs = 0; }
+            usleep(100 * 1000);
+            continue;
+        }
+        if (r > 0) {
+            fd = accept(g_srv, NULL, NULL);
+            if (fd < 0) {
+                if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK && errno != ECONNABORTED) {
+                    if (++errs >= 3) { relisten("accept failed"); errs = 0; }
+                    usleep(100 * 1000);
+                }
+                continue;
+            }
+            errs = 0;
+            serve_one(fd);
+            close(fd);
+        }
+        if (mono_s() >= next_check) {
+            next_check = mono_s() + 3;
+            console_ip(ip, sizeof ip);
+            if (mono_s() >= next_beat) {
+                /* The last of these in the log shows when a payload that died on its own was last alive. */
+                next_beat = mono_s() + 30;
+                log_line("alive: page on :%d, network address %s", g_port, ip);
+            }
+            if (strcmp(ip, last_ip)) {
+                char why[120];
+                snprintf(why, sizeof why, "network address %s -> %s", last_ip, ip);
+                snprintf(last_ip, sizeof last_ip, "%s", ip);
+                relisten(why);
+            }
+        }
     }
     return NULL;
 }
 
 int http_start(hb_ctl *c, char *url, int url_max)
 {
-    int port, one = 1;
+    int port;
     char ip[48];
     g_c = c;
     for (port = HB_HTTP_PORT; port < HB_HTTP_PORT + 6; port++) {
-        int wait;
+        int e = 0;
         /* The usual port: a copy that is closing may hold it a moment
          * longer (#25), so wait for it before moving to the next one. */
-        for (wait = 0; ; wait += 250) {
-            struct sockaddr_in a;
-            int s = socket(AF_INET, SOCK_STREAM, 0), e;
-            if (s < 0) return 0;
-            setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
-            memset(&a, 0, sizeof a);
-            a.sin_family = AF_INET;
-            a.sin_port = htons((unsigned short)port);
-            a.sin_addr.s_addr = htonl(INADDR_ANY);
-            if (bind(s, (struct sockaddr *)&a, sizeof a) == 0 && listen(s, 4) == 0) {
-                g_srv = s;
-                break;
-            }
-            e = errno;
-            close(s);
-            if (port != HB_HTTP_PORT || e != EADDRINUSE || wait >= 3000) {
-                log_line("http: port %d unavailable (errno %d)", port, e);
-                break;
-            }
-            usleep(250 * 1000);
-        }
+        g_srv = listen_on(port, port == HB_HTTP_PORT ? 3000 : 0, &e);
         if (g_srv >= 0) break;
+        log_line("http: port %d unavailable (errno %d)", port, e);
     }
     if (g_srv < 0) return 0;
     g_quit = 0;
+    g_port = port;
     if (pthread_create(&g_thr, NULL, srv_main, NULL) != 0) {
         close(g_srv);
         g_srv = -1;
         return 0;
     }
+    g_started = 1;
     console_ip(ip, sizeof ip);
     snprintf(url, (size_t)url_max, "http://%s:%d", ip, port);
     return port;
@@ -904,10 +1077,11 @@ int http_start(hb_ctl *c, char *url, int url_max)
 
 void http_stop(void)
 {
-    if (g_srv < 0) return;
+    if (!g_started) return;
     g_quit = 1;
     pthread_join(g_thr, NULL);
-    close(g_srv);
+    g_started = 0;
+    if (g_srv >= 0) close(g_srv);
     g_srv = -1;
 }
 #endif
