@@ -7,6 +7,7 @@
 #include "tile.h"
 #include "font_woff2.h"
 #include "diag.h"
+#include "log.h"
 #include "rate.h"
 #include "btchip.h"
 #include "backup.h"
@@ -514,12 +515,17 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         return respond(out, max, 404, "text/plain", "no icon\n", 8);
     if (!strcmp(path, "/api/diag")) {
         /* Plain-text diagnostics report (see diag.h), also in diag.txt. */
-        static char dt[60000];
-        int n = diag_text(dt, sizeof dt);
+        static char dt[68000];
+        int n = diag_text(dt, 60000);
         if (n <= 0) {
             strcpy(dt, "no diagnostics collected yet\n");
             n = (int)strlen(dt);
         }
+        /* The last log lines of this run, with their times. */
+        dt[n++] = '\n';
+        n += snprintf(dt + n, 64, "--- log tail (this run) ---\n");
+        n += log_tail(dt + n, 7000);
+        if (n < (int)sizeof dt - 1 && dt[n - 1] != '\n') dt[n++] = '\n';
         return respond(out, max, 200, "text/plain; charset=utf-8", dt, n);
     }
     if (!strcmp(path, "/api/devices") || !strcmp(path, "/api/saved")) {
@@ -656,7 +662,14 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
 
     CTL_LOCK(c);
     if (!strcmp(path, "/api/status")) {
+        char ua[96];
         c->status_polls++;   /* page open: main may re-query the headset volume */
+        /* a browser has the page open (a curl check of ours does not count) */
+        if (!header_value(req, reqlen, "User-Agent", ua, sizeof ua) || strncmp(ua, "curl", 4)) {
+            struct timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            c->page_seen_ms = (long)ts.tv_sec * 1000L + (long)(ts.tv_nsec / 1000000L);
+        }
     } else if (!strcmp(path, "/api/volume")) {
         if (!query_int(q, "pct", &v)) goto bad;
         if (v < 0) v = 0;

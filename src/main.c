@@ -184,6 +184,10 @@ static int accept_one(btlink *link, const headset_ini *ini, int ms)
  * second or two; this only bounds a miss. Long enough that a slow page
  * still finishes, short enough that we do not sit for half a minute. */
 #define HB_PAGE_MS 5000
+#define AUTO_OFF_FILE STATE_DIR "/no_auto_connect"   /* kill switch: create the file to turn it off */
+#define HB_LW_MS 25000          /* listen window: full reads, no paging, while a page is open */
+#define HB_LW_REARM_MS 60000    /* a new window earliest this long after the last one ended */
+#define HB_LW_SEEN_MS 8000      /* the page counts as open this long after its last status poll */
 #define HB_DROPPED_LISTEN_MS 10000   /* page to a just-left headset failed: listen this long */
 #define HB_VOLQ_MS     15000   /* page open, no volume report this long: ask the headset again */
 #define HB_VOLQ_PAGE_MS 5000   /* page counts as open while it polled within this */
@@ -693,6 +697,9 @@ static int other_saved_calling(const unsigned char addr[6])
  * another device, Scan or Reconnect. */
 static int g_rejoining;                    /* gentle_rejoin runs for g_rejoin_addr */
 static unsigned char g_rejoin_addr[6];
+static long g_lw_until;                    /* listen window open until (0 = none) */
+static long g_lw_last_end;                 /* when the last window ended */
+static int  g_lw_used;                     /* a window already ran in this idle period */
 static int connect_abort(const unsigned char addr[6])
 {
     FILE *f;
@@ -1165,7 +1172,7 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
         /* #34: tell the transport what our link needs (fewer reads armed =
          * more of the pad's traffic reaches the system). Sticky: a saved
          * headset that dropped is rejoining, so its call-back is caught. */
-        hci_usb_hint(g_stream_up, g_have_target, g_rejoining);
+        hci_usb_hint(g_stream_up, g_have_target, g_rejoining || g_lw_until > 0);
         /* Safety net: a call from one of ours that nobody took within 5 s
          * is turned down (busy) before it blocks pages for ~25 s. */
         static long last;
@@ -3459,6 +3466,48 @@ static int gentle_rejoin_loop(hci_t hci, headset_ini *ini)
     }
 }
 
+/* Listen window: a saved headset that was turned off or put in its case calls
+ * the console when it comes out. The normal idle keeps 4 reads armed, so the
+ * console's own stack often answers first. While a browser has the page open
+ * we arm all event reads for a short while (listening only, no page, no scan,
+ * no adapter open or close), once per idle period, never while held, paused,
+ * killed by the file, or a command waits. Then back to the 4 standing reads. */
+static void lw_end(const char *why)
+{
+    if (g_lw_until > 0) {
+        log_line("listen window: closed (%s)", why);
+        g_lw_last_end = now_ms();
+    }
+    g_lw_until = 0;
+    hci_usb_hint(g_stream_up, g_have_target, g_rejoining);
+}
+
+static void lw_tick(const headset_ini *ini)
+{
+    long now = now_ms();
+    long seen;
+    int open, blocked, paused;
+    CTL_LOCK(&g_ctl);
+    seen = g_ctl.page_seen_ms;
+    paused = g_ctl.paused;
+    CTL_UNLOCK(&g_ctl);
+    open = seen && now - seen < HB_LW_SEEN_MS;
+    blocked = !ini->ok || !ini->have_addr || paused || held(ini->addr) || cmd_waiting() ||
+              access(AUTO_OFF_FILE, F_OK) == 0;
+    if (g_lw_until > 0) {
+        if (!open) lw_end("page closed");
+        else if (blocked) lw_end("blocked");
+        else if (now >= g_lw_until) { lw_end("time is up"); g_lw_used = 1; }
+        return;
+    }
+    if (!open) { g_lw_used = 0; return; }        /* a reopened page may start a new one */
+    if (g_lw_used || blocked) return;
+    if (g_lw_last_end && now - g_lw_last_end < HB_LW_REARM_MS) return;
+    g_lw_until = now + HB_LW_MS;
+    log_line("listen window: all reads armed for %d s, no paging (page is open)", HB_LW_MS / 1000);
+    hci_usb_hint(g_stream_up, g_have_target, 1);
+}
+
 /* Rest mode resets the Bluetooth USB device: close everything and open it
  * again (quick tries first, then every 5 s) until it is back or Stop. */
 static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, headset_ini *ini)
@@ -3789,6 +3838,7 @@ int main(void)
             if (g_bg_pages && !hb_auto_page_ok(g_bg_pages))
                 log_line("auto: background pages used up (%d), only listening until Connect or a wake", g_bg_pages);
             (void)woke_up();
+            g_lw_used = 0;
             for (;;) {
                 int go;
                 if (hb_stop_requested()) break;
@@ -3815,6 +3865,7 @@ int main(void)
                     g_bg_pages = 0;
                 }
                 bg_tick(&ini);
+                lw_tick(&ini);
                 CTL_LOCK(&g_ctl);
                 go = g_ctl.req_connect;
                 g_ctl.req_connect = 0;
@@ -3904,6 +3955,7 @@ int main(void)
                 }
             }
         }
+        lw_end("leaving idle");
         if (!transport_dead(hci)) btlink_page_scan_hold(hci, 0);   /* put back once */
         if (hb_stop_requested()) { rc = 0; break; }
         (void)headset_ini_load(&ini);
