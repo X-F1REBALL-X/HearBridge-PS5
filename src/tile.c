@@ -15,7 +15,7 @@ int tile_manifest(char *out, size_t cap, const char *url)
     int n;
 
     n = snprintf(out, cap,
-                 "{\n  \"titleId\": \"%s\",\n  \"applicationCategoryType\": 0,\n  \"contentBadgeType\": 1,\n"
+                 "{\n  \"titleId\": \"%s\",\n  \"applicationCategoryType\": 65536,\n  \"contentBadgeType\": 1,\n"
                  "  \"deeplinkUri\": \"%s\",\n  \"localizedParameters\": {\n"
                  "    \"defaultLanguage\": \"en-US\"", HB_TILE_ID, url && url[0] ? url : HB_TILE_URL);
     if (n < 0 || (size_t)n >= cap) return -1;
@@ -31,11 +31,10 @@ int tile_manifest(char *out, size_t cap, const char *url)
     return (int)(len + (size_t)n);
 }
 
-int tile_needs_reinstall(const char *stored, int installed)
+int tile_version_mismatch(const char *stored)
 {
     char v[16];
     size_t n = 0;
-    if (!installed) return 0;
     if (!stored) return 1;
     while (stored[n] && stored[n] != '\r' && stored[n] != '\n' && stored[n] != ' ' && n < sizeof v - 1) {
         v[n] = stored[n];
@@ -43,6 +42,12 @@ int tile_needs_reinstall(const char *stored, int installed)
     }
     v[n] = 0;
     return strcmp(v, HB_TILE_VERSION) != 0;
+}
+
+int tile_needs_reinstall(const char *stored, int installed)
+{
+    if (!installed) return 0;
+    return tile_version_mismatch(stored);
 }
 
 /* 1 if path already holds exactly buf. */
@@ -149,7 +154,8 @@ int tile_files_write(const char *root, const char *url,
     if (ensure_dir(app) || ensure_dir(sys)) return -1;
     if (store(man, js, (size_t)jl) || store(ico, png, png_len)) return -1;
     snprintf(st, sizeof st, "%s/start.html", app);
-    if (html && store(st, html, html_len)) return -1;
+    if (html) { if (store(st, html, html_len)) return -1; }
+    else unlink(st);                                /* file:// page of an earlier build */
     return 0;
 }
 

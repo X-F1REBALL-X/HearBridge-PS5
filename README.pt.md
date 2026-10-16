@@ -24,7 +24,7 @@ O HearBridge PS5 é um payload (ELF) que leva o áudio dos jogos e do sistema do
 
 ## Instalar
 
-1. Baixe **HearBridge-PS5-1.3.0.elf** da [versão mais recente](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+1. Baixe **HearBridge-1.3.3.elf** da [versão mais recente](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
 2. Envie para o seu carregador de ELF na porta 9021.
 3. Abra **http://&lt;console-ip&gt;:8090** ou o bloco **HearBridge** e pareie seus fones em **Definições**.
 
@@ -34,7 +34,7 @@ Todo o resto, de funções a solução de problemas, está no **[guia](https://x
 
 ```sh
 export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk   # ps5-payload-sdk v0.43
-make ps5      # dist/HearBridge-PS5-<version>.elf
+make ps5      # dist/HearBridge-<version>.elf
 make test
 ```
 

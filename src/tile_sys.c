@@ -17,7 +17,6 @@
 #include "creds.h"
 #include "diag.h"
 #include "icon_png.h"
-#include "start_html.h"
 #include "log.h"
 
 #include <ps5/kernel.h>
@@ -134,34 +133,53 @@ int tile_install(const char *url, tile_report *rep)
 
     r->legacy_marker = unlink(HB_TILE_LEGACY_MARK) == 0;
     {
-        /* An icon installed by an older tile version (e.g. under Media):
-         * uninstall it so the new param.json (Games) is taken. */
+        /* Older tile version (e.g. Games): uninstall HRBG00001 so the new
+         * param.json category (Media) is taken. Always attempt uninstall on a
+         * version mismatch — do not require appmeta/AppExists first. Media->Games
+         * once left a leftover Media icon when uninstall was skipped. */
         char v[16] = "";
         int have = 0;
         FILE *f = fopen(HB_TILE_VER_PATH, "r");
         if (f) { have = fgets(v, (int)sizeof v, f) != NULL; fclose(f); }
-        /* /user/appmeta is not readable on every firmware: AppExists too. */
-        int installed = meta_exists(HB_TILE_ID);
-        if (!installed) {
+        if (tile_version_mismatch(have ? v : NULL)) {
             int (*init)(void) = (int (*)(void))appinst_nid(NID_Initialize);
             int (*term)(void) = (int (*)(void))appinst_nid(NID_Terminate);
             int (*exists)(const char *, int *) = (int (*)(const char *, int *))appinst_nid(NID_AppExists);
-            int e = 0;
-            if (init && term && exists && init() == 0) {
-                if (exists(HB_TILE_ID, &e) == 0 && e) installed = 1;
-                term();
-            }
-        }
-        if (tile_needs_reinstall(have ? v : NULL, installed)) {
-            int rc = unregister_title();
+            int rc, still = -1, e = 0;
+
+            rc = unregister_title();
             log_line("tile: icon from tile version %s, this is %s: reinstalling (unregister %#x)",
                      have ? v : "1", HB_TILE_VERSION, (unsigned)rc);
-            if (!rc) usleep(2000 * 1000);
+            usleep(3000 * 1000);
+            /* Drop appmeta if the installer left it (often unreadable; best-effort). */
+            {
+                char meta[64], param[80], icon[80];
+                snprintf(meta, sizeof meta, "/user/appmeta/%s", HB_TILE_ID);
+                snprintf(param, sizeof param, "%s/param.json", meta);
+                snprintf(icon, sizeof icon, "%s/icon0.png", meta);
+                unlink(param);
+                unlink(icon);
+                rmdir(meta);
+            }
+            if (init && term && exists && init() == 0) {
+                if (exists(HB_TILE_ID, &e) == 0) still = (e != 0);
+                term();
+            }
+            if (still == 1) {
+                rc = unregister_title();
+                log_line("tile: still installed after unregister, retry (unregister %#x)",
+                         (unsigned)rc);
+                usleep(3000 * 1000);
+            } else if (still == 0) {
+                log_line("tile: AppExists no after unregister — clear to re-register");
+            } else {
+                log_line("tile: could not re-check AppExists after unregister");
+            }
         }
     }
     errno = 0;
     if (tile_files_write(HB_TILE_ROOT, url, hb_icon_png, sizeof hb_icon_png,
-                         hb_start_html, HB_START_HTML_LEN) != 0) {
+                         NULL, 0) != 0) {
         r->files_failed = 1;
         r->files_errno = errno;
         log_line("tile: cannot write %s/%s (errno %d)", HB_TILE_ROOT, HB_TILE_ID, r->files_errno);

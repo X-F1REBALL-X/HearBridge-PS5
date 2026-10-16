@@ -56,7 +56,39 @@ int main(int argc, char **argv)
     strcpy(c.device, "WF-\"1000\"XM6");
     n = get(&c, "/");
     CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/html") &&
-          strstr(out, "HearBridge PS5"), "GET / serves the page");
+          strstr(out, "<title>HearBridge</title>") && !strstr(out, "HearBridge PS5"), "GET / serves the page (heading without PS5)");
+    /* tile landing page + AppCache manifest (offline "load the payload" page) */
+    n = get(&c, "/start");
+    if (n > 0) out[n] = 0;
+    CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/html") &&
+          strstr(out, "manifest=\"/hb.appcache\"") && strstr(out, "ping?m=xhr") && strstr(out, "id=\"o\"") &&
+          !strstr(out, "Cache-Control"), "GET /start: AppCache master page, cacheable");
+    n = get(&c, "/hb.appcache");
+    if (n > 0) out[n] = 0;
+    CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "Content-Type: text/cache-manifest") &&
+          strstr(out, "\r\n\r\nCACHE MANIFEST\n") && strstr(out, "CACHE:\n/start\n") &&
+          strstr(out, "NETWORK:\n*\n") && !strstr(out, "no-store"),
+          "GET /hb.appcache: manifest lists /start, rest from network");
+    /* probe endpoints used by the tile page, counted in /api/diag */
+    n = get(&c, "/ping?m=xhr&t=1");
+    if (n > 0) out[n] = 0;
+    CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "Access-Control-Allow-Origin: *") &&
+          strstr(out, "\r\n\r\nhb-ok"), "GET /ping: hb-ok with CORS");
+    n = get(&c, "/ping.js?m=js");
+    if (n > 0) out[n] = 0;
+    CHECK(n > 0 && strstr(out, "application/javascript") && strstr(out, "window.hbUp=1;"), "GET /ping.js sets hbUp");
+    n = get(&c, "/ping.gif?m=img");
+    CHECK(n > 0 && strstr(out, "image/gif") && out[n - 1] == 0x3b, "GET /ping.gif: a GIF");
+    n = get(&c, "/ping.html?m=frame");
+    if (n > 0) out[n] = 0;
+    CHECK(n > 0 && strstr(out, "text/html") && strstr(out, "hb-ok"), "GET /ping.html: same-origin frame page");
+    get(&c, "/ping.gif?m=img&h=l");
+    n = get(&c, "/api/diag");
+    if (n > 0) out[n] = 0;
+    CHECK(n > 0 && strstr(out, "tile probes: page 1, xhr 1, fetch 0, img 1, img-localhost 1, script 1, frame 1"),
+          "diag counts the tile probes by kind");
+    n = get(&c, "/start?x=1");
+    CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12), "GET /start with a query still works");
     n = get(&c, "/api/status");
     CHECK(n > 0 && strstr(out, "application/json") && strstr(out, "\"gain_pct\":250"),
           "status JSON, default gain 250%");

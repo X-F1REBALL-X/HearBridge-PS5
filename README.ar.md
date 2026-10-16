@@ -26,7 +26,7 @@ HearBridge PS5 حمولة (ELF) تشغّل صوت الألعاب والنظام 
 
 ## التثبيت
 
-1. نزّل **HearBridge-PS5-1.3.0.elf** من [أحدث إصدار](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+1. نزّل **HearBridge-1.3.3.elf** من [أحدث إصدار](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
 2. أرسله إلى محمّل ELF على المنفذ 9021.
 3. افتح **http://&lt;console-ip&gt;:8090** أو مربع **HearBridge**، ثم اقرن سماعاتك من **الإعدادات**.
 
@@ -38,7 +38,7 @@ HearBridge PS5 حمولة (ELF) تشغّل صوت الألعاب والنظام 
 
 ```sh
 export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk   # ps5-payload-sdk v0.43
-make ps5      # dist/HearBridge-PS5-<version>.elf
+make ps5      # dist/HearBridge-<version>.elf
 make test
 ```
 

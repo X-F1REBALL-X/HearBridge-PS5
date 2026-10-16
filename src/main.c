@@ -3501,6 +3501,7 @@ int main(void)
     a2dp_open_opts opts;
     headset_ini ini;
     int rc = 2, mk_errno = 0, lock_rc, lock_errno = 0, log_ok;
+    char prev_tail[360] = "";
 
     /* First sign of life, before any file, lock or library work: if this
      * toast shows but nothing else happens, the payload did start and the
@@ -3514,10 +3515,37 @@ int main(void)
 
     /* Log first so a lock problem is written down too (a second instance
      * only appends a few lines before it exits). */
+    {
+        /* How did the previous run end? Its last log lines (kept in the append-only
+         * log) go into /api/diag, so a payload that died on its own (e.g. when the
+         * network dropped) can be diagnosed from the page without FTP. */
+        FILE *pf = fopen(LOG_PATH, "r");
+        if (pf) {
+            char t[360], chunk[2048];
+            size_t got = 0, r;
+            while ((r = fread(chunk, 1, sizeof chunk, pf)) > 0) {     /* keep only the last bytes */
+                if (r >= sizeof t - 1) { memcpy(t, chunk + r - (sizeof t - 1), sizeof t - 1); got = sizeof t - 1; }
+                else {
+                    if (got + r > sizeof t - 1) {
+                        size_t drop = got + r - (sizeof t - 1);
+                        memmove(t, t + drop, got - drop);
+                        got -= drop;
+                    }
+                    memcpy(t + got, chunk, r);
+                    got += r;
+                }
+            }
+            fclose(pf);
+            t[got] = 0;
+            { size_t k; for (k = 0; k < got; k++) if (t[k] == '\n' || t[k] == '\r') t[k] = '|'; }
+            snprintf(prev_tail, sizeof prev_tail, "%s", t);
+        }
+    }
     log_ok = log_open(LOG_PATH);
     diag_init(NULL);           /* file path set once we own the lock */
     diag_set("hearbridge", "%s (one build for all firmwares, compiled %s)", HEARBRIDGE_VERSION,
              __DATE__);
+    if (prev_tail[0]) diag_set("previous run ended with", "%s", prev_tail);
     /* A newly sent ELF always wins, whatever version is running (same
      * one included): the old instance is asked to stop (stop file +
      * SIGTERM; it closes the headset, the page and the Bluetooth device),

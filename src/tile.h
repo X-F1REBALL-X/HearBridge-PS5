@@ -9,24 +9,38 @@
 
 #define HB_TILE_ID    "HRBG00001"
 #define HB_TILE_NAME  "HearBridge"
-#define HB_TILE_URL   "http://127.0.0.1:8090/"
 #define HB_TILE_ROOT  "/user/app"
+/* #33: the tile opens /start on the payload's own server. That page carries
+ * an AppCache manifest (like the WK Autoloader tile), so WebKit keeps a copy
+ * and the tile still shows "load the payload first" when the payload is not
+ * running and when system Wi-Fi is down. file:// did not open at all on
+ * hardware (1.3.3 local test), so it is not used. */
+#define HB_TILE_URL   "http://127.0.0.1:8090/start"
 
 /* Bump when param.json changes in a way an installed tile only picks up by
- * being installed again (2: moved from Media to Games). The installer keeps
- * the version it last installed in HB_TILE_VER_PATH; a tile installed with
- * another version is uninstalled and installed once more. */
-#define HB_TILE_VERSION  "2"
+ * being installed again (2: Media->Games; 3: file:// deeplink; 4: Games->Media
+ * again per X poll / #22; 5: http://127.0.0.1:8090/start with AppCache, file://
+ * did not open; 6: start page with several probes, same link; 7: no "PS5" on the page). The installer keeps the version it last installed
+ * in HB_TILE_VER_PATH; a mismatched version triggers uninstall + re-register.
+ * Media->Games once left a leftover Media icon when uninstall was skipped or
+ * the Shell kept a stale tab entry — version 4 hardens that path. */
+#define HB_TILE_VERSION  "10"  /* 10: explanation page stays, silent retries; 9: Checking state shows only title + Checking...; 8: clear offline page; 7: no PS5 on the page; 6: probes; 5: Media + AppCache (#22, #33) */
 #define HB_TILE_VER_PATH "/data/hearbridge/tile.ver"
+
+/* 1 when stored tile version (text of HB_TILE_VER_PATH, NULL if missing)
+ * is not HB_TILE_VERSION. Independent of whether the console reports the
+ * title as installed — used so we still attempt uninstall on a bump. */
+int tile_version_mismatch(const char *stored);
 
 /* 1 when an installed tile (installed != 0) was put there by another tile
  * version (stored: text of HB_TILE_VER_PATH, NULL if missing). */
 int tile_needs_reinstall(const char *stored, int installed);
 
-/* Fallback page written next to the tile (start.html): checks whether
- * HearBridge answers and either opens the control page or explains, in the
- * user's language, that the ELF must be loaded first. */
-#define HB_TILE_START_URL "file://" HB_TILE_ROOT "/" HB_TILE_ID "/start.html"
+/* The start page (src/web/start.html, served by http.c at /start and kept by
+ * WebKit through /hb.appcache): checks whether HearBridge answers and either
+ * opens the control page or explains, in the user's language, that the ELF
+ * must be loaded first. */
+#define HB_TILE_START_URL HB_TILE_URL
 
 /* param.json text for the tile with this deep link; length, or -1. */
 int tile_manifest(char *out, size_t cap, const char *url);

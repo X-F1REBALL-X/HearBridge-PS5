@@ -24,7 +24,7 @@ HearBridge PS5 это payload (ELF), который выводит звук иг
 
 ## Установка
 
-1. Скачайте **HearBridge-PS5-1.3.0.elf** из [последнего релиза](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+1. Скачайте **HearBridge-1.3.3.elf** из [последнего релиза](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
 2. Отправьте его загрузчику ELF на порт 9021.
 3. Откройте **http://&lt;console-ip&gt;:8090** или плитку **HearBridge** и подключите наушники в разделе **Настройки**.
 
@@ -34,7 +34,7 @@ HearBridge PS5 это payload (ELF), который выводит звук иг
 
 ```sh
 export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk   # ps5-payload-sdk v0.43
-make ps5      # dist/HearBridge-PS5-<version>.elf
+make ps5      # dist/HearBridge-<version>.elf
 make test
 ```
 

@@ -3,7 +3,7 @@
 include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
 
 VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/version.h)
-ELF   := dist/HearBridge-PS5-$(VERSION).elf
+ELF   := dist/HearBridge-$(VERSION).elf
 BUILD ?= build/ps5
 
 CFLAGS  := -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/bt -Isrc/a2dp

@@ -48,6 +48,6 @@ jobs:
           sha256sum dist/*.elf | tee dist/SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: HearBridge-PS5-elf
+          name: HearBridge-elf
           path: dist/
           if-no-files-found: error
