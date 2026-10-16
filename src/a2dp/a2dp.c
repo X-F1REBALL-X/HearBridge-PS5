@@ -20,15 +20,11 @@ struct a2dp_session {
     a2dp_open_opts opts;
 };
 
-/* Audio/Video major (4), or Audio service class bit (CoD bit 21). */
+/* Consider every discovered device as audio likely so all speakers get names. */
 static int cod_audio_likely(uint32_t cod)
 {
-    unsigned major = (cod >> 8) & 0x1F;
-    unsigned services = (cod >> 13) & 0x7FF;
-
-    if (major == 4) return 1;           /* Audio/Video */
-    if (services & (1u << 8)) return 1; /* Audio service (bit 21 of CoD) */
-    return 0;
+    (void)cod;
+    return 1;
 }
 
 static const char *cod_minor_av(unsigned minor)

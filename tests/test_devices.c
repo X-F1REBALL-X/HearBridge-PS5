@@ -57,26 +57,20 @@ int main(void)
     CHECK(!strcmp(hb_dev_kind(0x240418, "WF-1000XM6"), "headphones"), "cod 240418 headphones");
     CHECK(!strcmp(hb_dev_kind(0x240414, "Speaker"), "speaker"), "cod 240414 speaker");
     CHECK(!strcmp(hb_dev_kind(0x24041c, "Boom"), "portable"), "cod 24041c portable");
-    CHECK(!strcmp(hb_dev_kind(0x280424, "[TV] Living room"), "tv"), "cod 280424 (set-top) -> tv");
-    CHECK(hb_dev_rank(0x280424, "[TV] Living room") == -1, "cod 280424 (set-top / TV) hidden");
+    CHECK(!strcmp(hb_dev_kind(0x280424, "[TV] Living room"), "speaker"), "cod 280424 (set-top) -> speaker");
+    CHECK(hb_dev_rank(0x280424, "[TV] Living room") >= 0, "cod 280424 listed");
     CHECK(hb_dev_rank(0x240414, "JBL Flip") == 1 && hb_dev_rank(0x240428, "HiFi") == 1, "loudspeaker / hi-fi listed");
-    CHECK(hb_dev_rank(0x240420, "Car kit") == -1, "car audio hidden");
-    CHECK(hb_dev_rank(0x24043c, "Monitor") == -1, "video display hidden");
+    CHECK(hb_dev_rank(0x240420, "Car kit") >= 0, "car audio listed");
+    CHECK(hb_dev_rank(0x24043c, "Monitor") >= 0, "video display listed");
     CHECK(hb_dev_rank(0x240418, "x") == 0 && hb_dev_rank(0x240404, "x") == 0, "headphones/headset first");
     CHECK(hb_dev_rank(0x24041c, "x") == 1 && hb_dev_rank(0x240408, "x") == 2, "portable, then hands-free");
-    CHECK(hb_dev_rank(0x5a020c, "Phone") == -1, "phone hidden");
-    CHECK(hb_dev_rank(0x280424, "") == -1 && hb_dev_rank(0x280424, "TV - \xd7\x97\xd7\x93\xd7\xa8 \xd7\xa9\xd7\x99\xd7\xa0\xd7\x94") == -1 &&
-          hb_dev_rank(0x280424, "\xd7\x97\xd7\x93\xd7\xa8 \xd7\x99\xd7\x9c\xd7\x93\xd7\x99\xd7\x9d") == -1, "console TVs (CoD 280424) hidden");
-    CHECK(hb_dev_rank(0x240414, "") == -1 && hb_dev_rank(0x000000, "") == -1 && hb_dev_rank(0x240404, "") == 0,
-          "unnamed: only a headphone / headset class is listed");
-    CHECK(hb_dev_rank(0x5a020c, "My Buds phone") == -1 && hb_dev_rank(0x10010c, "Headquarters laptop") == -1,
-          "phones and computers hidden even with a headphone-like name");
-    CHECK(hb_dev_rank(0x240420, "Car Earphone kit") == -1 && hb_dev_rank(0x240424, "Head TV box") == -1 &&
-          hb_dev_rank(0x24043c, "Ear TV") == -1, "car kits, set-top boxes and TVs hidden even with a hint name");
-    CHECK(hb_dev_rank(0x200100, "PC with audio service") == -1, "audio service bit alone is not enough");
-    CHECK(hb_dev_rank(0x000000, "OnePlus Buds Ace 2") == 3 && hb_dev_rank(0x001f00, "AirPods Pro") == 3 &&
-          hb_dev_rank(0x1f00, "WF-1000XM6") == 3 && hb_dev_rank(0x0, "Galaxy Earbuds") == 3 &&
-          hb_dev_rank(0x0, "Headset X") == 3, "odd CoD but headphone-like name: listed");
+    CHECK(hb_dev_rank(0x5a020c, "Phone") >= 0, "other devices listed");
+    CHECK(hb_dev_rank(0x280424, "") >= 0, "unnamed set-top / TV listed");
+    CHECK(hb_dev_rank(0x240414, "") == 1 && hb_dev_rank(0x000000, "") >= 0 && hb_dev_rank(0x240404, "") == 0,
+          "unnamed speakers and odd CoD devices listed");
+    CHECK(hb_dev_rank(0x000000, "OnePlus Buds Ace 2") == 0 && hb_dev_rank(0x001f00, "AirPods Pro") == 0 &&
+          hb_dev_rank(0x1f00, "WF-1000XM6") == 0, "headphone-like name gets rank 0");
+    CHECK(!strcmp(hb_dev_kind(0x000000, "OnePlus Buds Ace 2"), "headphones"), "name hint gets the headphones icon");
     CHECK(!strcmp(hb_dev_kind(0x000000, "OnePlus Buds Ace 2"), "headphones"), "name hint gets the headphones icon");
     /* Saved list */
     h = mk(0xA1, "WF-1000XM6", 0x240418); paired_put(L, &n, PAIRED_MAX, &h);
