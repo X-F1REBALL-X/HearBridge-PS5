@@ -24,7 +24,7 @@ HearBridge PS5 是一个 payload（ELF），通过主机自带的蓝牙，把 PS
 
 ## 安装
 
-1. 从[最新版本](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)下载 **HearBridge-1.3.3.elf**。
+1. 从[最新版本](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)下载 **HearBridge-1.3.5.elf**。
 2. 发送到端口 9021 上的 ELF 加载器。
 3. 打开 **http://&lt;console-ip&gt;:8090** 或 **HearBridge** 图块，然后在 **设置** 中配对耳机。
 
