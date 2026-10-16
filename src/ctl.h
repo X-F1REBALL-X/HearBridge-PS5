@@ -66,6 +66,7 @@ typedef struct {
     unsigned cmd_seq;      /* bumped by the web thread for each select.txt command */
     /* headset extras (stream loop -> web) */
     int battery;           /* AVRCP battery status 0..4, -1 unknown */
+    long page_seen_ms;          /* last /api/status from a browser (monotonic ms) */
     unsigned long status_polls; /* /api/status requests: the page is open while it moves */
     int batt_pct;          /* HFP battery percent 0..100, -1 unknown */
     int batt_src;          /* 0 none, 1 HF indicator (exact), 2 Apple (10 % steps) */

@@ -15,6 +15,7 @@
 #include <string.h>
 
 void log_line(const char *fmt, ...) { (void)fmt; }
+int log_tail(char *out, size_t cap) { if (cap) out[0] = 0; return 0; }
 
 static int fails;
 #define CHECK(c, what) do { if (c) printf("ok   %s\n", what); \
@@ -87,6 +88,7 @@ int main(int argc, char **argv)
     if (n > 0) out[n] = 0;
     CHECK(n > 0 && strstr(out, "tile probes: page 1, xhr 1, fetch 0, img 1, img-localhost 1, script 1, frame 1"),
           "diag counts the tile probes by kind");
+    CHECK(n > 0 && strstr(out, "--- log tail (this run) ---"), "diag shows a log tail section");
     n = get(&c, "/start?x=1");
     CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12), "GET /start with a query still works");
     n = get(&c, "/api/status");
