@@ -1,5 +1,5 @@
 /* Real a2dp_inquiry + hci_cmd against a deterministic controller. No USB,
- * console, kernel helpers, or wall-clock waits. Synthetic atom is a fixture. */
+ * console, kernel helpers, or wall-clock waits. Synthetic test is a fixture. */
 #include "a2dp.h"
 #include "hci_cmd.h"
 #include <stdio.h>
@@ -70,7 +70,7 @@ static int event(void *ctx, unsigned char *out, int cap)
         out[3] = 0xaa; out[8] = 0xbb; out[9] = 1;
         out[11] = 0x18; out[12] = 0x04; out[13] = 0x20; /* headphones */
         out[16] = (unsigned char)-35;
-        out[17] = 5; out[18] = 9; memcpy(out + 19, "atom", 4);
+        out[17] = 5; out[18] = 9; memcpy(out + 19, "test", 4);
         result_sent = 1; return 257;
     }
     if (tick - start >= slots * 1280L && !lost_complete) {
@@ -108,7 +108,7 @@ int main(void)
     a2dp_inq_dev d[4]; int n;
     s = session(1); masked = 1;
     CHECK(a2dp_inquiry(s, d, 4, &n) && n == 1, "mask changed after startup: device still discovered");
-    CHECK(n == 1 && !strcmp(d[0].name, "atom") && d[0].audio_likely, "real EIR parser preserves atom name and audio class");
+    CHECK(n == 1 && !strcmp(d[0].name, "test") && d[0].audio_likely, "real EIR parser preserves test name and audio class");
     CHECK(masks == 1 && !forbidden, "one mask refresh, no reset or disabling page scan");
     a2dp_scan_deadline_ms = tick + 12000;
     a2dp_inquiry(s, d, 4, &n);
