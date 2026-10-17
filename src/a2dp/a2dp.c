@@ -447,23 +447,12 @@ static int inquiry_once(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound
     seconds = s->opts.inquiry_seconds > 0 ? s->opts.inquiry_seconds : 10;
     /* Inquiry_Length unit = 1.28 s; valid 0x01..0x30. */
     length_slots = (int)((seconds * 100 + 64) / 128);
-    if (a2dp_scan_deadline_ms) {
-        /* Hard scan deadline: shorten this inquiry to end before it, or skip. */
-        int fit = hb_scan_slots_left(a2dp_scan_deadline_ms, now_ms());
-        if (fit < 1) {
-            g_inq_skipped = 1;            /* not an inquiry: no event recovery */
-            return 1;
-        }
-        if (length_slots > fit) length_slots = fit;
-    }
+    if (a2dp_scan_deadline_ms && hci_is_mediatek() && length_slots < 8)
+        /* Repeating 2-slot inquiries restarts the hopping train. Allow one
+         * continuous 10.24 s inquiry on MediaTek, within the manual window. */
+        length_slots = 8;
     if (length_slots < 1) length_slots = 1;
     if (length_slots > 0x30) length_slots = 0x30;
-
-    /* General/Unlimited Inquiry Access Code (GIAC) 0x9E8B33, LSB first;
-     * Num_Responses 0 = unlimited. */
-    inq[0] = 0x33; inq[1] = 0x8B; inq[2] = 0x9E;
-    inq[3] = (unsigned char)length_slots;
-    inq[4] = 0x00;
 
     /* Want RSSI/EIR results. Read the current mode; only if it is not
      * already 2 set it for our scan and put it back afterwards. */
@@ -477,7 +466,28 @@ static int inquiry_once(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound
         }
     }
 
-    log_line("inquiry: starting (~%d s, length=%d, GIAC)", seconds, length_slots);
+    /* Setup commands can lose replies and consume seconds. Calculate the
+     * remaining radio budget after setup, immediately before Inquiry. */
+    if (INQ_ABORTED()) goto aborted;
+    if (a2dp_scan_deadline_ms) {
+        /* Hard scan deadline: shorten this inquiry to end before it, or skip. */
+        int fit = hb_scan_slots_left(a2dp_scan_deadline_ms, now_ms());
+        if (fit < 1) {
+            g_inq_skipped = 1;            /* not an inquiry: no event recovery */
+            goto aborted;
+        }
+        if (length_slots > fit) length_slots = fit;
+    }
+    if (length_slots < 1) length_slots = 1;
+    if (length_slots > 0x30) length_slots = 0x30;
+
+    /* General/Unlimited Inquiry Access Code (GIAC) 0x9E8B33, LSB first;
+     * Num_Responses 0 = unlimited. */
+    inq[0] = 0x33; inq[1] = 0x8B; inq[2] = 0x9E;
+    inq[3] = (unsigned char)length_slots;
+    inq[4] = 0x00;
+
+    log_line("inquiry: starting (%d ms, length=%d, GIAC)", length_slots * 1280, length_slots);
     for (attempt = 1; attempt <= INQ_START_TRIES && !started; attempt++) {
         int st = -1;
         if (!hci.ops->cmd(hci.ctx, HB_OP_INQUIRY, inq, 5)) {
@@ -1147,7 +1157,22 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
 int a2dp_inquiry(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound)
 {
     int r;
-    if (!s) return 0;
+    if (!s || !out || max <= 0 || !nfound) return 0;
+    *nfound = 0;
+    if (INQ_ABORTED() || PAST_DEADLINE()) return 1;
+    if (a2dp_scan_deadline_ms && hci_is_mediatek() && !a2dp_scan_evmask_sent) {
+        /* Sony shares this controller and can change its global event mask
+         * after our startup. Command Status/Complete cannot be masked, so
+         * receiving those is not evidence that inquiry results are enabled.
+         * Refresh our existing startup mask once per explicit manual scan,
+         * before Inquiry, rather than waiting for total event silence. */
+        a2dp_scan_evmask_sent = 1;
+        if (!hci_cmd_sync(s->hci, HB_OP_SET_EVENT_MASK, k_evmask, 8, NULL, NULL, 0))
+            log_line("inquiry: manual scan event-mask refresh unconfirmed");
+        else
+            log_line("inquiry: manual scan event mask refreshed (MediaTek)");
+    }
+    if (INQ_ABORTED() || PAST_DEADLINE()) return 1;
     hci_scan_pause(s->hci, "scan");
     r = inquiry_scan_off(s, out, max, nfound);
     hci_scan_resume(s->hci);
