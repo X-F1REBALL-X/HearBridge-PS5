@@ -19,6 +19,14 @@ BUILD := build
 
 all: ps5
 
+# Deterministic discovery regression test; no console or Bluetooth hardware.
+.PHONY: test-inquiry
+test: test-inquiry
+test-inquiry:
+	@mkdir -p $(BUILD)/host
+	cc -std=c11 -Wall -Wextra -O2 -Isrc -Isrc/a2dp -Isrc/bt tests/test_inquiry.c src/a2dp/a2dp.c src/bt/hci_cmd.c src/bt/acl_track.c src/a2dp/devclass.c src/utf8.c src/rejoin.c -o $(BUILD)/host/test_inquiry
+	$(BUILD)/host/test_inquiry
+
 ps5:
 ifndef PS5_PAYLOAD_SDK
 	$(error PS5_PAYLOAD_SDK is undefined)
