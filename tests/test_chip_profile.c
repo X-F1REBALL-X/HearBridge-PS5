@@ -88,30 +88,64 @@ int main(void)
     /* scan pause: default profile sends nothing */
     reset(2);
     hci_scan_pause_enable(0);
-    hci_scan_pause(h, "connect");
+    hci_scan_pause(h, "scan");
+    hci_scan_resume(h);
+    hci_scan_pause_page(h, "connect");
     hci_scan_resume(h);
     CHECK(nops == 0 && scan_val == 2, "scan: default profile never touches Scan_Enable");
 
-    /* mediatek (#34): only inquiry scan is paused, page scan stays on so a
-     * pad can always page the console; nested pauses restore once */
+    /* mediatek, our own page / pair / connect (#34): page and inquiry scan
+     * both off, or the console's page scan leaves the page no radio time;
+     * nested pauses restore once */
     reset(3);
     hci_scan_pause_enable(1);
-    hci_scan_pause(h, "pairing");
-    CHECK(nops == 2 && ops[0] == HB_OP_READ_SCAN_ENABLE && ops[1] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 2,
-          "scan: mediatek reads Scan_Enable, then turns inquiry scan off (page scan kept)");
-    hci_scan_pause(h, "connect");
-    CHECK(nops == 2, "scan: a nested pause sends nothing");
+    hci_scan_pause_page(h, "pairing");
+    CHECK(nops == 2 && ops[0] == HB_OP_READ_SCAN_ENABLE && ops[1] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 0,
+          "page: mediatek reads Scan_Enable, then turns page and inquiry scan off");
+    hci_scan_pause_page(h, "connect");
+    CHECK(nops == 2, "page: a nested pause sends nothing");
     hci_scan_resume(h);
-    CHECK(nops == 2 && scan_val == 2, "scan: inner resume keeps inquiry scan off");
+    CHECK(nops == 2 && scan_val == 0, "page: inner resume keeps scanning off");
     hci_scan_resume(h);
-    CHECK(nops == 3 && ops[2] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 3, "scan: outer resume puts the system value back");
+    CHECK(nops == 3 && ops[2] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 3, "page: outer resume puts the system value back");
     hci_scan_resume(h);
-    CHECK(nops == 3, "scan: an extra resume does nothing");
+    CHECK(nops == 3, "page: an extra resume does nothing");
+
+    /* the PS5 default (page scan only) is the case #34 hit: it must be paused for a page */
+    reset(2);
+    hci_scan_pause_page(h, "connect");
+    CHECK(nops == 2 && ops[1] == HB_OP_WRITE_SCAN_ENABLE && args0[1] == 0 && scan_val == 0,
+          "page: system page scan only (PS5 default) is turned off while we page");
+    hci_scan_resume(h);
+    CHECK(nops == 3 && scan_val == 2, "page: page scan is back on when the page ends");
+    hci_scan_release(h);
+    CHECK(nops == 3 && scan_val == 2, "page: release after a finished page sends nothing");
+
+    /* stop while a page is in progress: the value goes back */
+    reset(2);
+    hci_scan_pause_page(h, "connect");
+    CHECK(scan_val == 0, "page: scan off during the page");
+    hci_scan_release(h);
+    CHECK(scan_val == 2, "page: stop during a page puts the system scan back");
+
+    reset(0);
+    hci_scan_pause_page(h, "connect");
+    hci_scan_resume(h);
+    CHECK(nops == 1 && scan_val == 0, "page: nothing to pause when the system scan is already off");
+
+    /* mediatek inquiry (63b1bdc, #34): only inquiry scan is paused, page scan
+     * stays on so a pad can always page the console */
+    reset(3);
+    hci_scan_pause(h, "scan");
+    CHECK(nops == 2 && ops[1] == HB_OP_WRITE_SCAN_ENABLE && scan_val == 2,
+          "scan: mediatek turns inquiry scan off, page scan kept");
+    hci_scan_resume(h);
+    CHECK(nops == 3 && scan_val == 3, "scan: resume puts the system value back");
 
     reset(2);
-    hci_scan_pause(h, "pairing");
+    hci_scan_pause(h, "scan");
     hci_scan_resume(h);
-    CHECK(scan_val == 2 && nops <= 2, "scan: page scan only (PS5 default) is never turned off");
+    CHECK(scan_val == 2 && nops <= 2 && args0[nops - 1] == 2, "scan: page scan only (PS5 default) is never turned off for an inquiry");
 
     reset(0);
     hci_scan_pause(h, "scan");
@@ -123,6 +157,15 @@ int main(void)
     hci_scan_pause(h, "scan");
     hci_scan_resume(h);
     CHECK(scan_val == 2 && ops[nops - 1] == HB_OP_WRITE_SCAN_ENABLE, "scan: unread value restores the PS5 default (page scan)");
+
+    /* an inquiry that is already running keeps page scan on for a page nested inside it */
+    reset(3);
+    hci_scan_pause(h, "scan");
+    hci_scan_pause_page(h, "connect");
+    CHECK(scan_val == 2, "scan: the outermost pause decides, a page nested in an inquiry changes nothing");
+    hci_scan_resume(h);
+    hci_scan_resume(h);
+    CHECK(scan_val == 3, "scan: nested pauses restore once");
     hci_scan_pause_enable(0);
 
     /* ACL pipe: MediaTek 0e8d:3603 if0 (ep81 int, ep01 + ep02 bulk out, ep82 bulk in) */

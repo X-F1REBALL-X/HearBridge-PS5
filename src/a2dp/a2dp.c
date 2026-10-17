@@ -1127,9 +1127,9 @@ done:
     return rc;
 }
 
-/* Pairing and inquiry run with the system page scan paused (see
- * hci_scan_pause): otherwise the MediaTek controller gives them almost no
- * radio time. */
+/* Pairing runs with the system page scan paused (hci_scan_pause_page), an
+ * inquiry with the system inquiry scan paused (hci_scan_pause): otherwise the
+ * MediaTek controller gives them almost no radio time. */
 int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out)
 {
     int r;
@@ -1138,7 +1138,7 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
         log_line("pair: blocked address, not pairing");
         return 0;
     }
-    hci_scan_pause(s->hci, "pairing");
+    hci_scan_pause_page(s->hci, "pairing");
     r = pair_paged(s, target, out);
     hci_scan_resume(s->hci);
     return r;

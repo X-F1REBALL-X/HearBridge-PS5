@@ -44,7 +44,10 @@ int hci_cmd_status(hci_t hci, unsigned op, const void *params, int plen);
  * or times out, and an inquiry hears almost nothing. With page/inquiry scan
  * off, a page completes in ~1 s. pause() turns scanning off (nests);
  * resume() puts the system's value back when the outermost pause ends. */
-void hci_scan_pause(hci_t hci, const char *why);
+void hci_scan_pause(hci_t hci, const char *why);   /* inquiry: page scan stays on (#34) */
+/* Our own page / pair / connect: page and inquiry scan both off until the
+ * outermost hci_scan_resume(). */
+void hci_scan_pause_page(hci_t hci, const char *why);
 /* Off by default: pause/resume do nothing unless the controller is a
  * MediaTek (hci_usb turns it on for the mediatek chip profile). */
 void hci_scan_pause_enable(int on);

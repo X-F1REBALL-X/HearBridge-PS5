@@ -2724,7 +2724,7 @@ int btlink_connect(btlink *l, const unsigned char addr[6],
         log_line("btlink: not paging a blocked address");
         return 0;
     }
-    hci_scan_pause(l->hci, "connect");
+    hci_scan_pause_page(l->hci, "connect");
     r = connect_paged(l, addr, psrm, clock_offset, link_key, key_type, name_inout, name_max, timeout_ms);
     hci_scan_resume(l->hci);
     return r;

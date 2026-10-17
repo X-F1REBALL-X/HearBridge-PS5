@@ -121,7 +121,11 @@ static int g_mediatek;
 void hci_set_mediatek(int on) { g_mediatek = on; }
 int  hci_is_mediatek(void) { return g_mediatek; }
 
-void hci_scan_pause(hci_t hci, const char *why)
+/* Shared by both pause flavours. keep_page = 1: only inquiry scan is turned
+ * off, page scan stays as the system set it (inquiry, #34). keep_page = 0:
+ * page and inquiry scan are both turned off (our own page / pairing). The
+ * first (outermost) pause decides; nested ones send nothing. */
+static void scan_pause(hci_t hci, const char *why, int keep_page)
 {
     unsigned char cc[16], off = 0;
     int cc_len = 0;
@@ -131,17 +135,35 @@ void hci_scan_pause(hci_t hci, const char *why)
     if (hci_cmd_sync(hci, HB_OP_READ_SCAN_ENABLE, NULL, 0, cc, &cc_len, (int)sizeof cc) && cc_len >= 7)
         g_scan_saved = cc[6];
     if (g_scan_saved == 0) return;      /* nothing to pause */
-    /* #34: only inquiry scan is paused. Page scan (bit 1) stays as the system
-     * set it, so a controller can always page the console back in, and a
-     * copy killed mid-pause (process manager, SIGKILL: no atexit) cannot
-     * leave the console unreachable for pads. */
-    off = (unsigned char)(g_scan_saved > 0 ? (g_scan_saved & 0x02) : 0x02);
-    if (off == g_scan_saved) return;    /* nothing to pause */
+    if (keep_page) {
+        /* #34: only inquiry scan is paused. Page scan (bit 1) stays as the system
+         * set it, so a controller can always page the console back in, and a
+         * copy killed mid-pause (process manager, SIGKILL: no atexit) cannot
+         * leave the console unreachable for pads. */
+        off = (unsigned char)(g_scan_saved > 0 ? (g_scan_saved & 0x02) : 0x02);
+        if (off == g_scan_saved) return;    /* nothing to pause */
+    }
     if (hci_cmd_sync(hci, HB_OP_WRITE_SCAN_ENABLE, &off, 1, NULL, NULL, 0))
-        log_line("scan: system page/inquiry scan paused for %s (was %d)", why ? why : "-", g_scan_saved);
+        log_line("scan: system %s scan paused for %s (was %d)",
+                 keep_page ? "inquiry" : "page/inquiry", why ? why : "-", g_scan_saved);
     else
         log_line("scan: could not pause the system page scan (%s)", why ? why : "-");
     if (g_scan_saved < 0) g_scan_saved = 0x02;   /* unread: PS5 default */
+}
+
+/* Inquiry: page scan stays on (see scan_pause). */
+void hci_scan_pause(hci_t hci, const char *why)
+{
+    scan_pause(hci, why, 1);
+}
+
+/* Our own page / pairing / connect: the console's page scan runs at ~100%
+ * duty on MediaTek and leaves a page of ours almost no radio time (1.3.2 and
+ * later logged "overall timeout" on every saved-headset connect, #34), so it
+ * is off for the length of the page and put back by hci_scan_resume(). */
+void hci_scan_pause_page(hci_t hci, const char *why)
+{
+    scan_pause(hci, why, 0);
 }
 
 void hci_scan_resume(hci_t hci)
