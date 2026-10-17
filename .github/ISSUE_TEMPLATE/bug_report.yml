@@ -50,7 +50,9 @@ body:
     attributes:
       label: Which HearBridge file did you run?
       options:
-        - HearBridge-1.3.3.elf
+        - HearBridge-1.3.5.elf
+        - HearBridge-PS5-1.3.2.elf
+        - HearBridge-PS5-1.3.1.elf
         - HearBridge-PS5-1.3.0.elf
         - HearBridge-PS5-1.2.0.elf
         - HearBridge-PS5-1.1.0.elf
