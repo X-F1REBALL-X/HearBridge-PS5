@@ -38,6 +38,9 @@ check(!calls.some(function(c){return c.p.indexOf('/api/scan')===0}) && calls.som
 check(/setInterval\(function\(\)\{if\(scanLive/.test(html), 'page: devices are polled during the scan, not after it');
 check(/Nothing yet/.test(el('evlog').innerHTML), 'page: empty log says nothing yet');
 check(/if\(lg\.hbFollow\)lg\.scrollTop=lg\.scrollHeight/.test(html) && /this\.hbFollow=this\.scrollTop/.test(html), 'page: log follows the newest line unless scrolled up');
+check(/function devices\(\)\{[^]*?d\.name\|\|t\('unknownName'\)[^]*?esc\(d\.addr\)/.test(html) && !/!d\.name&&!HEAD/.test(html) && /audio:1,av:1/.test(html),
+  'page: unnamed devices are listed with Unknown name and their address, odd-class audio kinds shown');
+check(JSON.parse(i18n).langs.every(function(l){var v=JSON.parse(i18n).strings[l.code].unknownName;return v&&v.length>2}), 'page: "Unknown name" is translated in every language');
 check(/patchList\('devlist'/.test(html) && /patchList\('savedlist'/.test(html) && !/\$\('(devlist|savedlist)'\)\.innerHTML=/.test(html),
   'page: device lists are patched in place (no rebuild per poll, no hover/focus blink)');
 const actions = [['mute', '/api/mute?on=1'], ['tone', '/api/tone?on=1'], 

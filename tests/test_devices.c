@@ -67,8 +67,15 @@ int main(void)
     CHECK(hb_dev_rank(0x5a020c, "Phone") == -1, "phone hidden");
     CHECK(hb_dev_rank(0x280424, "") == -1 && hb_dev_rank(0x280424, "TV - \xd7\x97\xd7\x93\xd7\xa8 \xd7\xa9\xd7\x99\xd7\xa0\xd7\x94") == -1 &&
           hb_dev_rank(0x280424, "\xd7\x97\xd7\x93\xd7\xa8 \xd7\x99\xd7\x9c\xd7\x93\xd7\x99\xd7\x9d") == -1, "console TVs (CoD 280424) hidden");
-    CHECK(hb_dev_rank(0x240414, "") == -1 && hb_dev_rank(0x000000, "") == -1 && hb_dev_rank(0x240404, "") == 0,
-          "unnamed: only a headphone / headset class is listed");
+    CHECK(hb_dev_rank(0x240404, "") == 0 && hb_dev_rank(0x240418, "") == 0 && hb_dev_rank(0x240414, "") == 4 &&
+          hb_dev_rank(0x240408, "") == 4 && hb_dev_rank(0x000000, "") == 4 && hb_dev_rank(0x001f00, NULL) == 4,
+          "unnamed: headphone / headset class keeps its place, any other unnamed device is listed last (by address)");
+    CHECK(hb_dev_rank(0x240414, "JBL Flip") < hb_dev_rank(0x240414, "") && hb_dev_rank(0x001f00, "AirPods 4") < hb_dev_rank(0x001f00, ""),
+          "named audio devices rank before unnamed ones");
+    CHECK(hb_dev_rank(0x5a020c, "") == -1 && hb_dev_rank(0x10010c, "") == -1 && hb_dev_rank(0x002508, "") == -1 &&
+          hb_dev_rank(0x002504, "") == -1 && hb_dev_rank(0x280424, "") == -1 && hb_dev_rank(0x240420, "") == -1 &&
+          hb_dev_rank(0x24043c, "") == -1 && hb_dev_rank(0x240440, "") == -1,
+          "unnamed devices in a hidden class (phone, PC, pad, TV, car, camera) stay hidden");
     CHECK(hb_dev_rank(0x5a020c, "My Buds phone") == -1 && hb_dev_rank(0x10010c, "Headquarters laptop") == -1,
           "phones and computers hidden even with a headphone-like name");
     CHECK(hb_dev_rank(0x240420, "Car Earphone kit") == -1 && hb_dev_rank(0x240424, "Head TV box") == -1 &&
@@ -81,6 +88,48 @@ int main(void)
           hb_dev_rank(0x001f00, "DualSense Wireless Controller") < 0 && hb_dev_rank(0x000000, "DUALSHOCK 4 Headset") < 0,
           "#34: controllers never listed, whatever the name");
     CHECK(!strcmp(hb_dev_kind(0x000000, "OnePlus Buds Ace 2"), "headphones"), "name hint gets the headphones icon");
+    /* Hidden by class alone (decides which devices get a name request) */
+    CHECK(hb_dev_hidden_by_class(0x5a020c) == 1 && hb_dev_hidden_by_class(0x10010c) == 1 &&
+          hb_dev_hidden_by_class(0x000100) == 1 && hb_dev_hidden_by_class(0x000200) == 1,
+          "hidden by class: computers and phones (major 1, 2)");
+    CHECK(hb_dev_hidden_by_class(0x002504) == 1 && hb_dev_hidden_by_class(0x002508) == 1 &&
+          hb_dev_hidden_by_class(0x002540) == 0 && hb_dev_hidden_by_class(0x002580) == 0,
+          "hidden by class: joystick and gamepad only in major 5");
+    CHECK(hb_dev_hidden_by_class(0x240420) == 1 && hb_dev_hidden_by_class(0x240424) == 1 &&
+          hb_dev_hidden_by_class(0x24042c) == 1 && hb_dev_hidden_by_class(0x240430) == 1 &&
+          hb_dev_hidden_by_class(0x240434) == 1 && hb_dev_hidden_by_class(0x240438) == 1 &&
+          hb_dev_hidden_by_class(0x24043c) == 1 && hb_dev_hidden_by_class(0x240440) == 1,
+          "hidden by class: car, set-top, TV, display, camera minors of A/V");
+    CHECK(hb_dev_hidden_by_class(0x240404) == 0 && hb_dev_hidden_by_class(0x240418) == 0 &&
+          hb_dev_hidden_by_class(0x240414) == 0 && hb_dev_hidden_by_class(0x24041c) == 0 &&
+          hb_dev_hidden_by_class(0x240408) == 0 && hb_dev_hidden_by_class(0x240428) == 0 &&
+          hb_dev_hidden_by_class(0x240444) == 0,
+          "not hidden: headsets, headphones, speakers, hands-free, hi-fi, video player");
+    CHECK(hb_dev_hidden_by_class(0x000000) == 0 && hb_dev_hidden_by_class(0x001f00) == 0 &&
+          hb_dev_hidden_by_class(0x7c0000) == 0 && hb_dev_hidden_by_class(0x000700) == 0,
+          "not hidden: empty or unusual CoD still gets a name request");
+    /* Unusual CoD: a name decides, the class does not hide it */
+    CHECK(hb_dev_hidden_by_class(0x001f00) == 0 && hb_dev_rank(0x001f00, "AirPods 4") == 3 &&
+          hb_dev_rank(0x000000, "AirPods 4") == 3 && hb_dev_rank(0x7c0000, "AirPods 4") == 3,
+          "unusual CoD named AirPods 4 is listed");
+    CHECK(hb_dev_rank(0x001f00, "Soundcore Life Q30") == 3 && hb_dev_rank(0x000000, "Soundcore Life Q30") == 3 &&
+          hb_dev_rank(0x7c0000, "Soundcore Life Q30") == 3 && hb_dev_rank(0x240404, "Soundcore Life Q30") == 0,
+          "unusual CoD with any name is listed last (rank 3), proper audio class keeps its rank");
+    CHECK(hb_dev_rank(0x001f00, "") == 4 && hb_dev_rank(0x000000, "") == 4 && hb_dev_rank(0x7c0000, NULL) == 4,
+          "unusual or empty CoD without a name is listed by address, last");
+    CHECK(hb_dev_hidden_by_class(0x280424) == 1 && hb_dev_rank(0x280424, "Samsung TV") == -1 &&
+          hb_dev_rank(0x240438, "Samsung TV") == -1,
+          "Samsung TV with a TV class stays hidden");
+    CHECK(hb_dev_rank(0x000000, "Samsung TV") == -1 && hb_dev_rank(0x001f00, "Samsung TV") == -1,
+          "Samsung TV with an unusual CoD is not listed either");
+    CHECK(hb_dev_rank(0x5a020c, "Galaxy S24") == -1 && hb_dev_rank(0x7a020c, "Pixel 9") == -1 &&
+          hb_dev_rank(0x02010c, "Office PC") == -1 && hb_dev_rank(0x00010c, "MacBook") == -1,
+          "phones and computers stay hidden, named or not");
+    CHECK(hb_dev_rank(0x002508, "DualSense Wireless Controller") == -1 && hb_dev_rank(0x000000, "DualSense") == -1 &&
+          hb_dev_rank(0x001f00, "DUALSHOCK 4") == -1 && hb_dev_rank(0x002504, "Pro Controller") == -1,
+          "controllers stay hidden by class and by name");
+    CHECK(hb_dev_hidden_by_class(0x002508) == 1 && hb_dev_rank(0x001f00, "Wireless Controller") == -1,
+          "controllers stay hidden by class and by name");
     /* Saved list */
     h = mk(0xA1, "WF-1000XM6", 0x240418); paired_put(L, &n, PAIRED_MAX, &h);
     h = mk(0xB2, "Speaker \xc3\xa9", 0x240414); paired_put(L, &n, PAIRED_MAX, &h);

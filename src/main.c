@@ -365,7 +365,7 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 /* A scan (button or page refresh) runs inquiries back to back for
  * SCAN_WINDOW_S. Each result is written to devices.json as it arrives.
  * The list stays until the next scan. */
-#define SCAN_WINDOW_S 12   /* short: the radio is shared with the DualSense */
+#define SCAN_WINDOW_S 15   /* short: the radio is shared with the DualSense */
 
 static void write_status(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void write_status(const char *fmt, ...)

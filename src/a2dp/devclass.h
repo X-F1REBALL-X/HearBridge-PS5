@@ -5,13 +5,17 @@
 /* Short kind for the page: "headphones", "headset", "speaker", "portable",
  * "hifi", "car", "handsfree", "tv", "av", "audio", or NULL = not audio. */
 const char *hb_dev_kind(uint32_t cod, const char *name);
-/* Only headphones and speakers are listed. Order (lower first): 0 headphones /
+/* Everything outside a hidden class is listed. Order (lower first): 0 headphones /
  * wearable headset, 1 portable audio / loudspeaker / hi-fi speaker, 2 hands-free
  * (all CoD major Audio/Video), 3 any
  * other device whose name hints at headphones (Buds, WF-, WH-, AirPods,
- * Pods, Ear, Head); -1 = hidden (TV, set-top box, speaker, car, phone...). */
+ * Pods, Ear, Head), 3 any other named device with an odd class, 4 an unnamed
+ * device (shown by address); -1 = hidden (TV, set-top box, car, phone, PC, pad...). */
 int hb_dev_rank(uint32_t cod, const char *name);
 int hb_dev_rank_class(uint32_t cod);
+/* 1 if the class alone keeps the device hidden (computer, phone, pad, TV, car,
+ * set-top, display, camera); 0 for everything else, including odd or empty CoD. */
+int hb_dev_hidden_by_class(uint32_t cod);
 /* 1 if the name looks like headphones / earbuds. */
 int hb_dev_name_hints_headphones(const char *name);
 #endif

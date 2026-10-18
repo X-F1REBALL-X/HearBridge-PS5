@@ -205,8 +205,9 @@ static void fetch_names(a2dp_session *s, a2dp_inq_dev *devs, int n)
         int got = 0;
 
         if (d->name[0]) continue;
-        /* Only audio devices that would be listed (no TVs) need a name. */
-        if (!d->audio_likely || hb_dev_rank_class(d->cod) < 0) continue;
+        /* Ask every device the class does not hide, odd or empty CoD included:
+         * the name may be the only sign that it is headphones (AirPods). */
+        if (hb_dev_hidden_by_class(d->cod)) continue;
 
         memcpy(p, d->addr, 6);
         p[6] = 0x01; /* R1 page scan repetition (common default) */
@@ -650,7 +651,7 @@ static int prefer_set(const unsigned char prefer[6])
 /* Scan log: each device's skip/candidate line once per scan, not on every
  * live update (a2dp_rank_log_reset() at the start of a scan). */
 static unsigned char g_rank_logged[A2DP_INQ_MAX][6];
-static unsigned char g_rank_kind[A2DP_INQ_MAX];   /* 1 skipped, 2 candidate */
+static unsigned char g_rank_kind[A2DP_INQ_MAX];   /* 1 hidden class, 2 candidate, 3 not audio, 4 no name */
 static int g_rank_nlogged;
 void a2dp_rank_log_reset(void) { g_rank_nlogged = 0; }
 static int rank_log_once(const unsigned char addr[6], int kind)
@@ -679,11 +680,16 @@ int a2dp_rank_sinks(const a2dp_inq_dev *found, int n,
     for (i = 0; i < n && cnt < max; i++) {
         int r = sink_rank(found[i].cod, found[i].name);
         if (r < 0) {
-            if (rank_log_once(found[i].addr, 1)) {
+            int hidden = hb_dev_hidden_by_class(found[i].cod);
+            int why = hidden ? 1 : found[i].name[0] ? 3 : 4;
+            if (rank_log_once(found[i].addr, why)) {
                 char astr[18];
                 hci_addr_str(found[i].addr, astr);
-                log_line("pick: skip %s CoD %06x (not listed: %s)", astr, (unsigned)found[i].cod,
-                         found[i].name[0] ? "not headphones/speaker" : "no name yet");
+                log_line("pick: skip %s CoD %06x major %u minor %u (not listed: %s)", astr,
+                         (unsigned)found[i].cod, (unsigned)((found[i].cod >> 8) & 0x1F),
+                         (unsigned)((found[i].cod >> 2) & 0x3F),
+                         hidden ? "hidden class (TV/phone/pad/car)" :
+                         found[i].name[0] ? "not headphones/speaker" : "no name received yet");
             }
             continue;
         }

@@ -761,10 +761,10 @@ function blockAdd(){var v=($('blkaddr').value||'').trim().toUpperCase().replace(
 if(!/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(v)){alert('Address like AA:BB:CC:DD:EE:FF');return}
 act('/api/block?on=1&addr='+v,function(){$('blkaddr').value='';blocked()})}
 function saved(){getj('/api/saved',function(j){var i;SAVL=j.devices;SAV={};for(i=0;i<SAVL.length;i++)SAV[SAVL[i].addr]=1;drawSaved()})}
-var SAV={},SHOW={headphones:1,headset:1,speaker:1,portable:1,hifi:1,handsfree:1},HEAD={headphones:1,headset:1};
+var SAV={},SHOW={headphones:1,headset:1,speaker:1,portable:1,hifi:1,handsfree:1,audio:1,av:1};
 function devices(){getj('/api/devices',function(j){var rows=[],i,d,k;
-for(i=0;i<j.devices.length;i++){d=j.devices[i];if(SAV[d.addr])continue;k=d.kind||kindOf(d.cod);if(!SHOW[k]||(!d.name&&!HEAD[k]))continue;
-rows.push({k:d.addr,h:row(icon(k),d.name||d.addr,'<span class="addr">'+esc(d.addr)+'</span>','<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('connectTo'))+'</button>',''),s:bars(d.rssi)})}
+for(i=0;i<j.devices.length;i++){d=j.devices[i];if(SAV[d.addr])continue;k=d.kind||kindOf(d.cod);if(!SHOW[k])continue;
+rows.push({k:d.addr,h:row(icon(k),d.name||t('unknownName'),'<span class="addr">'+esc(d.addr)+'</span>','<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('connectTo'))+'</button>',''),s:bars(d.rssi)})}
 patchList('devlist',rows,'<p class="k">'+esc(t('noDevices'))+'</p>')})}
 function pct(v){return Math.round(v)+'%'}
 function chips(a){var h='',i;for(i=0;i<a.length;i++)h+='<span class="chip'+(a[i][1]?' '+a[i][1]:'')+'">'+esc(a[i][0])+'</span>';return h}
@@ -785,7 +785,7 @@ $('live').className='live '+(st=='streaming'||st=='connected'?'ok':(st=='paused'
 var on=!!S.connected&&fresh(),link=on||((st=='connecting'||st=='pairing')&&S.device);
 $('dev').textContent=link?(S.device||'-'):t('notConnected');$('stats').style.display=on?'':'none';$('stidle').style.display=on?'none':'';$('hspanel').className='panel hs'+(on?'':' off');
 if(!on){S.pkts=S.frames=S.backlog=S.sample_rate=0;S.peak=S.out_peak=0;S.avrcp={}}
-if(st=='scanning')scanLive=Date.now()+12000;
+if(st=='scanning')scanLive=Date.now()+15000;
 if(scanLive&&(st=='waiting-selection'||st=='streaming'||st=='connected'||st=='connecting'||st=='error'||st=='paused'))scanLive=0;
 $('scanning').style.display=(st=='scanning'||(scanLive&&Date.now()<scanLive))?'':'none';
 if(Date.now()-devT>3000){devT=Date.now();devices();saved();blocked()}
@@ -982,7 +982,7 @@ function markLat(){latTouch=1;$('latt').textContent=$('lat').value+' ms';pushLat
 $('lat').oninput=markLat;$('lat').onchange=markLat;
 $('lat').onmouseup=markLat;$('lat').ontouchend=markLat;$('lat').onpointerup=markLat;
 for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!this.disabled)act('/api/codec?mode='+m)}})(cj);
-function armScan(){scanLive=Date.now()+12000;$('scanning').style.display='';devices()}
+function armScan(){scanLive=Date.now()+15000;$('scanning').style.display='';devices()}
 $('scan').onclick=scanPress;$('blkadd').onclick=blockAdd;
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};
 buildLangs();

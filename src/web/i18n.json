@@ -228,7 +228,8 @@
    "gameFrom": "from %s",
    "gameHsUse": "Use the %s profile now",
    "gameHsNone": "Not saved for a headset yet",
-   "gameHsRemoveConfirm": "Remove this headset's profile for this game?"
+   "gameHsRemoveConfirm": "Remove this headset's profile for this game?",
+   "unknownName": "Unknown name"
   },
   "ar": {
    "language": "اللغة",
@@ -406,7 +407,8 @@
    "gameFrom": "من %s",
    "gameHsUse": "استخدم ملف %s الآن",
    "gameHsNone": "لم يُحفظ لأي سماعة بعد",
-   "gameHsRemoveConfirm": "إزالة ملف هذه السماعة لهذه اللعبة؟"
+   "gameHsRemoveConfirm": "إزالة ملف هذه السماعة لهذه اللعبة؟",
+   "unknownName": "اسم غير معروف"
   },
   "es": {
    "language": "Idioma",
@@ -584,7 +586,8 @@
    "gameFrom": "de %s",
    "gameHsUse": "Usar ahora el perfil de %s",
    "gameHsNone": "Aún no guardado para ningunos auriculares",
-   "gameHsRemoveConfirm": "¿Quitar el perfil de estos auriculares para este juego?"
+   "gameHsRemoveConfirm": "¿Quitar el perfil de estos auriculares para este juego?",
+   "unknownName": "Nombre desconocido"
   },
   "fr": {
    "language": "Langue",
@@ -762,7 +765,8 @@
    "gameFrom": "de %s",
    "gameHsUse": "Utiliser maintenant le profil de %s",
    "gameHsNone": "Pas encore enregistré pour un casque",
-   "gameHsRemoveConfirm": "Supprimer le profil de ce casque pour ce jeu ?"
+   "gameHsRemoveConfirm": "Supprimer le profil de ce casque pour ce jeu ?",
+   "unknownName": "Nom inconnu"
   },
   "de": {
    "language": "Sprache",
@@ -940,7 +944,8 @@
    "gameFrom": "von %s",
    "gameHsUse": "Profil von %s jetzt verwenden",
    "gameHsNone": "Noch für kein Headset gespeichert",
-   "gameHsRemoveConfirm": "Profil dieses Headsets für dieses Spiel entfernen?"
+   "gameHsRemoveConfirm": "Profil dieses Headsets für dieses Spiel entfernen?",
+   "unknownName": "Unbekannter Name"
   },
   "pt": {
    "language": "Idioma",
@@ -1118,7 +1123,8 @@
    "gameFrom": "de %s",
    "gameHsUse": "Usar agora o perfil de %s",
    "gameHsNone": "Ainda não salvo para nenhum headset",
-   "gameHsRemoveConfirm": "Remover o perfil deste headset para este jogo?"
+   "gameHsRemoveConfirm": "Remover o perfil deste headset para este jogo?",
+   "unknownName": "Nome desconhecido"
   },
   "ru": {
    "language": "Язык",
@@ -1296,7 +1302,8 @@
    "gameFrom": "из %s",
    "gameHsUse": "Использовать профиль %s сейчас",
    "gameHsNone": "Пока не сохранено ни для одной гарнитуры",
-   "gameHsRemoveConfirm": "Удалить профиль этой гарнитуры для этой игры?"
+   "gameHsRemoveConfirm": "Удалить профиль этой гарнитуры для этой игры?",
+   "unknownName": "Имя неизвестно"
   },
   "ja": {
    "language": "言語",
@@ -1474,7 +1481,8 @@
    "gameFrom": "%sから",
    "gameHsUse": "%sのプロファイルを今すぐ使う",
    "gameHsNone": "まだどのヘッドセットにも保存されていません",
-   "gameHsRemoveConfirm": "このゲームのこのヘッドセットのプロファイルを削除しますか？"
+   "gameHsRemoveConfirm": "このゲームのこのヘッドセットのプロファイルを削除しますか？",
+   "unknownName": "名前不明"
   },
   "zh": {
    "language": "语言",
@@ -1652,7 +1660,8 @@
    "gameFrom": "来自 %s",
    "gameHsUse": "现在使用 %s 的配置",
    "gameHsNone": "尚未为任何耳机保存",
-   "gameHsRemoveConfirm": "删除此耳机在该游戏中的配置？"
+   "gameHsRemoveConfirm": "删除此耳机在该游戏中的配置？",
+   "unknownName": "名称未知"
   },
   "it": {
    "language": "Lingua",
@@ -1830,7 +1839,8 @@
    "gameFrom": "da %s",
    "gameHsUse": "Usa ora il profilo di %s",
    "gameHsNone": "Non ancora salvato per nessuna cuffia",
-   "gameHsRemoveConfirm": "Rimuovere il profilo di queste cuffie per questo gioco?"
+   "gameHsRemoveConfirm": "Rimuovere il profilo di queste cuffie per questo gioco?",
+   "unknownName": "Nome sconosciuto"
   }
  }
 }

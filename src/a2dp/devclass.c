@@ -57,18 +57,34 @@ int hb_dev_name_hints_headphones(const char *name)
 
 static int dev_rank(uint32_t cod, const char *name);
 
-/* Unnamed devices are listed only with a headphone / headset class. */
-/* Class only (name not known yet): would this device be listed once named? */
-int hb_dev_rank_class(uint32_t cod)
+/* 1 for classes that are never listed, whatever the name says: computers and
+ * phones, pad / joystick controllers, and TV, car, set-top, display and camera
+ * minors of Audio/Video. Anything else, including an odd or empty CoD, is 0. */
+int hb_dev_hidden_by_class(uint32_t cod)
 {
-    return dev_rank(cod, "");
+    unsigned major = (cod >> 8) & 0x1F, minor = (cod >> 2) & 0x3F;
+
+    if (major == 1 || major == 2) return 1;
+    if (major == 5 && ((minor & 0x0F) == 0x01 || (minor & 0x0F) == 0x02)) return 1;
+    if (major == 4 && (minor == 0x08 || minor == 0x09 || (minor >= 0x0B && minor <= 0x10))) return 1;
+    return 0;
 }
 
+/* Class only (name not known yet): would this device be listed? */
+int hb_dev_rank_class(uint32_t cod)
+{
+    return hb_dev_rank(cod, "");
+}
+
+/* Hidden classes and controller names are never listed. Every other device is:
+ * named ones by dev_rank, unnamed ones with their address only. An unnamed
+ * headphone / headset class keeps its place, any other unnamed device comes last. */
 int hb_dev_rank(uint32_t cod, const char *name)
 {
     int r = dev_rank(cod, name);
-    if (r > 0 && (!name || !name[0])) return -1;
-    return r;
+    if (name && name[0]) return r;
+    if (hb_dev_hidden_by_class(cod)) return -1;
+    return r == 0 ? 0 : 4;
 }
 
 static int dev_rank(uint32_t cod, const char *name)
@@ -84,18 +100,16 @@ static int dev_rank(uint32_t cod, const char *name)
         case 0x02: return 2;                /* hands-free */
         default: break;
         }
-        /* Car kits, set-top boxes, TVs and other A/V gear stay hidden. */
-        if (minor == 0x08 || minor == 0x09 || minor == 0x0B || minor == 0x0C ||
-            minor == 0x0D || minor == 0x0E || minor == 0x0F || minor == 0x10)
-            return -1;
     }
-    /* #34 allowlist: phones, computers and game controllers are never
-     * listed, whatever their name says (controllers always win). */
-    if (major == 1 || major == 2) return -1;
-    if (major == 5 && ((minor & 0x0F) == 0x01 || (minor & 0x0F) == 0x02)) return -1;
+    /* Car kits, set-top boxes, TVs and other A/V gear stay hidden. #34 allowlist:
+     * phones, computers and game controllers are never listed, whatever their
+     * name says (controllers always win). */
+    if (hb_dev_hidden_by_class(cod)) return -1;
     if (has(name, "Wireless Controller") || has(name, "DualSense") || has(name, "DUALSHOCK"))
         return -1;
-    /* Earbuds with an odd CoD (AirPods 0x001f00, Galaxy / OnePlus Buds):
-     * only by a headphone-like name. */
-    return hb_dev_name_hints_headphones(name) ? 3 : -1;
+    /* Anything else is findable once it has a name: earbuds with an odd or empty
+     * CoD (AirPods 0x001f00, Galaxy / OnePlus Buds, Soundcore) are listed last.
+     * Only a name that says TV is dropped. Unnamed ones never get here (hb_dev_rank). */
+    if (!name[0] || says_tv(name)) return -1;
+    return 3;
 }
