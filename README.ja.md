@@ -24,7 +24,7 @@ HearBridge PS5 は、PS5 のゲームとシステムの音を本体内蔵の Blu
 
 ## インストール
 
-1. [最新リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)から **HearBridge-1.3.5.elf** をダウンロードします。
+1. [最新リリース](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest)から **HearBridge-1.3.6.elf** をダウンロードします。
 2. ポート 9021 の ELF ローダーに送ります。
 3. **http://&lt;console-ip&gt;:8090** か **HearBridge** タイルを開き、**設定** でヘッドホンをペアリングします。
 
