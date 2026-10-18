@@ -1,0 +1,13 @@
+# Keep the GitHub language bar on the payload's own code.
+# Generated headers (built from assets and the web UI by scripts/gen_*.py)
+src/icon_png.h linguist-generated
+src/webpage.h linguist-generated
+src/font_woff2.h linguist-generated
+src/start_html.h linguist-generated
+# Build files and helper scripts
+Makefile linguist-detectable=false
+ps5.mk linguist-detectable=false
+scripts/** linguist-detectable=false
+tests/decode_dump linguist-detectable=false
+tests/sbc_snr.py linguist-detectable=false
+tests/test_page.js linguist-detectable=false
