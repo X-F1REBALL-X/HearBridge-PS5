@@ -177,6 +177,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,"
         "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},"
+        "\"adapter\":{\"external\":%d,\"node\":\"%s\"},"
         "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d,\"auto\":%d,\"auto_ms\":%d},"
         "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"src\":\"%s\",\"none\":%d},\"hs_moves\":%d,"
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
@@ -196,6 +197,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->xq_low, cid[0], cid[1], chip_ok && cven ? cven : "",
         chip_ok && btchip_is_mediatek(c->chip_vid),
         chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "",
+        c->bt_external, c->bt_node,
         c->lat_backoff_ms, c->lat_normal_ms, c->latency_auto != 0, c->lat_auto_ms,
         avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->batt_pct,
         c->batt_pct < 0 ? "" : c->batt_src == 1 ? "hf" : c->batt_src == 2 ? "apple" : "", c->batt_none, c->hs_moves,

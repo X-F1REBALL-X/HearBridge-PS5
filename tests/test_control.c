@@ -209,7 +209,9 @@ int main(int argc, char **argv)
         char d[64];
         CHECK(btchip_vendor(0x1286) && !strcmp(btchip_vendor(0x1286), "Marvell/NXP"), "chip: 1286 is Marvell/NXP");
         CHECK(btchip_vendor(0x0e8d) && !strcmp(btchip_vendor(0x0e8d), "MediaTek"), "chip: 0e8d is MediaTek");
-        CHECK(!btchip_vendor(0x8087) && !btchip_vendor(-1), "chip: other VIDs unknown");
+        CHECK(btchip_vendor(0x0bda) && !strcmp(btchip_vendor(0x0bda), "Realtek"), "chip: 0bda is Realtek");
+        CHECK(btchip_vendor(0x8087) && !strcmp(btchip_vendor(0x8087), "Intel"), "chip: 8087 is Intel");
+        CHECK(!btchip_vendor(0xabcd) && !btchip_vendor(-1), "chip: other VIDs unknown");
         CHECK(btchip_is_mediatek(0x0e8d) && !btchip_is_mediatek(0x1286) && !btchip_is_mediatek(-1),
               "chip: only 0e8d counts as MediaTek");
         btchip_describe(0x1286, 0x2059, d, (int)sizeof d);
@@ -224,6 +226,15 @@ int main(int argc, char **argv)
     get(&c, "/api/status");
     CHECK(strstr(out, "\"chip\":{\"vid\":\"\",\"pid\":\"\",\"vendor\":\"\",\"mediatek\":0,") != NULL,
           "status: empty chip until the controller is open");
+    CHECK(strstr(out, "\"adapter\":{\"external\":0,\"node\":\"\"}") != NULL,
+          "status: no adapter before the controller is open");
+    c.bt_external = 1;
+    snprintf(c.bt_node, sizeof c.bt_node, "/dev/ugen1.2");
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"adapter\":{\"external\":1,\"node\":\"/dev/ugen1.2\"}") != NULL,
+          "status: USB adapter and its node");
+    c.bt_external = 0;
+    c.bt_node[0] = 0;
     c.chip_vid = 0x1286; c.chip_pid = 0x2059;
     get(&c, "/api/status");
     CHECK(strstr(out, "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,

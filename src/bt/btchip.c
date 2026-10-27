@@ -9,6 +9,10 @@ const char *btchip_vendor(int vid)
     switch (vid) {
     case BTCHIP_VID_MARVELL:  return "Marvell/NXP";
     case BTCHIP_VID_MEDIATEK: return "MediaTek";
+    case BTCHIP_VID_REALTEK:  return "Realtek";
+    case BTCHIP_VID_CSR:      return "CSR";
+    case BTCHIP_VID_BROADCOM: return "Broadcom";
+    case BTCHIP_VID_INTEL:    return "Intel";
     default:                  return NULL;
     }
 }

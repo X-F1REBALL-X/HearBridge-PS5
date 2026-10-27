@@ -19,11 +19,17 @@
 #define HB_OP_REMOTE_NAME_REQ     0x0419
 #define HB_OP_IO_CAP_REPLY        0x042B
 #define HB_OP_USER_CONFIRM_REPLY  0x042C
+#define HB_OP_RESET               0x0C03
 #define HB_OP_SET_EVENT_MASK      0x0C01
+#define HB_OP_WRITE_LOCAL_NAME    0x0C13
 #define HB_OP_READ_SCAN_ENABLE    0x0C19
 #define HB_OP_WRITE_SCAN_ENABLE   0x0C1A
+#define HB_OP_WRITE_CLASS_OF_DEV  0x0C24
+#define HB_OP_WRITE_INQUIRY_MODE  0x0C45
 #define HB_OP_READ_SSP_MODE       0x0C55
 #define HB_OP_WRITE_SSP_MODE      0x0C56
+#define HB_OP_READ_LOCAL_VERSION  0x1001
+#define HB_OP_READ_LOCAL_FEATURES 0x1003
 #define HB_OP_READ_BUFFER_SIZE    0x1005
 #define HB_OP_READ_BD_ADDR        0x1009
 
@@ -32,6 +38,12 @@
  * Returns 1 if status byte is 0, else 0. */
 int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
                  unsigned char *out, int *out_len, int out_max);
+
+/* Like hci_cmd_sync() but the command is sent exactly once (no retry) and
+ * waited for up to 3 s. Used by stateful sequences such as Realtek patch
+ * fragments, where resending could be rejected by the chip. */
+int hci_cmd_sync_once(hci_t hci, unsigned op, const void *params, int plen,
+                      unsigned char *out, int *out_len, int out_max);
 
 /* Like hci_cmd_sync but waits for Command Status (0x0F) — Inquiry,
  * Create Connection, Remote Name Request, etc. */

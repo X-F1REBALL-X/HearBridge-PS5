@@ -6,10 +6,15 @@
 #ifndef HEARBRIDGE_BTCHIP_H
 #define HEARBRIDGE_BTCHIP_H
 
-#define BTCHIP_VID_MARVELL  0x1286
-#define BTCHIP_VID_MEDIATEK 0x0e8d
+#define BTCHIP_VID_MARVELL   0x1286
+#define BTCHIP_VID_MEDIATEK  0x0e8d
+#define BTCHIP_VID_REALTEK   0x0bda
+#define BTCHIP_VID_CSR       0x0a12
+#define BTCHIP_VID_BROADCOM  0x0a5c
+#define BTCHIP_VID_INTEL     0x8087
 
-/* "Marvell/NXP", "MediaTek", or NULL for a VID we do not know (or < 0). */
+/* "Marvell/NXP", "MediaTek", "Realtek", "CSR", "Broadcom", "Intel", or NULL
+ * for a VID we do not know (or < 0). */
 const char *btchip_vendor(int vid);
 
 /* 1 for a MediaTek controller. */

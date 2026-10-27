@@ -24,6 +24,7 @@
 #include "sysinfo.h"
 #include "hci_cmd.h"
 #include "hci_usb.h"
+#include "adapter.h"
 #include "blocklist.h"
 #include "hcidbg.h"
 #include "btchip.h"
@@ -3508,11 +3509,23 @@ static void lw_tick(const headset_ini *ini)
     hci_usb_hint(g_stream_up, g_have_target, 1);
 }
 
+/* Remember which controller is in use (shown on the control page). */
+static void note_adapter(void)
+{
+    CTL_LOCK(&g_ctl);
+    g_ctl.bt_external = hci_usb_is_external();
+    snprintf(g_ctl.bt_node, sizeof g_ctl.bt_node, "%s", hci_usb_node());
+    CTL_UNLOCK(&g_ctl);
+    log_line("adapter: using %s (%s)", hci_usb_node(),
+             hci_usb_is_external() ? "USB adapter, the console chip is untouched" : "the console's own chip");
+}
+
 /* Rest mode resets the Bluetooth USB device: close everything and open it
  * again (quick tries first, then every 5 s) until it is back or Stop. */
 static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, headset_ini *ini)
 {
     int attempt = 0;
+    char why[160];
     note_event("Bluetooth adapter reset, starting it again");
     write_status("reconnecting");
     ctl_set_state("reconnecting", NULL);
@@ -3526,6 +3539,13 @@ static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, hea
         if (hb_stop_requested()) break;
         if (!hci_usb_open(hci)) {
             if (attempt == 1 || attempt % 12 == 0) log_line("reopen: controller not back yet (try %d)", attempt);
+            continue;
+        }
+        note_adapter();
+        if (!bt_adapter_bringup(*hci, hci_usb_is_external(), why, (int)sizeof why)) {
+            log_line("reopen: adapter setup failed: %s", why[0] ? why : "unknown");
+            if (hci->ops && hci->ops->close) hci->ops->close(hci->ctx);
+            memset(hci, 0, sizeof *hci);
             continue;
         }
         if (ini->have_addr) memcpy(opts->prefer_addr, ini->addr, 6);
@@ -3551,6 +3571,7 @@ int main(void)
     headset_ini ini;
     int rc = 2, mk_errno = 0, lock_rc, lock_errno = 0, log_ok;
     char prev_tail[360] = "";
+    char why[160] = "";
 
     /* First sign of life, before any file, lock or library work: if this
      * toast shows but nothing else happens, the payload did start and the
@@ -3745,6 +3766,15 @@ int main(void)
         notify("HearBridge: HCI open failed");
         bt_failed_wait("error hci-open-failed");
         goto out;
+    }
+    note_adapter();
+    if (!bt_adapter_bringup(hci, hci_usb_is_external(), why, (int)sizeof why)) {
+        log_line("hearbridge: Bluetooth adapter setup failed: %s", why[0] ? why : "unknown");
+        diag_set("bt adapter", "%s", why[0] ? why : "setup failed");
+        (void)diag_save();
+        notify("HearBridge: adapter setup failed\n%s", why[0] ? why : "see /api/diag");
+        bt_failed_wait("error adapter-setup-failed");
+        goto close_hci;
     }
     {
         int vid, pid;

@@ -208,19 +208,26 @@ global.hbTest.draw();
 check(!/>Connected</.test(B()) && el('dev').textContent !== 'X',
   'page: an old status (tab asleep, no answer) does not keep showing connected');
 Date.now = realNow;
-// Bluetooth chip row (one build for every chip: no MediaTek hint any more)
+// Bluetooth adapter + chip row (one build for every chip: no MediaTek hint any more)
 STATUS.chip = { vid: '', pid: '', vendor: '', mediatek: 0, profile: '' };
+STATUS.adapter = { external: 0, node: '' };
 global.hbTest.req('/api/status');
 check(el('chipv').textContent === '-', 'page: chip row is "-" before the controller is open');
 STATUS.chip = { vid: '1286', pid: '2059', vendor: 'Marvell/NXP', mediatek: 0, profile: 'default' };
+STATUS.adapter = { external: 0, node: '/dev/ugen0.2' };
 global.hbTest.req('/api/status');
-check(el('chipv').textContent === 'Marvell/NXP (1286:2059)', 'page: Marvell chip');
+check(el('chipv').textContent === 'Console chip (ugen0.2) · Marvell/NXP (1286:2059)', 'page: Marvell chip');
 STATUS.chip = { vid: 'abcd', pid: '0012', vendor: '', mediatek: 0, profile: 'default' };
 global.hbTest.req('/api/status');
-check(el('chipv').textContent === 'abcd:0012', 'page: unknown chip shows only the IDs');
-STATUS.chip = { vid: '0e8d', pid: '3605', vendor: 'MediaTek', mediatek: 1, profile: 'mediatek' };
+check(el('chipv').textContent === 'Console chip (ugen0.2) · abcd:0012', 'page: unknown chip shows only the IDs');
+STATUS.chip = { vid: '0bda', pid: '8771', vendor: 'Realtek', mediatek: 0, profile: 'default' };
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2' };
 global.hbTest.req('/api/status');
-check(el('chipv').textContent === 'MediaTek (0e8d:3605)', 'page: MediaTek chip');
+check(el('chipv').textContent === 'USB adapter (ugen1.2) · Realtek (0bda:8771)', 'page: USB adapter');
+STATUS.chip = { vid: '0e8d', pid: '3605', vendor: 'MediaTek', mediatek: 1, profile: 'mediatek' };
+STATUS.adapter = { external: 0, node: '/dev/ugen0.2' };
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === 'Console chip (ugen0.2) · MediaTek (0e8d:3605)', 'page: MediaTek chip');
 // battery: level when the headset reports it, "—" when it does not
 STATUS.battery = { status: '', level: -1 };
 global.hbTest.req('/api/status');

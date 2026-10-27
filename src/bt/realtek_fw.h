@@ -1,0 +1,70 @@
+/* realtek_fw.h - Realtek USB Bluetooth patch uploader (btrtl-like).
+ *
+ * Some Realtek sticks boot into a ROM that answers HCI and can be opened,
+ * but whose radio cannot scan until the host uploads the matching patch.
+ * The patch is not part of HearBridge: it is read from the firmware
+ * directory below, the same way Linux's btrtl reads it.
+ *
+ * The parsers and the fragmenter are pure functions (host-tested in
+ * tests/test_realtek_fw.c); only hb_rtl_prepare() talks to the controller.
+ */
+#ifndef HEARBRIDGE_REALTEK_FW_H
+#define HEARBRIDGE_REALTEK_FW_H
+
+#include <stddef.h>
+
+#include "hci.h"
+
+#define HB_RTL_FW_DIR "/data/hearbridge/firmware"
+
+/* Identity from Read Local Version (0x1001), Core Vol 4 Part E 7.4.1. */
+typedef struct {
+    unsigned char  hci_version;
+    unsigned short hci_revision;
+    unsigned char  lmp_version;
+    unsigned short manufacturer;
+    unsigned short lmp_subversion;
+} hb_chip_identity;
+
+/* Parse the Command Complete event of Read Local Version. 1 on success. */
+int hb_chip_identity_from_cc(const unsigned char *ev, int len, hb_chip_identity *out);
+
+typedef struct {
+    unsigned short lmp_subversion;
+    unsigned short hci_revision;
+    unsigned char  hci_version;
+    const char    *name;
+    const char    *firmware_file;
+    const char    *config_file;
+    int            config_required;
+} hb_rtl_chip;
+
+/* The patch that matches this exact ROM identity, or NULL. */
+const hb_rtl_chip *hb_rtl_chip_for(const hb_chip_identity *id);
+
+/* 1 when the LMP subversion belongs to a Realtek USB part that can still be
+ * in ROM mode (the identity alone cannot tell a patched chip: btrtl matches
+ * the pair of revision/version for that). */
+int hb_rtl_in_rom_mode(const hb_chip_identity *id);
+
+/* Build the image the chip expects from a firmware file and an optional
+ * config file: select the Realtech v1 or RTBTCore v2 patch for rom_version,
+ * order v2 sections by priority and append the config blob. On success
+ * *out is a malloc'd buffer (caller frees) and *out_len its size. */
+int hb_rtl_build_image(const unsigned char *fw, size_t fw_len,
+                       const unsigned char *cfg, size_t cfg_len,
+                       unsigned char rom_version,
+                       unsigned char **out, size_t *out_len,
+                       char *why, int why_cap);
+
+/* Upload an image in 252-byte fragments with 0xfc20, then HCI Reset. */
+int hb_rtl_upload(hci_t hci, const unsigned char *image, size_t image_len,
+                  char *why, int why_cap);
+
+/* Read Local Version; when this is a Realtek USB part still in ROM mode,
+ * read its firmware files from HB_RTL_FW_DIR and upload the patch.
+ * 1 = carry on (no step needed or the upload succeeded), 0 = stop and set
+ * why (for example: the firmware file is missing). */
+int hb_rtl_prepare(hci_t hci, char *why, int why_cap);
+
+#endif

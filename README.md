@@ -20,6 +20,7 @@ HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on
 ## Highlights
 
 - One file for every PS5, Marvell/NXP or MediaTek Bluetooth.
+- **USB Bluetooth adapters too**, including Realtek sticks that boot in ROM mode.
 - Game profiles: your sound follows the game and the headset.
 - Battery percent, night mode and one-tap headset switching.
 
@@ -30,6 +31,51 @@ HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on
 3. Open **http://&lt;console-ip&gt;:8090** or the **HearBridge** tile, then pair your headphones in **Settings**.
 
 Everything else, from features to troubleshooting, is in the **[guide](https://x-f1reball-x.github.io/HearBridge-PS5/)**.
+
+## USB Bluetooth adapter
+
+Plug in a USB Bluetooth adapter and HearBridge uses it automatically; without
+one it uses the console's own chip. An adapter is not shared with the console's
+gamepad, so the controller can connect and reconnect normally while audio is
+streaming.
+
+To choose the controller yourself, create `/data/hearbridge/adapter` with one
+line (it is read when HearBridge starts):
+
+```text
+auto        # default: a USB adapter if one is present, else the console chip
+internal    # always the console's own chip
+usb         # always a USB adapter (start fails if there is none)
+ugen1.2     # one specific ugen node
+```
+
+The control page shows the adapter and its node under **Settings > Details >
+Chip**.
+
+### Realtek ROM-only adapters
+
+Some Realtek sticks (RTL8761BU/UB500/UB600 and other USB parts) start in a ROM
+mode that answers Bluetooth commands but cannot scan until a patch is uploaded.
+HearBridge uploads it the same way Linux's `btrtl` does, from files you put on
+the console:
+
+```text
+/data/hearbridge/firmware/rtl8761bu_fw.bin
+/data/hearbridge/firmware/rtl8761bu_config.bin   (optional, required on some parts)
+```
+
+Create the folder with your usual file-transfer payload. The files are in the
+`linux-firmware` package (`/lib/firmware/rtl_bt/` on Linux, `firmware-realtek`
+on Debian and Ubuntu) or in the
+[`rtl_bt` tree of linux-firmware](https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/rtl_bt).
+The adapter name and the file it needs are in the log
+(`/data/hearbridge/hearbridge.log`); the table covers RTL8723BU/DU,
+RTL8821AU/CU, RTL8761AU/BU/CU, RTL8822BU/CU, RTL8852AU/BU/CU/BTU, RTL8851BU
+and RTL8922AU.
+
+Pairing keys belong to one Bluetooth controller. A headset paired with the
+console's chip may have to be paired once more after switching to a USB adapter
+(or the other way round).
 
 ## Build
 

@@ -56,6 +56,11 @@ enum {
     DEF_EVT_EP      = 0x82,
     DEF_ACLIN_EP    = 0x81,
     DEF_ACLOUT_EP   = 0x01,
+    /* External adapters use the standard HCI layout when their descriptors
+     * cannot be read (BlueV's measured CSR 0a12:0001). */
+    EXT_EVT_EP      = 0x81,
+    EXT_ACLIN_EP    = 0x82,
+    EXT_ACLOUT_EP   = 0x02,
     DEF_MPS         = 16,
     EVT_BUF         = 260,           /* 2-byte header + 255 parameters */
 };
@@ -94,6 +99,7 @@ static int g_ncreq;
 struct usb_hci {
     int    fd;
     int    dead;
+    int    external;             /* a USB adapter, ours alone (not the console chip) */
     char   node[32];
     struct usbhci_iface ifc;
     struct usb_fs_endpoint fsep[SLOT_COUNT];
@@ -246,18 +252,24 @@ void hci_usb_hint(int streaming, int connecting, int sticky)
     g_hint_sticky = sticky;
 }
 
-static void want_counts(int *ne, int *na)
+static void want_counts(const struct usb_hci *u, int *ne, int *na)
 {
-    int full = now_ms() < g_full_until;
+    int full;
+    if (u->external) {                 /* our adapter: nobody else reads these pipes */
+        *ne = READS_EVT;
+        *na = READS_ACL;
+        return;
+    }
+    full = now_ms() < g_full_until;
     if (now_ms() < g_yield_until2) { *ne = *na = 0; return; }
     *ne = (full || g_hint_busy || g_hint_sticky) ? READS_EVT : SHARE_EVT;
     *na = (full || g_hint_busy) ? READS_ACL : g_hint_stream ? SHARE_ACL : 0;
 }
 
-static int slot_wanted(int idx)
+static int slot_wanted(const struct usb_hci *u, int idx)
 {
     int ne, na;
-    want_counts(&ne, &na);
+    want_counts(u, &ne, &na);
     if (idx >= SLOT_EVT0 && idx < SLOT_ACL0) return idx - SLOT_EVT0 < ne;
     if (idx >= SLOT_ACL0 && idx < SLOT_OUT) return idx - SLOT_ACL0 < na;
     return 1;
@@ -265,7 +277,7 @@ static int slot_wanted(int idx)
 
 static void arm_read(struct usb_hci *u, int idx)
 {
-    if (!slot_wanted(idx)) return;
+    if (!u->external && !slot_wanted(u, idx)) return;
     (void)slot_go(u, idx, HCI_PKT_MAX, USB_FS_FLAG_SINGLE_SHORT_OK);
 }
 
@@ -273,12 +285,13 @@ static void arm_read(struct usb_hci *u, int idx)
 static void share_step(struct usb_hci *u)
 {
     int ne, na, k;
-    want_counts(&ne, &na);
+    if (u->external) return;           /* every read stays armed */
+    want_counts(u, &ne, &na);
     if (ne == g_mode_evt && na == g_mode_acl) return;
     g_mode_evt = ne;
     g_mode_acl = na;
     for (k = SLOT_EVT0; k < SLOT_OUT; k++)
-        if (u->sl[k].busy && !slot_wanted(k)) slot_abort(u, k);
+        if (u->sl[k].busy && !slot_wanted(u, k)) slot_abort(u, k);
     log_line("hci_usb: reads armed: %d event / %d ACL (%s)", ne, na,
              now_ms() < g_full_until ? "our command" : g_hint_busy ? "connecting" :
              g_hint_sticky ? "headset rejoin" : g_hint_stream ? "streaming, shared" : "idle, shared");
@@ -449,7 +462,9 @@ static void creq_flush(struct usb_hci *u)
 
 void hci_usb_yield(int ms)
 {
-    long until = now_ms() + (ms > 0 ? ms : 0);
+    long until;
+    if (g_open && g_open->external) return;   /* the adapter is not shared */
+    until = now_ms() + (ms > 0 ? ms : 0);
     if (until > g_yield_until) g_yield_until = until;
     g_yield_until2 = g_yield_until;
     g_yields++;
@@ -461,6 +476,7 @@ void hci_usb_yield(int ms)
 static int yield_step(struct usb_hci *u)
 {
     int k;
+    if (u->external) return 0;
     if (now_ms() < g_yield_until) {
         if (!g_yielding) {
             g_yielding = 1;
@@ -503,7 +519,8 @@ static int op_pump(void *self, int wait_ms)
         int got = reap(u), k;
         creq_flush(u);
         share_step(u);
-        if (g_yielding || now_ms() < g_yield_until) return got || u->evq.count || u->aclq.count;
+        if (!u->external && (g_yielding || now_ms() < g_yield_until))
+            return got || u->evq.count || u->aclq.count;
         /* A read whose re-arm failed (EBUSY/transient error) would leave
          * the event or ACL pipe silent for good: re-arm idle readers. */
         for (k = SLOT_EVT0; k < SLOT_OUT; k++)
@@ -640,9 +657,10 @@ static int read_config(int fd, uint8_t *buf, int cap)
     return gd.ugd_actlen;
 }
 
-/* Returns the number of Bluetooth HCI interfaces (class e0/01/01) in the
- * configuration, or -1 when the descriptor could not be read. */
-static int pick_endpoints(int fd, struct usbhci_iface *ifc)
+/* Returns the number of Bluetooth HCI interfaces (e0/01/01, plus the
+ * vendor-specific ff/01/01 layout) in the configuration, or -1 when the
+ * descriptor could not be read. */
+static int pick_endpoints(int fd, struct usbhci_iface *ifc, int external)
 {
     static uint8_t cfg[1024];
     struct usbhci_iface found[USBHCI_MAX_IFACES];
@@ -651,26 +669,27 @@ static int pick_endpoints(int fd, struct usbhci_iface *ifc)
 
     memset(ifc, 0, sizeof *ifc);
     if (k > 0) *ifc = found[0];
-    if (!ifc->evt_ep) { ifc->evt_ep = DEF_EVT_EP;    ifc->evt_mps = DEF_MPS; }
-    if (!ifc->in_ep)  { ifc->in_ep  = DEF_ACLIN_EP;  ifc->in_mps  = DEF_MPS; }
-    if (!ifc->out_ep) { ifc->out_ep = DEF_ACLOUT_EP; ifc->out_mps = DEF_MPS; }
+    if (!ifc->evt_ep) { ifc->evt_ep = external ? EXT_EVT_EP : DEF_EVT_EP; ifc->evt_mps = DEF_MPS; }
+    if (!ifc->in_ep)  { ifc->in_ep  = external ? EXT_ACLIN_EP : DEF_ACLIN_EP; ifc->in_mps = DEF_MPS; }
+    if (!ifc->out_ep) { ifc->out_ep = external ? EXT_ACLOUT_EP : DEF_ACLOUT_EP; ifc->out_mps = DEF_MPS; }
     if (!ifc->evt_mps) ifc->evt_mps = DEF_MPS;
     if (!ifc->in_mps)  ifc->in_mps  = DEF_MPS;
     if (!ifc->out_mps) ifc->out_mps = DEF_MPS;
     if (k > 0 || n <= 0)
         log_line("hci_usb: %s descriptor (%d HCI iface), evt 0x%02x in 0x%02x out 0x%02x",
-                 k > 0 ? "using" : "fallback, no", k, ifc->evt_ep, ifc->in_ep, ifc->out_ep);
+                 k > 0 ? "using" : external ? "external fallback, no" : "fallback, no",
+                 k, ifc->evt_ep, ifc->in_ep, ifc->out_ep);
     return n > 0 ? k : -1;
 }
 
 /* No readable configuration: only a device that says it is a wireless
- * controller (class e0) or comes from a PS5 Bluetooth chip vendor. */
+ * controller (class e0) or comes from a known Bluetooth chip vendor. */
 static int bt_by_device(int fd, int vid)
 {
     struct usb_device_descriptor dd;
     memset(&dd, 0, sizeof dd);
     if (ioctl(fd, USB_GET_DEVICE_DESC, &dd) == 0 && dd.bDeviceClass == 0xE0) return 1;
-    return vid == 0x1286 || vid == 0x0e8d;   /* Marvell, MediaTek (btchip.h) */
+    return btchip_vendor(vid) != NULL;
 }
 
 /* VID:PID of the controller hci_usb_open() picked (-1 until then). */
@@ -709,9 +728,9 @@ static void device_id(int fd, char *out, size_t cap, int *vid, int *pid)
 }
 
 /* 1 = opened. 0 = not usable (or not a Bluetooth controller at all).
- * -1 = a Bluetooth controller whose transfer slots are still held, e.g. by
- * an instance that is shutting down: worth another try in a moment. */
-static int try_node(struct usb_hci *u, const char *path)
+ * -1 = a controller that is ours (internal or the requested adapter) but
+ * whose transfers are still held, e.g. by an instance that is stopping. */
+static int try_node(struct usb_hci *u, const char *path, int external)
 {
     struct usb_fs_init in;
     char id[128], chip[64];
@@ -721,14 +740,22 @@ static int try_node(struct usb_hci *u, const char *path)
         log_line("hci_usb: open %s: errno %d", path, errno);
         return 0;
     }
+    u->external = external;
     snprintf(u->node, sizeof u->node, "%s", path);
     device_id(u->fd, id, sizeof id, &vid, &pid);
     log_line("usb: %s is %s", path, id);
-    nbt = pick_endpoints(u->fd, &u->ifc);
+    if (vid == 0x054c && (pid == 0x0ce6 || pid == 0x0ecc)) {
+        /* DualSense and the PS Link audio dongle: never a controller for us. */
+        log_line("hci_usb: %s is a Sony gamepad/audio dongle, skipped", path);
+        close(u->fd);
+        u->fd = -1;
+        return 0;
+    }
+    nbt = pick_endpoints(u->fd, &u->ifc, external);
     if (nbt == 0 || (nbt < 0 && !bt_by_device(u->fd, vid))) {
         /* Never treat a headset dongle, pad or anything else as a Bluetooth
          * controller (#25: the PS Link dongle 054c:0ce6 / 0ecc is audio). */
-        log_line("hci_usb: %s is not a Bluetooth controller (no e0/01/01 interface), skipped", path);
+        log_line("hci_usb: %s is not a Bluetooth controller (no HCI interface), skipped", path);
         close(u->fd);
         u->fd = -1;
         return 0;
@@ -739,8 +766,8 @@ static int try_node(struct usb_hci *u, const char *path)
              btchip_get_override() >= 0 ? " (override from the chip file)" : "");
     if (mtk) {
         usbhci_pair_out_with_in(&u->ifc);
-        log_line("hci_usb: MediaTek controller: ACL out 0x%02x, system scan paused during page/scan",
-                 u->ifc.out_ep);
+        log_line("hci_usb: MediaTek controller: ACL out 0x%02x%s", u->ifc.out_ep,
+                 external ? "" : ", system scan paused during page/scan");
     }
 
     memset(&in, 0, sizeof in);
@@ -759,11 +786,12 @@ static int try_node(struct usb_hci *u, const char *path)
     for (i = SLOT_EVT0; i < SLOT_OUT; i++) arm_read(u, i);
     u->tx_slot = SLOT_OUT;
     hb_txpath_init(&u->tp);
-    hci_scan_pause_enable(mtk);
+    hci_scan_pause_enable(mtk && !external);
     hci_set_mediatek(mtk);
-    log_line("hci_usb: opened %s (%d event / %d ACL reads in flight)", path,
-             READS_EVT, READS_ACL);
-    diag_set("bt controller", "%s %s; HCI iface %d evt 0x%02x in 0x%02x out 0x%02x", path, id,
+    log_line("hci_usb: opened %s%s (%d event / %d ACL reads in flight)", path,
+             external ? " (USB adapter)" : " (console chip)", READS_EVT, READS_ACL);
+    diag_set("bt controller", "%s %s%s; HCI iface %d evt 0x%02x in 0x%02x out 0x%02x", path, id,
+             external ? " (USB adapter)" : " (console chip)",
              u->ifc.number, u->ifc.evt_ep, u->ifc.in_ep, u->ifc.out_ep);
     g_chip_vid = vid;
     g_chip_pid = pid;
@@ -797,38 +825,135 @@ fail:
 /* A second copy started right after the first one was told to stop: the
  * old one may still hold the controller's transfer slots for a moment. */
 #define HCI_BUSY_RETRY_MS 8000
+#define HB_INTERNAL_NODE  "/dev/ugen0.2"
+#define HB_ADAPTER_PATH   "/data/hearbridge/adapter"
+#define HCI_MAX_NODES     24
+
+/* Defined with the diagnostics survey below. */
+static int list_ugen(char names[][32], int max);
+
+/* Which controller the user asked for:
+ *   auto (default), internal, usb (adapter or nothing), or ugenX.Y. */
+enum { SEL_AUTO, SEL_INTERNAL, SEL_USB, SEL_NODE };
+
+static int is_internal_node(const char *path)
+{
+    return !strcmp(path, HB_INTERNAL_NODE);
+}
+
+/* Root hubs are ugenX.1; they have no Bluetooth interface. */
+static int is_root_hub(const char *path)
+{
+    size_t n = strlen(path);
+    return n >= 2 && path[n - 2] == '.' && path[n - 1] == '1';
+}
+
+static void sort_nodes(char names[][32], int n)
+{
+    int i, j;
+    for (i = 1; i < n; i++)
+        for (j = i; j > 0 && strcmp(names[j - 1], names[j]) > 0; j--) {
+            char t[32];
+            memcpy(t, names[j], sizeof t);
+            memcpy(names[j], names[j - 1], sizeof t);
+            memcpy(names[j - 1], t, sizeof t);
+        }
+}
+
+/* Reads /data/hearbridge/adapter. Missing/blank = auto. An explicit
+ * ugenX.Y (with or without /dev/) is used as it is. */
+static int adapter_selection(char *node, int cap)
+{
+    FILE *f;
+    char line[64], word[16];
+    int n = 0, i;
+
+    if (node && cap > 0) node[0] = 0;
+    f = fopen(HB_ADAPTER_PATH, "r");
+    if (!f) return SEL_AUTO;
+    if (!fgets(line, sizeof line, f)) line[0] = 0;
+    fclose(f);
+    line[strcspn(line, "\r\n")] = 0;
+    while (line[n] == ' ' || line[n] == '\t') n++;
+    for (i = 0; line[n] && line[n] != ' ' && line[n] != '\t' && i < (int)sizeof word - 1; n++) {
+        char c = line[n];
+        word[i++] = (c >= 'A' && c <= 'Z') ? (char)(c - 'A' + 'a') : c;
+    }
+    word[i] = 0;
+    if (!word[0] || !strcmp(word, "auto")) return SEL_AUTO;
+    if (!strcmp(word, "internal") || !strcmp(word, "console")) return SEL_INTERNAL;
+    if (!strcmp(word, "usb") || !strcmp(word, "external") || !strcmp(word, "adapter"))
+        return SEL_USB;
+    if (!strncmp(word, "/dev/ugen", 9) || !strncmp(word, "ugen", 4)) {
+        if (node && cap > 0)
+            snprintf(node, (size_t)cap, "%s%s", word[0] == '/' ? "" : "/dev/", word);
+        return SEL_NODE;
+    }
+    log_line("hci_usb: %s says \"%s\", using auto", HB_ADAPTER_PATH, word);
+    return SEL_AUTO;
+}
 
 int hci_usb_open(hci_t *out)
 {
-    static const char *const nodes[] = {
-        "/dev/ugen0.2", "/dev/ugen0.3", "/dev/ugen1.2", "/dev/ugen0.1",
+    static const char *const fallback[] = {
+        "/dev/ugen0.3", "/dev/ugen0.4", "/dev/ugen1.2", "/dev/ugen1.3",
+        "/dev/ugen1.4", "/dev/ugen2.2", "/dev/ugen2.3",
     };
+    char choice[32] = "";
+    int sel = adapter_selection(choice, (int)sizeof choice);
     struct usb_hci *u;
-    size_t i;
     long until = now_ms() + HCI_BUSY_RETRY_MS;
     int tries = 0;
+
     if (!out) return 0;
     memset(out, 0, sizeof *out);
     u = calloc(1, sizeof *u);
     if (!u) return 0;
     u->fd = -1;
+    log_line("hci_usb: controller selection: %s%s%s",
+             sel == SEL_INTERNAL ? "internal" : sel == SEL_USB ? "usb" : sel == SEL_NODE ? "node " : "auto",
+             sel == SEL_NODE ? choice : "", sel == SEL_AUTO ? " (adapter first)" : "");
     for (;;) {
-        int busy = 0;
-        for (i = 0; i < sizeof nodes / sizeof nodes[0]; i++) {
-            int r = try_node(u, nodes[i]);
-            if (r == 1) {
-                static int hooked;
-                out->ctx = u;
-                out->ops = &usb_ops;
-                g_open = u;
-                if (!hooked) { atexit(release_at_exit); hooked = 1; }
-                if (tries) log_line("hci_usb: controller free after %d retries", tries);
-                return 1;
+        int busy = 0, found = 0;
+
+        if (sel == SEL_INTERNAL) {
+            int r = try_node(u, HB_INTERNAL_NODE, 0);
+            if (r == 1) found = 1;
+            else if (r < 0) busy = 1;
+        } else if (sel == SEL_NODE) {
+            int r = try_node(u, choice, 0);
+            if (r == 1) found = 1;
+            else if (r < 0) busy = 1;
+        } else {
+            char names[HCI_MAX_NODES][32];
+            int n = list_ugen(names, HCI_MAX_NODES), i;
+
+            if (!n) {
+                for (i = 0; i < (int)(sizeof fallback / sizeof fallback[0]) && n < HCI_MAX_NODES; i++)
+                    snprintf(names[n++], sizeof names[0], "%s", fallback[i]);
             }
-            if (r < 0) {
-                busy = 1;   /* the Bluetooth controller is still held: wait for it, */
-                break;      /* never move on to other USB devices */
+            sort_nodes(names, n);
+            for (i = 0; i < n; i++) {
+                int r;
+                if (is_internal_node(names[i]) || is_root_hub(names[i])) continue;
+                r = try_node(u, names[i], 1);
+                if (r == 1) { found = 1; break; }
+                if (r < 0) { busy = 1; break; }   /* held by a copy that is stopping */
             }
+            if (!found && !busy && sel == SEL_AUTO) {
+                int r = try_node(u, HB_INTERNAL_NODE, 0);
+                if (r == 1) found = 1;
+                else if (r < 0) busy = 1;
+            }
+        }
+        if (found) {
+            static int hooked;
+            out->ctx = u;
+            out->ops = &usb_ops;
+            g_open = u;
+            if (!hooked) { atexit(release_at_exit); hooked = 1; }
+            if (tries) log_line("hci_usb: controller free after %d retries", tries);
+            return 1;
         }
         if (!busy || now_ms() >= until || hb_stop_requested()) break;
         if (!tries) log_line("hci_usb: controller still held (another copy closing?), retrying for %d s",
@@ -837,8 +962,20 @@ int hci_usb_open(hci_t *out)
         usleep(500 * 1000);
     }
     free(u);
-    diag_set("bt controller", "NOT FOUND: no Bluetooth controller at /dev/ugen0.2, 0.3, 1.2 or 0.1 could be used");
+    diag_set("bt controller", sel == SEL_INTERNAL || (sel == SEL_AUTO && !tries)
+             ? "NOT FOUND: the console Bluetooth controller could not be opened"
+             : "NOT FOUND: no usable Bluetooth USB adapter or console controller");
     return 0;
+}
+
+int hci_usb_is_external(void)
+{
+    return g_open ? g_open->external : 0;
+}
+
+const char *hci_usb_node(void)
+{
+    return g_open ? g_open->node : "";
 }
 
 /* ---- diagnostics: list every ugen device ---------------------------------- */

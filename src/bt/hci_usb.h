@@ -11,8 +11,17 @@
 #include "hci.h"
 
 /* Find and open the controller, filling *out on success.
- * Returns 1 on success, 0 on failure (out is left zeroed). */
+ * A USB adapter is preferred when one is present; /data/hearbridge/adapter
+ * can say "internal", "usb" or an explicit ugenX.Y instead. Returns 1 on
+ * success, 0 on failure (out is left zeroed). */
 int hci_usb_open(hci_t *out);
+
+/* 1 when the opened controller is a USB adapter (ours alone), 0 for the
+ * console's own chip (shared with the system stack). */
+int hci_usb_is_external(void);
+
+/* Node of the opened controller ("/dev/ugenX.Y"), "" before one is open. */
+const char *hci_usb_node(void);
 
 /* USB VID:PID of the opened controller (see btchip.h for the vendor).
  * Returns 1 once hci_usb_open() succeeded, else 0 with both set to -1. */

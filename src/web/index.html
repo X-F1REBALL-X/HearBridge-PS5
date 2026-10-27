@@ -798,8 +798,11 @@ var av=S.avrcp||{},avUp=av.connected||av.absolute_volume||av.notifications||av.s
 var vmode=!av.sink_volume?'volSoftware':S.hs_moves>0?'volFollows':'volSetsHeadset';$('hvnote').textContent=avUp?t(vmode):'';
 setHtml('av',!avUp?chips([[t('avrcpNone'),'off']]):chips([[av.absolute_volume?t('avrcpAbs'):t('avrcpConn')]].concat(av.notifications?[[t('notif')]]:[]).concat([[t(vmode),av.sink_volume?'hi':'']])));
 setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
-/* Bluetooth chip: vendor (IDs) */
-var ch=S.chip||{};$('chipv').textContent=ch.vid?(ch.vendor?ch.vendor+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'-';
+/* Bluetooth adapter: USB or console chip, its node, then the chip vendor/IDs */
+var ch=S.chip||{},ad=S.adapter||{};
+var ct=(ad.node||ch.vid)?((ad.external?t('adapterUsb'):t('adapterInternal'))+(ad.node?' ('+ad.node.replace('/dev/','')+')':'')):'';
+var ci=ch.vid?(ch.vendor?ch.vendor+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'';
+$('chipv').textContent=(ct?(ci?ct+' · '+ci:ct):ci)||'-';
 var ev=S.events||[],eh='';
 if(!ev.length)eh='<div class="k">'+esc(t('logEmpty'))+'</div>';
 else for(var ei=0;ei<ev.length;ei++)eh+='<div class="'+evKind(ev[ei])+'">'+esc(ev[ei])+'</div>';
