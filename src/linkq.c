@@ -45,9 +45,13 @@ int hb_linkq_rssi_score(int rssi)
 int hb_linkq_score(int rssi, int lq, int dpm, int backlog, int cap)
 {
     int rs = hb_linkq_rssi_score(rssi), radio = -1, s, pen = 0;
-    if (rs >= 0 && lq >= 0) radio = (rs + lq * 100 / 255) / 2;
+    /* Some adapters (cheap Realtek USB sticks, for one) answer Read Link
+     * Quality with 0/255 on a perfectly good link. Treat 0 as "not
+     * reported" instead of halving an otherwise good RSSI score. */
+    int lqs = lq > 0 ? lq * 100 / 255 : -1;
+    if (rs >= 0 && lqs >= 0) radio = (rs + lqs) / 2;
     else if (rs >= 0) radio = rs;
-    else if (lq >= 0) radio = lq * 100 / 255;
+    else if (lqs >= 0) radio = lqs;
     /* what the stream sees counts for real: drops hurt more than a weak number */
     if (dpm > 0) pen += dpm >= 30 ? 60 : 10 + dpm * 50 / 30;
     if (cap > 0 && backlog > 0) pen += clampi(backlog * 30 / cap, 0, 30);
