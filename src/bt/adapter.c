@@ -7,7 +7,6 @@
 #include "hci_cmd.h"
 #include "log.h"
 #include "realtek_fw.h"
-#include "util.h"
 
 /* Audio/Video major class, minor "unclassified" (0x000400). */
 static const unsigned char g_cod[3] = { 0x00, 0x04, 0x00 };

@@ -11,15 +11,16 @@ void hci_addr_str(const unsigned char addr[6], char buf[18])
              addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
 }
 
-int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
-                 unsigned char *out, int *out_len, int out_max)
+static int cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
+                    unsigned char *out, int *out_len, int out_max,
+                    int attempts, int first_ms, int last_ms)
 {
     int attempt;
 
     if (!hci.ops || !hci.ctx) return 0;
 
-    for (attempt = 1; attempt <= 3; attempt++) {
-        long deadline = now_ms() + (attempt == 3 ? 3000 : 1000);
+    for (attempt = 1; attempt <= attempts; attempt++) {
+        long deadline = now_ms() + (attempt == attempts ? last_ms : first_ms);
         unsigned char ev[HCI_PKT_MAX];
 
         if (!hci.ops->cmd(hci.ctx, op, params, plen)) {
@@ -57,10 +58,17 @@ int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
             /* Drain ACL so shared-controller queues do not stall. */
             while (hci.ops->next_acl(hci.ctx, ev, (int)sizeof ev) > 0) { }
         }
-        log_line("hci_cmd: %#06x no reply (try %d)", op, attempt);
+        if (attempts == 1) log_line("hci_cmd: %#06x no reply", op);
+        else log_line("hci_cmd: %#06x no reply (try %d)", op, attempt);
     }
     if (hci.ops->diag) hci.ops->diag(hci.ctx);
     return 0;
+}
+
+int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
+                 unsigned char *out, int *out_len, int out_max)
+{
+    return cmd_sync(hci, op, params, plen, out, out_len, out_max, 3, 1000, 3000);
 }
 
 /* Like hci_cmd_sync() but sent once: stateful sequences (the Realtek patch
@@ -68,42 +76,7 @@ int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
 int hci_cmd_sync_once(hci_t hci, unsigned op, const void *params, int plen,
                       unsigned char *out, int *out_len, int out_max)
 {
-    unsigned char ev[HCI_PKT_MAX];
-    long deadline;
-
-    if (!hci.ops || !hci.ctx) return 0;
-    if (!hci.ops->cmd(hci.ctx, op, params, plen)) {
-        log_line("hci_cmd: transport error sending %#06x", op);
-        return 0;
-    }
-    deadline = now_ms() + 3000;
-    while (now_ms() < deadline) {
-        int n, pr = hci.ops->pump(hci.ctx, 20);
-
-        if (pr < 0) {
-            log_line("hci_cmd: transport lost while waiting for %#06x", op);
-            return 0;
-        }
-        while ((n = hci.ops->next_event(hci.ctx, ev, (int)sizeof ev)) > 0) {
-            if (ev[0] == 0x0E && n >= 6 &&
-                ((unsigned)ev[3] | ((unsigned)ev[4] << 8)) == op) {
-                if (out && out_len && out_max > 0) {
-                    int copy = n < out_max ? n : out_max;
-                    memcpy(out, ev, (size_t)copy);
-                    *out_len = copy;
-                }
-                if (ev[5] != 0) {
-                    log_line("hci_cmd: %#06x status %#04x", op, ev[5]);
-                    return 0;
-                }
-                return 1;
-            }
-        }
-        while (hci.ops->next_acl(hci.ctx, ev, (int)sizeof ev) > 0) { }
-    }
-    log_line("hci_cmd: %#06x no reply", op);
-    if (hci.ops->diag) hci.ops->diag(hci.ctx);
-    return 0;
+    return cmd_sync(hci, op, params, plen, out, out_len, out_max, 1, 3000, 3000);
 }
 
 int hci_cmd_status(hci_t hci, unsigned op, const void *params, int plen)

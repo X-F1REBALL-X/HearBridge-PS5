@@ -676,8 +676,9 @@ static int pick_endpoints(int fd, struct usbhci_iface *ifc, int external)
     if (!ifc->in_mps)  ifc->in_mps  = DEF_MPS;
     if (!ifc->out_mps) ifc->out_mps = DEF_MPS;
     if (k > 0 || n <= 0)
-        log_line("hci_usb: %s descriptor (%d HCI iface), evt 0x%02x in 0x%02x out 0x%02x",
-                 k > 0 ? "using" : external ? "external fallback, no" : "fallback, no",
+        log_line("hci_usb: %s (%d HCI iface), evt 0x%02x in 0x%02x out 0x%02x",
+                 k > 0 ? "using descriptor" :
+                 external ? "external fallback, no descriptor" : "fallback, no descriptor",
                  k, ifc->evt_ep, ifc->in_ep, ifc->out_ep);
     return n > 0 ? k : -1;
 }
