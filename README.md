@@ -69,9 +69,11 @@ Create the folder with your usual file-transfer payload. The files are in the
 on Debian and Ubuntu) or in the
 [`rtl_bt` tree of linux-firmware](https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/rtl_bt).
 The adapter name and the file it needs are in the log
-(`/data/hearbridge/hearbridge.log`); the table covers RTL8723BU/DU,
-RTL8821AU/CU, RTL8761AU/BU/CU, RTL8822BU/CU, RTL8852AU/BU/CU/BTU, RTL8851BU
-and RTL8922AU.
+(`/data/hearbridge/hearbridge.log`). Only the RTL8761BU (the UB600) has been
+tested on hardware. The loader also knows the other USB chips in Linux's
+`btrtl` table, but they are untested; in particular the secure-boot parts
+(RTL8852AU/BU/CU, RTL8851BU, RTL8922AU, RTL8852BTU) take their patch from the
+key-id security sections, a path that has not been run on a console yet.
 
 Pairing keys belong to one Bluetooth controller. A headset paired with the
 console's chip may have to be paired once more after switching to a USB adapter

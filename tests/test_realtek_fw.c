@@ -23,6 +23,20 @@ static void put_le32(unsigned char *p, unsigned v)
     p[3] = (unsigned char)(v >> 24);
 }
 
+/* The version instruction (opcode 0, length 1, the project id as data) and the
+ * extension signature that ends every Realtek container. */
+static size_t put_extension(unsigned char *p, unsigned project)
+{
+    p[0] = (unsigned char)project;
+    p[1] = 1;
+    p[2] = 0;
+    p[3] = 0x51;
+    p[4] = 0x04;
+    p[5] = 0xfd;
+    p[6] = 0x77;
+    return 7;
+}
+
 static void test_identity(void)
 {
     unsigned char cc[16];
@@ -40,20 +54,38 @@ static void test_identity(void)
     CHECK(hb_rtl_in_rom_mode(&id), "known part can be in ROM mode");
     cc[0] = 0x0f;
     CHECK(!hb_chip_identity_from_cc(cc, 14, &id), "wrong event rejected");
+
+    /* the RTL8761CU row leaves the HCI version open, like btrtl's table */
+    id.hci_version = 0x0c;
+    id.hci_revision = 0x000e;
+    CHECK(hb_rtl_chip_for(&id) != NULL && !strcmp(hb_rtl_chip_for(&id)->name, "RTL8761CU"),
+          "RTL8761CU row matches any HCI version");
+
+    id.lmp_subversion = 0x8852;
+    id.hci_revision = 0x000c;
+    id.hci_version = 0x0c;
+    CHECK(hb_rtl_chip_for(&id) && hb_rtl_chip_for(&id)->firmware_file_v2 &&
+          !strcmp(hb_rtl_chip_for(&id)->firmware_file_v2, "rtl8852cu_fw_v2.bin"),
+          "RTL8852C names the _v2 file first");
+    id.lmp_subversion = 0xdfc6;          /* patched identity */
+    id.hci_revision = 0xd922;
+    CHECK(hb_rtl_chip_for(&id) == NULL && !hb_rtl_in_rom_mode(&id),
+          "a patched identity is not a ROM row");
 }
 
 static void test_v1(void)
 {
     unsigned char fw[64];
     unsigned char *out = NULL;
-    size_t out_len = 0;
+    size_t out_len = 0, len = 52;
     char why[128];
+    hb_rtl_target t = { 0x8761, 5, 0 };
 
     memset(fw, 0, sizeof fw);
     memcpy(fw, "Realtech", 8);
     fw[8] = 0x11; fw[9] = 0x22; fw[10] = 0x33; fw[11] = 0x44;
     put_le16(fw + 12, 2);
-    /* table at 14: ids (4 bytes), lengths (4), offsets (8), data at 30 */
+    /* table at 14: ids (4 bytes), lengths (4), offsets (8), data at 34 and 40 */
     put_le16(fw + 14, 7);            /* rom 6 -> wanted 7 (first entry, not ours) */
     put_le16(fw + 16, 6);            /* ours: rom 5 -> wanted 6 */
     put_le16(fw + 18, 3);
@@ -62,27 +94,52 @@ static void test_v1(void)
     put_le32(fw + 26, 40);           /* our patch at 40 */
     fw[34] = 'x'; fw[35] = 'x'; fw[36] = 'x';
     memcpy(fw + 40, "PATCH", 5);
+    put_extension(fw + 45, 14);      /* RTL8761A/B/C project */
 
-    CHECK(hb_rtl_build_image(fw, sizeof fw, NULL, 0, 5, &out, &out_len, why, sizeof why),
+    CHECK(hb_rtl_build_image(fw, len, NULL, 0, &t, &out, &out_len, why, sizeof why),
           "v1 image builds (%s)", why);
     CHECK(out_len == 5 && out[0] == 'P' && out[1] == 0x11 && out[2] == 0x22 &&
           out[3] == 0x33 && out[4] == 0x44,
           "v1 picks the chip's patch and stamps the file version");
     free(out);
-
     out = NULL;
-    CHECK(!hb_rtl_build_image(fw, sizeof fw, NULL, 0, 9, &out, &out_len, why, sizeof why) &&
+
+    t.rom_version = 9;
+    CHECK(!hb_rtl_build_image(fw, len, NULL, 0, &t, &out, &out_len, why, sizeof why) &&
           strstr(why, "ROM version 9"), "v1 missing patch reports the ROM version");
+    t.rom_version = 5;
+
+    t.lmp_subversion = 0x8723;
+    CHECK(!hb_rtl_build_image(fw, len, NULL, 0, &t, &out, &out_len, why, sizeof why) &&
+          strstr(why, "another chip"), "v1 refuses a file for another chip");
+    t.lmp_subversion = 0x8761;
+
+    CHECK(!hb_rtl_build_image(fw, len - 4, NULL, 0, &t, &out, &out_len, why, sizeof why) &&
+          strstr(why, "extension"), "v1 refuses a file without the extension signature");
 }
 
-static size_t v2_sub(unsigned char *p, unsigned eco, unsigned priority, const char *data, size_t n)
+static size_t v2_sub(unsigned char *p, unsigned eco, unsigned priority, unsigned key,
+                     const char *data, size_t n)
 {
     p[0] = (unsigned char)eco;
     p[1] = (unsigned char)priority;
-    p[2] = p[3] = 0;
+    p[2] = (unsigned char)key;   /* cb[0] for snippets, key id for security */
+    p[3] = 0;
     put_le32(p + 4, (unsigned)n);
     memcpy(p + 8, data, n);
     return 8 + n;
+}
+
+static size_t v2_section(unsigned char *p, unsigned type, unsigned count)
+{
+    size_t at;
+
+    put_le32(p, type);
+    put_le32(p + 4, 0);              /* length fixed by the caller */
+    at = 8;
+    put_le16(p + at, count);
+    p[at + 2] = p[at + 3] = 0;
+    return at + 4;
 }
 
 static void test_v2(void)
@@ -91,45 +148,50 @@ static void test_v2(void)
     unsigned char *out = NULL;
     size_t out_len = 0, pos, at;
     char why[128];
+    hb_rtl_target t = { 0x8761, 5, 0 };
 
     memset(fw, 0, sizeof fw);
     memcpy(fw, "RTBTCore", 8);
     put_le32(fw + 16, 3);
     pos = 20;
-    /* snippets: three subsections, only eco 6 (rom 5 + 1) is used */
-    put_le32(fw + pos, 1);
-    put_le32(fw + pos + 4, 0);       /* length fixed below */
-    at = pos + 8;
-    put_le16(fw + at, 3);
-    fw[at + 2] = fw[at + 3] = 0;
-    at += 4;
-    at += v2_sub(fw + at, 6, 2, "BB", 2);
-    at += v2_sub(fw + at, 5, 1, "XX", 2);
-    at += v2_sub(fw + at, 6, 1, "AA", 2);
-    put_le32(fw + pos + 4, (unsigned)(at - (pos + 8)));
-    pos = at;
-    /* security section: must be skipped */
-    put_le32(fw + pos, 3);
-    put_le32(fw + pos + 4, 4);
-    memcpy(fw + pos + 8, "SEC!", 4);
-    pos += 12;
-    /* dummy section, priority 3 */
-    put_le32(fw + pos, 2);
-    put_le32(fw + pos + 4, 0);
-    at = pos + 8;
-    put_le16(fw + at, 1);
-    fw[at + 2] = fw[at + 3] = 0;
-    at += 4;
-    at += v2_sub(fw + at, 6, 3, "CC", 2);
-    put_le32(fw + pos + 4, (unsigned)(at - (pos + 8)));
-    pos = at;
-    memset(fw + pos, 0, 7);          /* extension tail */
-    pos += 7;
 
-    CHECK(hb_rtl_build_image(fw, pos, (const unsigned char *)"CFG", 3, 5, &out, &out_len,
-                             why, sizeof why), "v2 image builds (%s)", why);
-    CHECK(out_len == 9 && !memcmp(out, "AABBCCCFG", 9),
-          "v2 orders by priority, skips security, appends config");
+    /* snippets: BB(2), AA(1), XX(other eco), DD(1) */
+    at = v2_section(fw + pos, 1, 4);
+    at += v2_sub(fw + pos + at, 6, 2, 0, "BB", 2);
+    at += v2_sub(fw + pos + at, 6, 1, 0, "AA", 2);
+    at += v2_sub(fw + pos + at, 5, 1, 0, "XX", 2);
+    at += v2_sub(fw + pos + at, 6, 1, 0, "DD", 2);
+    put_le32(fw + pos + 4, (unsigned)(at - 8));
+    pos += at;
+
+    /* security: SS for key 7, TT for key 9, same eco */
+    at = v2_section(fw + pos, 3, 2);
+    at += v2_sub(fw + pos + at, 6, 0, 7, "SS", 2);
+    at += v2_sub(fw + pos + at, 6, 0, 9, "TT", 2);
+    put_le32(fw + pos + 4, (unsigned)(at - 8));
+    pos += at;
+
+    /* dummy, priority 3 */
+    at = v2_section(fw + pos, 2, 1);
+    at += v2_sub(fw + pos + at, 6, 3, 0, "CC", 2);
+    put_le32(fw + pos + 4, (unsigned)(at - 8));
+    pos += at;
+
+    pos += put_extension(fw + pos, 14);
+
+    CHECK(hb_rtl_build_image(fw, pos, (const unsigned char *)"CFG", 3, &t, &out,
+                             &out_len, why, sizeof why), "v2 image builds (%s)", why);
+    CHECK(out_len == 11 && !memcmp(out, "DDAABBCCCFG", 11),
+          "v2 orders equal priorities in reverse file order, skips security, appends config");
+    free(out);
+
+    /* a key id keeps the matching security subsections and ignores the config */
+    out = NULL;
+    t.key_id = 7;
+    CHECK(hb_rtl_build_image(fw, pos, (const unsigned char *)"CFG", 3, &t, &out,
+                             &out_len, why, sizeof why), "v2 key-id image builds (%s)", why);
+    CHECK(out_len == 10 && !memcmp(out, "SSDDAABBCC", 10),
+          "v2 with a key id keeps its security subsection and skips the config");
     free(out);
 }
 

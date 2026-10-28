@@ -37,7 +37,15 @@ typedef struct {
     const char    *firmware_file;
     const char    *config_file;
     int            config_required;
+    const char    *firmware_file_v2;  /* tried first when set (RTL8852C) */
 } hb_rtl_chip;
+
+/* What the container parser needs to know about the chip. */
+typedef struct {
+    unsigned short lmp_subversion; /* the file's project id must be for this chip */
+    unsigned char  rom_version;    /* selects the patch (eco = rom_version + 1) */
+    unsigned char  key_id;         /* 0: no security sections, the config is used */
+} hb_rtl_target;
 
 /* The patch that matches this exact ROM identity, or NULL. */
 const hb_rtl_chip *hb_rtl_chip_for(const hb_chip_identity *id);
@@ -48,12 +56,14 @@ const hb_rtl_chip *hb_rtl_chip_for(const hb_chip_identity *id);
 int hb_rtl_in_rom_mode(const hb_chip_identity *id);
 
 /* Build the image the chip expects from a firmware file and an optional
- * config file: select the Realtech v1 or RTBTCore v2 patch for rom_version,
- * order v2 sections by priority and append the config blob. On success
- * *out is a malloc'd buffer (caller frees) and *out_len its size. */
+ * config file: check the extension and project id, select the Realtech v1 or
+ * RTBTCore v2 patch for rom_version, order v2 sections by priority (including
+ * the key-id security sections) and append the config blob unless the chip has
+ * a key id. On success *out is a malloc'd buffer (caller frees) and *out_len
+ * its size. */
 int hb_rtl_build_image(const unsigned char *fw, size_t fw_len,
                        const unsigned char *cfg, size_t cfg_len,
-                       unsigned char rom_version,
+                       const hb_rtl_target *target,
                        unsigned char **out, size_t *out_len,
                        char *why, int why_cap);
 
