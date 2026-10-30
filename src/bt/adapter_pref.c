@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 /* Host tests point this at a temp file; the console keeps the default path.
  * No getenv: 1.0.2 payloads must not import it. */
@@ -107,9 +108,26 @@ int hb_adapter_pref_set(const char *word)
         snprintf(line, sizeof line, "%.*s\n", n, p);
     } else return 0;
 
-    f = fopen(adapter_path(), "w");
-    if (!f) return 0;
-    if (fputs(line, f) < 0) { fclose(f); return 0; }
-    fclose(f);
+    /* Same pattern as other HearBridge prefs: write a temp file, rename
+     * over the real path, then read back so a failed overwrite cannot leave
+     * the old choice (e.g. "internal") looking current. */
+    {
+        char tmp[160], got[40], want[40];
+        const char *path = adapter_path();
+        snprintf(tmp, sizeof tmp, "%s.tmp", path);
+        f = fopen(tmp, "w");
+        if (!f) return 0;
+        if (fputs(line, f) < 0) { fclose(f); unlink(tmp); return 0; }
+        if (fclose(f) != 0) { unlink(tmp); return 0; }
+        if (rename(tmp, path) != 0) { unlink(tmp); return 0; }
+        snprintf(want, sizeof want, "%s", line);
+        want[strcspn(want, "\r\n")] = 0;
+        f = fopen(path, "r");
+        if (!f) return 0;
+        if (!fgets(got, sizeof got, f)) { fclose(f); return 0; }
+        fclose(f);
+        got[strcspn(got, "\r\n")] = 0;
+        if (strcmp(got, want) != 0) return 0;
+    }
     return 1;
 }

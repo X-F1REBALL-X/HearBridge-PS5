@@ -607,6 +607,12 @@ static void op_diag(void *self)
 }
 
 
+/* VID:PID of the controller hci_usb_open() picked (-1 until then). */
+static int g_chip_vid = -1, g_chip_pid = -1;
+/* After USB_FS_UNINIT on the console chip, give the USB stack a beat before
+ * probing an external stick (Console → USB was racing the bus). */
+static int g_settle_usb_ms;
+
 static void op_close(void *self)
 {
     struct usb_hci *u = self;
@@ -614,6 +620,14 @@ static void op_close(void *self)
     int i;
     if (!u) return;
     if (g_open == u) g_open = NULL;
+    /* Leaving the console chip: drop MediaTek scan-pause and clear the
+     * chip ids so /api/status does not keep advertising the old controller
+     * while a USB reopen is still trying. */
+    if (!u->external)
+        g_settle_usb_ms = 750;
+    hci_scan_pause_enable(0);
+    hci_set_mediatek(0);
+    g_chip_vid = g_chip_pid = -1;
     if (u->fd >= 0) {
         for (i = 0; i < SLOT_COUNT; i++) {
             struct usb_fs_close cl;
@@ -693,9 +707,6 @@ static int bt_by_device(int fd, int vid)
     if (ioctl(fd, USB_GET_DEVICE_DESC, &dd) == 0 && dd.bDeviceClass == 0xE0) return 1;
     return btchip_vendor(vid) != NULL;
 }
-
-/* VID:PID of the controller hci_usb_open() picked (-1 until then). */
-static int g_chip_vid = -1, g_chip_pid = -1;
 
 int hci_usb_chip(int *vid, int *pid)
 {
@@ -895,20 +906,40 @@ int hci_usb_open(hci_t *out)
             else if (r < 0) busy = 1;
         } else {
             char names[HCI_MAX_NODES][32];
-            int n = list_ugen(names, HCI_MAX_NODES), i;
+            int n, i;
+
+            if (g_settle_usb_ms > 0) {
+                int ms = g_settle_usb_ms;
+                g_settle_usb_ms = 0;
+                log_line("hci_usb: waiting %d ms after releasing the console chip before USB probe", ms);
+                usleep(ms * 1000);
+            }
+            n = list_ugen(names, HCI_MAX_NODES);
 
             if (!n) {
                 for (i = 0; i < (int)(sizeof fallback / sizeof fallback[0]) && n < HCI_MAX_NODES; i++)
                     snprintf(names[n++], sizeof names[0], "%s", fallback[i]);
             }
             sort_nodes(names, n);
+            /* One busy/ENOMEM node must not stop the scan: after the console
+             * chip was released, another ugen can look held for a moment while
+             * the Realtek stick further down the list is already free. A
+             * break here made Settings → USB (and then Auto) fall back to the
+             * console chip and look "stuck" on it. */
             for (i = 0; i < n; i++) {
                 int r;
                 if (is_internal_node(names[i]) || is_root_hub(names[i])) continue;
                 r = try_node(u, names[i], 1);
                 if (r == 1) { found = 1; break; }
-                if (r < 0) { busy = 1; break; }   /* held by a copy that is stopping */
+                if (r < 0) {
+                    busy = 1;
+                    log_line("hci_usb: %s busy/held, trying the next USB node", names[i]);
+                    continue;
+                }
             }
+            if (!found && sel == SEL_USB)
+                log_line("hci_usb: no USB Bluetooth adapter opened%s",
+                         busy ? " (at least one node was busy)" : "");
             if (!found && !busy && sel == SEL_AUTO) {
                 int r = try_node(u, HB_INTERNAL_NODE, 0);
                 if (r == 1) found = 1;

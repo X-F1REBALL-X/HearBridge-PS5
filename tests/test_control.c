@@ -146,6 +146,16 @@ int main(int argc, char **argv)
         c.req_adapter = 0;
         post(&c, "/api/adapter?mode=auto");
         CHECK(!strcmp(c.bt_pref, "auto"), "adapter: back to auto");
+        /* Console → USB → Auto must overwrite each time (the sticky-console bug). */
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=internal");
+        CHECK(!strcmp(c.bt_pref, "internal") && c.req_adapter, "adapter: console chip");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=usb");
+        CHECK(!strcmp(c.bt_pref, "usb") && c.req_adapter, "adapter: USB after console");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=auto");
+        CHECK(!strcmp(c.bt_pref, "auto") && c.req_adapter, "adapter: Auto after USB");
         n = post(&c, "/api/adapter?mode=nope");
         CHECK(!strncmp(out, "HTTP/1.1 400", 12), "adapter: bad mode -> 400");
         unlink(path);

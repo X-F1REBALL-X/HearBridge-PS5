@@ -793,7 +793,9 @@ var b=$('adnodes').getElementsByTagName('button');
 for(i=0;i<b.length;i++)b[i].onclick=function(){pickAd(null,this.getAttribute('data-node'))}
 }
 function pickAd(mode,node){var p=mode?'/api/adapter?mode='+encodeURIComponent(mode):'/api/adapter?node='+encodeURIComponent(node);
-$('admsg').textContent=t('adapterRestart');act(p,function(){$('admsg').textContent=t('adapterSaved')})}
+var want=mode||node;if(want==='console')want='internal';if(want==='external'||want==='adapter')want='usb';
+$('admsg').textContent=t('adapterRestart');
+xhr('POST',p,function(){var pref=S&&S.adapter&&S.adapter.pref;if(pref&&pref===want)$('admsg').textContent=t('adapterSaved');else if(!MSGK)$('admsg').textContent=''})}
 function draw(){
 $('msg').textContent=MSGK?t(MSGK):'';
 $('ver').textContent=S.version;

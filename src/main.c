@@ -713,6 +713,7 @@ static int connect_abort(const unsigned char addr[6])
     CTL_LOCK(&g_ctl);
     reset = g_ctl.req_reset;
     disc = g_ctl.req_disconnect;
+    if (g_ctl.req_adapter) { CTL_UNLOCK(&g_ctl); return 1; }  /* Settings: leave this radio */
     CTL_UNLOCK(&g_ctl);
     if (reset) return 1;                 /* drop our page, not anyone else's */
     if (disc) return 1;                  /* Disconnect pressed while it was connecting */
@@ -3398,6 +3399,7 @@ static int gentle_rejoin_loop(hci_t hci, headset_ini *ini)
             int go = 0, reset = 0;
             CTL_LOCK(&g_ctl);
             reset = g_ctl.req_reset;
+            if (g_ctl.req_adapter) { CTL_UNLOCK(&g_ctl); return 0; }  /* reopen at the top */
             CTL_UNLOCK(&g_ctl);
             if (reset) return 0;          /* idle path clears our page / ACL */
             {
@@ -3548,12 +3550,43 @@ static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, hea
     *asess = NULL;
     if (hci->ops && hci->ops->close) hci->ops->close(hci->ctx);
     memset(hci, 0, sizeof *hci);
+    /* Status must not keep showing the previous chip (often the console)
+     * while we hunt for the USB stick after Settings → Console → USB. */
+    CTL_LOCK(&g_ctl);
+    g_ctl.chip_vid = -1;
+    g_ctl.chip_pid = -1;
+    g_ctl.bt_node[0] = 0;
+    hb_adapter_pref_word(g_ctl.bt_pref, (int)sizeof g_ctl.bt_pref);
+    CTL_UNLOCK(&g_ctl);
     while (!hb_stop_requested()) {
-        int left = hb_reopen_delay_ms(attempt++);
-        while (left > 0 && !hb_stop_requested()) { usleep(250 * 1000); left -= 250; }
+        int left, ad = 0;
+        CTL_LOCK(&g_ctl);
+        ad = g_ctl.req_adapter;
+        if (ad) {
+            /* A later Settings pick (USB → Auto, etc.): drop the old reopen
+             * request's leftover and start again with the new preference. */
+            g_ctl.req_adapter = 0;
+            hb_adapter_pref_word(g_ctl.bt_pref, (int)sizeof g_ctl.bt_pref);
+        }
+        CTL_UNLOCK(&g_ctl);
+        if (ad) {
+            log_line("reopen: adapter preference changed to %s, trying that", g_ctl.bt_pref);
+            attempt = 0;
+        }
+        left = hb_reopen_delay_ms(attempt++);
+        while (left > 0 && !hb_stop_requested()) {
+            CTL_LOCK(&g_ctl);
+            ad = g_ctl.req_adapter;
+            CTL_UNLOCK(&g_ctl);
+            if (ad) break;               /* pick up the new choice without waiting out the delay */
+            usleep(250 * 1000);
+            left -= 250;
+        }
         if (hb_stop_requested()) break;
+        if (ad) continue;
         if (!hci_usb_open(hci)) {
-            if (attempt == 1 || attempt % 12 == 0) log_line("reopen: controller not back yet (try %d)", attempt);
+            if (attempt == 1 || attempt % 12 == 0) log_line("reopen: controller not back yet (try %d, pref=%s)",
+                                                             attempt, g_ctl.bt_pref);
             continue;
         }
         note_adapter();
