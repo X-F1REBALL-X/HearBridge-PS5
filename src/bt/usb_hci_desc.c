@@ -16,6 +16,14 @@ static int complete(const struct usbhci_iface *f)
     return f->evt_ep && f->in_ep && f->out_ep;
 }
 
+/* Wireless Controller / RF / Bluetooth is the standard triple. Broadcom
+ * family sticks (and some OEM modules) use the vendor-specific ff/01/01
+ * instead, which btusb also accepts; the endpoints are the same. */
+static int is_hci_iface(unsigned char cls, unsigned char sub, unsigned char proto)
+{
+    return proto == 0x01 && sub == 0x01 && (cls == 0xE0 || cls == 0xFF);
+}
+
 static void add_endpoint(struct usbhci_iface *f, const uint8_t *e)
 {
     uint8_t addr = e[2];
@@ -68,9 +76,9 @@ int usbhci_scan(const uint8_t *d, int len, struct usbhci_iface *found)
             if (inside && complete(&cur) && count < USBHCI_MAX_IFACES)
                 found[count++] = cur;
             memset(&cur, 0, sizeof cur);
-            /* bAlternateSetting == 0, class/subclass/protocol E0/01/01 */
-            inside = d[pos + 3] == 0 && d[pos + 5] == 0xE0 &&
-                     d[pos + 6] == 0x01 && d[pos + 7] == 0x01;
+            /* bAlternateSetting == 0, class/subclass/protocol e0/01/01 or
+             * the vendor-specific ff/01/01 used by Broadcom family sticks */
+            inside = d[pos + 3] == 0 && is_hci_iface(d[pos + 5], d[pos + 6], d[pos + 7]);
             cur.number = d[pos + 2];
         } else if (type == DT_ENDPOINT && blen >= 7 && inside) {
             add_endpoint(&cur, d + pos);
@@ -106,7 +114,7 @@ int usbhci_describe(const uint8_t *d, int len, char *out, size_t cap)
         if (type == DT_INTERFACE && blen >= 9) {
             PUT("%sif%u.%u %02x/%02x/%02x%s", ifaces ? "; " : "", d[pos + 2], d[pos + 3],
                 d[pos + 5], d[pos + 6], d[pos + 7],
-                (d[pos + 5] == 0xE0 && d[pos + 6] == 0x01 && d[pos + 7] == 0x01) ? " (BT HCI)" : "");
+                is_hci_iface(d[pos + 5], d[pos + 6], d[pos + 7]) ? " (BT HCI)" : "");
             ifaces++;
         } else if (type == DT_ENDPOINT && blen >= 7) {
             PUT(" ep%02x %s/%u", d[pos + 2], xfer[d[pos + 3] & 3u],

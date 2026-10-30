@@ -15,7 +15,7 @@ VERSION := $(shell sed -n 's/^\#define HEARBRIDGE_VERSION "\(.*\)"/\1/p' src/ver
 
 BUILD := build
 
-.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp test-linktune test-txpath
+.PHONY: all ps5 send clean test test-sbc test-dump test-crypto test-control webpage test-tile test-devices test-rate icon test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp test-linktune test-txpath test-realtek rtl-fw
 
 all: ps5
 
@@ -60,7 +60,7 @@ test-control:
 	cmp -s $(BUILD)/host/webpage.h src/webpage.h || (echo "src/webpage.h is stale: make webpage"; false)
 	python3 scripts/gen_font.py assets/fonts/inter-latin.woff2 $(BUILD)/host/font_woff2.h
 	cmp -s $(BUILD)/host/font_woff2.h src/font_woff2.h || (echo "src/font_woff2.h is stale: make webpage"; false)
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp -Isrc/bt tests/test_control.c src/bt/blocklist.c src/http.c src/gameprof.c src/bt/btchip.c src/diag.c src/ctl.c src/gain.c src/a2dp/eq.c src/a2dp/rate.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/backup.c -lpthread -lm -o $(BUILD)/host/test_control
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -DHB_HTTP_HOST_TEST -Isrc -Isrc/a2dp -Isrc/bt tests/test_control.c src/bt/adapter_pref.c src/bt/blocklist.c src/http.c src/gameprof.c src/bt/btchip.c src/diag.c src/ctl.c src/gain.c src/a2dp/eq.c src/a2dp/rate.c src/a2dp/avrcp.c src/a2dp/sdp_server.c src/backup.c -lpthread -lm -o $(BUILD)/host/test_control
 	$(BUILD)/host/test_control $(BUILD)/host/status.json
 	python3 -c "import json;d=json.load(open('$(BUILD)/host/status.json'));print('ok   status JSON parses,', len(d), 'keys')"
 
@@ -94,7 +94,18 @@ icon:
 	python3 scripts/gen_icon.py assets/icon0.png src/icon_png.h
 	python3 scripts/gen_start.py src/web/start.html src/start_html.h
 
-test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp test-linktune test-txpath
+# Embed Realtek USB firmware blobs from assets/firmware into src/rtl_fw_blobs.h.
+rtl-fw:
+	python3 scripts/gen_rtl_fw.py src/rtl_fw_blobs.h
+
+test: test-sbc test-dump test-crypto test-control test-tile test-devices test-rate test-acl test-mtu test-track test-pace test-diag test-reinstall test-page test-link test-prefs test-eq test-cswitch test-rejoin test-forgot test-switch test-connreq test-cfg test-chip test-night test-alerts test-linkq test-gameprof test-backup test-hfp test-linktune test-txpath test-realtek
+
+test-realtek:
+	@mkdir -p $(BUILD)/host
+	python3 scripts/gen_rtl_fw.py $(BUILD)/host/rtl_fw_blobs.h
+	cmp -s $(BUILD)/host/rtl_fw_blobs.h src/rtl_fw_blobs.h || (echo "src/rtl_fw_blobs.h is stale: make rtl-fw"; false)
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt tests/test_realtek_fw.c src/bt/realtek_fw.c src/bt/hci_cmd.c src/util.c src/log.c -o $(BUILD)/host/test_realtek_fw
+	$(BUILD)/host/test_realtek_fw $(BUILD)/host/rtl_fw_out
 
 test-txpath:
 	@mkdir -p $(BUILD)/host

@@ -7,10 +7,30 @@ const i18n = fs.readFileSync(process.argv[3], 'utf8');
 let js = html.match(/<script>([\s\S]*)<\/script>/)[1].replace('/*I18N*/', i18n);
 js = js.replace(/HBTOKENx{25}/, 'deadbeefdeadbeefdeadbeefdeadbeef');
 const els = {};
+function mkEl(tag) {
+  const o = { tag: tag || 'div', style: { setProperty(k, v) { this[k] = v; } }, className: '', textContent: '',
+    innerHTML: '', value: 0, disabled: false, attrs: {}, children: [], parentNode: null,
+    setAttribute(k, v) { this.attrs[k] = String(v); },
+    getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; },
+    getElementsByTagName(t) { return this.children.filter(c => (c.tag || '') === t); },
+    appendChild(c) { if (c.parentNode && c.parentNode.children) {
+        const i = c.parentNode.children.indexOf(c); if (i >= 0) c.parentNode.children.splice(i, 1); }
+      c.parentNode = this; this.children.push(c); return c; },
+    removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); c.parentNode = null; return c; },
+    querySelectorAll(sel) {
+      const m = /^button\[data-node(?:="([^"]*)")?\]$/.exec(sel) || /^button\[data-node\]$/.exec(sel);
+      if (!m) return [];
+      return this.children.filter(c => (c.tag || '') === 'button' && c.getAttribute('data-node') !== null &&
+        (m[1] === undefined || c.getAttribute('data-node') === m[1]));
+    },
+    querySelector(sel) { const a = this.querySelectorAll(sel.replace(/\.act$/, ''));
+      if (/\.act$/.test(sel)) return a.find(c => /\bact\b/.test(c.className)) || null;
+      return a[0] || null; },
+  };
+  return o;
+}
 function el(id) {
-  if (!els[id]) els[id] = { id, style: { setProperty(k, v) { this[k] = v; } }, className: '', textContent: '', innerHTML: '', value: 0,
-    attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute: () => null, getElementsByTagName: () => [], parentNode: null,
-    appendChild(c) { c.parentNode = this; } };
+  if (!els[id]) { els[id] = mkEl('div'); els[id].id = id; }
   return els[id];
 }
 const calls = [];
@@ -26,7 +46,8 @@ const STATUS = { version: '1.1.0', state: 'streaming', connected: 1, device: 'X'
   latency: { target_ms: 200, estimate_ms: 187, capture_ms: 21, packet_ms: 11, queue_ms: 20, radio_ms: 5, sink_ms: 130, sink_reported: 1 },
   codec: 'SBC-XQ', codec_pref: 0, codec_avail: 10, eq: { on: 1, db: [6, 3, 0, 0, 0] } };
 const ctx = {
-  document: { getElementById: el, querySelectorAll: () => [], documentElement: {} },
+  document: { getElementById: el, querySelectorAll: () => [], documentElement: {},
+    createElement(tag) { return mkEl(tag); } },
   XMLHttpRequest: XHR, localStorage: { getItem: () => 'en', setItem() {} }, navigator: { language: 'en' },
   location: { search: '' }, confirm: () => true, setInterval() {}, setTimeout(fn) { fn(); return 1; }, clearTimeout() {}, Date, JSON, Math, String, parseInt,
 };
@@ -103,6 +124,9 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150',
           'page: Settings > Details has the counters, AVRCP, peaks and latency breakdown');
     check(pg4.indexOf('id="chipv"') > 0 && pg4.indexOf('id="latnote"') > 0 && pg4.indexOf('id="fmtd"') > 0 && main.indexOf('id="chipv"') < 0,
           'page: chip, latency hint and full format details live in Settings > Details');
+    check(pg4.indexOf('id="adseg"') > 0 && pg4.indexOf('id="adnodes"') > 0 && pg4.indexOf('data-i18n="adapterPick"') > 0 &&
+          pg4.indexOf('id="adauto"') > 0 && pg4.indexOf('id="adint"') > 0 && pg4.indexOf('id="adusb"') > 0,
+          'page: Settings > Details has Bluetooth adapter Auto / Console / USB picker');
   }
   check(!/[\u2013\u2014]/.test(html) && !/[\u2013\u2014]/.test(i18n), 'page: no em / en dashes anywhere the user reads');
 }
@@ -208,19 +232,56 @@ global.hbTest.draw();
 check(!/>Connected</.test(B()) && el('dev').textContent !== 'X',
   'page: an old status (tab asleep, no answer) does not keep showing connected');
 Date.now = realNow;
-// Bluetooth chip row (one build for every chip: no MediaTek hint any more)
+// Bluetooth adapter + chip row (one build for every chip: no MediaTek hint any more)
 STATUS.chip = { vid: '', pid: '', vendor: '', mediatek: 0, profile: '' };
+STATUS.adapter = { external: 0, node: '' };
 global.hbTest.req('/api/status');
 check(el('chipv').textContent === '-', 'page: chip row is "-" before the controller is open');
 STATUS.chip = { vid: '1286', pid: '2059', vendor: 'Marvell/NXP', mediatek: 0, profile: 'default' };
+STATUS.adapter = { external: 0, node: '/dev/ugen0.2' };
 global.hbTest.req('/api/status');
-check(el('chipv').textContent === 'Marvell/NXP (1286:2059)', 'page: Marvell chip');
+check(el('chipv').textContent === 'Console chip (ugen0.2) · Marvell/NXP (1286:2059)', 'page: Marvell chip');
 STATUS.chip = { vid: 'abcd', pid: '0012', vendor: '', mediatek: 0, profile: 'default' };
 global.hbTest.req('/api/status');
-check(el('chipv').textContent === 'abcd:0012', 'page: unknown chip shows only the IDs');
-STATUS.chip = { vid: '0e8d', pid: '3605', vendor: 'MediaTek', mediatek: 1, profile: 'mediatek' };
+check(el('chipv').textContent === 'Console chip (ugen0.2) · abcd:0012', 'page: unknown chip shows only the IDs');
+STATUS.chip = { vid: '0bda', pid: '8771', vendor: 'Realtek', mediatek: 0, profile: 'default' };
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2' };
 global.hbTest.req('/api/status');
-check(el('chipv').textContent === 'MediaTek (0e8d:3605)', 'page: MediaTek chip');
+check(el('chipv').textContent === 'USB adapter (ugen1.2) · Realtek (0bda:8771)', 'page: USB adapter');
+STATUS.chip = { vid: '0a12', pid: '0001', vendor: 'CSR', mediatek: 0, profile: 'default' };
+STATUS.adapter = { external: 1, node: '/dev/ugen2.2' };
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === 'USB adapter (ugen2.2) · CSR (0a12:0001)', 'page: CSR USB adapter');
+STATUS.chip = { vid: '0e8d', pid: '3605', vendor: 'MediaTek', mediatek: 1, profile: 'mediatek' };
+STATUS.adapter = { external: 0, node: '/dev/ugen0.2' };
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === 'Console chip (ugen0.2) · MediaTek (0e8d:3605)', 'page: MediaTek chip');
+
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'auto',
+  adapters: [{node:'ugen0.2',label:'Console chip',vid:'1286',pid:'2059',internal:1},
+             {node:'ugen1.2',label:'Realtek',vid:'0bda',pid:'8771',internal:0}] };
+global.hbTest.req('/api/status');
+check(el('adauto').className === 'act' && el('adint').className === '' && el('adusb').className === 'hid', 'page: adapter Auto selected');
+check(el('adseg').querySelector('button[data-node="ugen1.2"]') &&
+      /Realtek/.test(el('adseg').querySelector('button[data-node="ugen1.2"]').textContent) &&
+      !el('adseg').querySelectorAll('button[data-node="ugen0.2"]').length &&
+      !el('adnodes').innerHTML,
+      'page: one row — Auto/Console plus chip sticks, no duplicate Console');
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'usb', adapters: [] };
+global.hbTest.req('/api/status');
+check(el('adusb').className === 'act' && el('adauto').className === '', 'page: adapter USB selected when no chip list');
+STATUS.adapter = { external: 0, node: '/dev/ugen0.2', pref: 'ugen1.3',
+  adapters: [{node:'ugen0.2',label:'Console chip',internal:1},{node:'ugen1.3',label:'CSR',vid:'0a12',pid:'0001',internal:0}] };
+global.hbTest.req('/api/status');
+check(el('adauto').className === '' && el('adseg').querySelector('button[data-node="ugen1.3"].act') &&
+      /CSR/.test(el('adseg').querySelector('button[data-node="ugen1.3"]').textContent),
+      'page: explicit ugen node selected by chip button');
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'auto', adapters: [] };
+global.hbTest.req('/api/status');
+calls.length = 0; el('adusb').onclick();
+check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/adapter?mode=usb' && calls[0].h['X-HB-Token'],
+      'page: USB adapter button POSTs /api/adapter?mode=usb with token');
+
 // battery: level when the headset reports it, "—" when it does not
 STATUS.battery = { status: '', level: -1 };
 global.hbTest.req('/api/status');

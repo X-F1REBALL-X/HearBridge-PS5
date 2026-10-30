@@ -6,17 +6,29 @@
 #ifndef HEARBRIDGE_BTCHIP_H
 #define HEARBRIDGE_BTCHIP_H
 
-#define BTCHIP_VID_MARVELL  0x1286
-#define BTCHIP_VID_MEDIATEK 0x0e8d
+#define BTCHIP_VID_MARVELL   0x1286
+#define BTCHIP_VID_MEDIATEK  0x0e8d
+#define BTCHIP_VID_REALTEK   0x0bda
+#define BTCHIP_VID_CSR       0x0a12
+#define BTCHIP_VID_BROADCOM  0x0a5c
+#define BTCHIP_VID_INTEL     0x8087
 
-/* "Marvell/NXP", "MediaTek", or NULL for a VID we do not know (or < 0). */
+/* "Marvell/NXP", "MediaTek", "Realtek", "CSR", "Broadcom", "Intel", or NULL
+ * for a VID we do not know (or < 0). */
 const char *btchip_vendor(int vid);
 
 /* 1 for a MediaTek controller. */
 int btchip_is_mediatek(int vid);
 
-/* "Marvell/NXP (1286:2059)", "abcd:1234" (unknown vendor), or "" when
- * vid < 0 (no controller yet). Always NUL-terminated when cap > 0. */
+/* 1 for a Realtek USB stick (needs the Realtek firmware path when in ROM). */
+int btchip_is_realtek(int vid);
+
+/* 1 for a CSR / Cambridge Silicon Radio stick (plain HCI, no firmware). */
+int btchip_is_csr(int vid);
+
+/* "Marvell/NXP (1286:2059)", "CSR8510 (0a12:0001)", "abcd:1234" (unknown
+ * vendor), or "" when vid < 0 (no controller yet). Always NUL-terminated
+ * when cap > 0. */
 void btchip_describe(int vid, int pid, char *out, int cap);
 
 /* Controller profile. MEDIATEK (VID 0e8d, e.g. 3603, 3605): system scan

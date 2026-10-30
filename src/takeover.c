@@ -106,9 +106,13 @@ static int port_busy(int port)
 int hb_port_takeover(int port, const char *stop_path, int ms)
 {
     int t;
+    long pid;
     if (!port_busy(port)) return 0;
     log_line("takeover: port %d is still in use - asking a running copy to stop", port);
     touch(stop_path);
+    pid = hb_find_pid(HB_PROC_NAME);
+    if (pid <= 1) pid = hb_find_pid("payload.elf");
+    if (pid > 1) kill((pid_t)pid, SIGTERM);
     for (t = 0; t < ms; t += 250) {
         usleep(250 * 1000);
         if (!port_busy(port)) {
@@ -117,8 +121,22 @@ int hb_port_takeover(int port, const char *stop_path, int ms)
             usleep(500 * 1000);      /* its Bluetooth teardown runs before the page closes */
             return 1;
         }
+        /* Halfway: escalate so a copy blocked in USB still dies. */
+        if (t + 250 >= ms / 2 && pid > 1) {
+            kill((pid_t)pid, SIGKILL);
+            pid = 0;
+        }
     }
     unlink(stop_path);
     log_line("takeover: port %d still in use after %d ms (not a HearBridge copy?)", port, ms);
     return -1;
+}
+
+void hb_force_replace(const char *stop_path)
+{
+    int p;
+    (void)hb_stop_named(HB_PROC_NAME, stop_path, 4000);
+    (void)hb_stop_named("payload.elf", stop_path, 2000);
+    for (p = 8090; p <= 8095; p++)
+        (void)hb_port_takeover(p, stop_path, p == 8090 ? 8000 : 1500);
 }

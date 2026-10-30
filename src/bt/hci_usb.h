@@ -11,8 +11,17 @@
 #include "hci.h"
 
 /* Find and open the controller, filling *out on success.
- * Returns 1 on success, 0 on failure (out is left zeroed). */
+ * A USB adapter is preferred when one is present; /data/hearbridge/adapter
+ * can say "internal", "usb" or an explicit ugenX.Y instead. Returns 1 on
+ * success, 0 on failure (out is left zeroed). */
 int hci_usb_open(hci_t *out);
+
+/* 1 when the opened controller is a USB adapter (ours alone), 0 for the
+ * console's own chip (shared with the system stack). */
+int hci_usb_is_external(void);
+
+/* Node of the opened controller ("/dev/ugenX.Y"), "" before one is open. */
+const char *hci_usb_node(void);
 
 /* USB VID:PID of the opened controller (see btchip.h for the vendor).
  * Returns 1 once hci_usb_open() succeeded, else 0 with both set to -1. */
@@ -34,6 +43,21 @@ void hci_usb_hint(int streaming, int connecting, int sticky);
  * its VID:PID, names, interfaces (class/subclass/protocol) and endpoints,
  * then close it again. Nothing is sent to any device. Call before
  * hci_usb_open(). Returns the number of nodes listed. */
+/* Candidate ugen nodes for Settings (no root hubs). names[i] is "/dev/ugenX.Y". */
+int hci_usb_list_nodes(char names[][32], int max);
+
+/* One real Bluetooth adapter for Settings: chip-labeled, hubs excluded. */
+struct hci_usb_adapter {
+    char path[32];   /* /dev/ugenX.Y */
+    char label[24];  /* Realtek, CSR, Console chip, Realtek 2 */
+    int vid, pid;
+    int internal;
+};
+
+/* Probe every ugen (read-only): keep Bluetooth HCI only, skip hubs and
+ * non-BT devices. labels are chip names with " 2" suffixes on duplicates. */
+int hci_usb_list_adapters(struct hci_usb_adapter *out, int max);
+
 int hci_usb_survey(void);
 
 #endif

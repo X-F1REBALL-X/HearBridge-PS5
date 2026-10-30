@@ -22,6 +22,10 @@ int main(void)
           "rssi: golden range relative values");
     CHECK(hb_linkq_rssi_score(-50) == 100 && hb_linkq_rssi_score(-90) == 0, "rssi: absolute dBm values");
     CHECK(hb_linkq_score(0, 255, 0, 0, 10) == 100, "score: perfect link");
+    CHECK(hb_linkq_score(-1, 0, 0, 0, 10) == 96,
+          "score: a 0/255 adapter link quality is ignored when RSSI is good");
+    CHECK(hb_linkq_score(HB_RSSI_UNKNOWN, 0, 0, 0, 10) == 100,
+          "score: 0/255 with no RSSI falls back to a clean stream");
     CHECK(hb_linkq_score(0, 255, 30, 0, 10) <= 40, "score: drops pull it down hard");
     CHECK(hb_linkq_score(HB_RSSI_UNKNOWN, -1, 0, 0, 10) == 100, "score: no radio numbers, stream fine");
     CHECK(hb_linkq_score(HB_RSSI_UNKNOWN, -1, -1, 0, 0) == -1, "score: nothing known");

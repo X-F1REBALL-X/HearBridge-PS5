@@ -11,15 +11,16 @@ void hci_addr_str(const unsigned char addr[6], char buf[18])
              addr[5], addr[4], addr[3], addr[2], addr[1], addr[0]);
 }
 
-int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
-                 unsigned char *out, int *out_len, int out_max)
+static int cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
+                    unsigned char *out, int *out_len, int out_max,
+                    int attempts, int first_ms, int last_ms)
 {
     int attempt;
 
     if (!hci.ops || !hci.ctx) return 0;
 
-    for (attempt = 1; attempt <= 3; attempt++) {
-        long deadline = now_ms() + (attempt == 3 ? 3000 : 1000);
+    for (attempt = 1; attempt <= attempts; attempt++) {
+        long deadline = now_ms() + (attempt == attempts ? last_ms : first_ms);
         unsigned char ev[HCI_PKT_MAX];
 
         if (!hci.ops->cmd(hci.ctx, op, params, plen)) {
@@ -57,11 +58,85 @@ int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
             /* Drain ACL so shared-controller queues do not stall. */
             while (hci.ops->next_acl(hci.ctx, ev, (int)sizeof ev) > 0) { }
         }
-        log_line("hci_cmd: %#06x no reply (try %d)", op, attempt);
+        if (attempts == 1) log_line("hci_cmd: %#06x no reply", op);
+        else log_line("hci_cmd: %#06x no reply (try %d)", op, attempt);
     }
     if (hci.ops->diag) hci.ops->diag(hci.ctx);
     return 0;
 }
+
+int hci_cmd_sync(hci_t hci, unsigned op, const void *params, int plen,
+                 unsigned char *out, int *out_len, int out_max)
+{
+    return cmd_sync(hci, op, params, plen, out, out_len, out_max, 3, 1000, 3000);
+}
+
+/* Like hci_cmd_sync() but sent once: stateful sequences (the Realtek patch
+ * fragments) must not be repeated at the chip. */
+int hci_cmd_sync_once(hci_t hci, unsigned op, const void *params, int plen,
+                      unsigned char *out, int *out_len, int out_max)
+{
+    return cmd_sync(hci, op, params, plen, out, out_len, out_max, 1, 3000, 3000);
+}
+
+int hci_cmd_vendor(hci_t hci, unsigned op, const void *params, int plen,
+                   unsigned char *out, int *out_len, int out_max)
+{
+    long deadline;
+    unsigned char ev[HCI_PKT_MAX];
+    int saw_cc = 0;
+
+    if (!hci.ops || !hci.ctx) return 0;
+    if (!hci.ops->cmd(hci.ctx, op, params, plen)) {
+        log_line("hci_cmd: transport error sending vendor %#06x", op);
+        return 0;
+    }
+    /* BlueZ hci_send_req(EVT_VENDOR): wait for 0xFF and return its
+     * parameters only (rp[0] == 0xc2 for CSR BCCMD). Command Complete
+     * for 0xFC00 often arrives first — drain it, keep waiting. */
+    deadline = now_ms() + 2000;
+    while (now_ms() < deadline) {
+        int n, pr;
+        pr = hci.ops->pump(hci.ctx, 20);
+        if (pr < 0) {
+            log_line("hci_cmd: transport lost waiting vendor %#06x", op);
+            return 0;
+        }
+        while ((n = hci.ops->next_event(hci.ctx, ev, (int)sizeof ev)) > 0) {
+            if (ev[0] == 0xFF && n >= 2) {
+                int payload = n - 2;
+                if (out && out_len && out_max > 0) {
+                    int copy = payload < out_max ? payload : out_max;
+                    if (copy > 0) memcpy(out, ev + 2, (size_t)copy);
+                    *out_len = copy;
+                }
+                return 1;
+            }
+            if (ev[0] == 0x0E && n >= 6) {
+                unsigned rop = (unsigned)ev[3] | ((unsigned)ev[4] << 8);
+                if (rop == op) {
+                    if (ev[5] != 0) {
+                        log_line("hci_cmd: vendor %#06x status %#04x", op, ev[5]);
+                        return 0;
+                    }
+                    saw_cc = 1;
+                    /* Keep waiting for EVT_VENDOR. */
+                }
+            }
+        }
+        while (hci.ops->next_acl(hci.ctx, ev, (int)sizeof ev) > 0) { }
+    }
+    if (saw_cc) {
+        /* Some CSR sticks ACK BCCMD with Command Complete only. Caller
+         * must verify with READ_BD_ADDR after warm reset. */
+        log_line("hci_cmd: vendor %#06x Command Complete only (no EVT_VENDOR)", op);
+        if (out_len) *out_len = 0;
+        return 1;
+    }
+    log_line("hci_cmd: vendor %#06x no reply", op);
+    return 0;
+}
+
 
 int hci_cmd_status(hci_t hci, unsigned op, const void *params, int plen)
 {

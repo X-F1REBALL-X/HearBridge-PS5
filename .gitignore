@@ -10,3 +10,8 @@
 *.bak*
 .DS_Store
 *.swp
+
+# Bundled Realtek firmware (linux-firmware rtl_bt)
+!assets/firmware/
+!assets/firmware/**
+!assets/firmware/*.bin

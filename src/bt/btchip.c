@@ -9,6 +9,10 @@ const char *btchip_vendor(int vid)
     switch (vid) {
     case BTCHIP_VID_MARVELL:  return "Marvell/NXP";
     case BTCHIP_VID_MEDIATEK: return "MediaTek";
+    case BTCHIP_VID_REALTEK:  return "Realtek";
+    case BTCHIP_VID_CSR:      return "CSR";
+    case BTCHIP_VID_BROADCOM: return "Broadcom";
+    case BTCHIP_VID_INTEL:    return "Intel";
     default:                  return NULL;
     }
 }
@@ -18,13 +22,26 @@ int btchip_is_mediatek(int vid)
     return vid == BTCHIP_VID_MEDIATEK;
 }
 
+int btchip_is_realtek(int vid)
+{
+    return vid == BTCHIP_VID_REALTEK;
+}
+
+int btchip_is_csr(int vid)
+{
+    return vid == BTCHIP_VID_CSR;
+}
+
 void btchip_describe(int vid, int pid, char *out, int cap)
 {
     const char *v = btchip_vendor(vid);
     if (!out || cap <= 0) return;
     if (vid < 0 || vid > 0xffff || pid < 0 || pid > 0xffff) { out[0] = 0; return; }
-    if (v) snprintf(out, (size_t)cap, "%s (%04x:%04x)", v, vid, pid);
-    else   snprintf(out, (size_t)cap, "%04x:%04x", vid, pid);
+    /* Common Cambridge Silicon Radio Bluetooth 4.0 stick (plain HCI). */
+    if (vid == BTCHIP_VID_CSR && pid == 0x0001)
+        snprintf(out, (size_t)cap, "CSR8510 (%04x:%04x)", vid, pid);
+    else if (v) snprintf(out, (size_t)cap, "%s (%04x:%04x)", v, vid, pid);
+    else        snprintf(out, (size_t)cap, "%04x:%04x", vid, pid);
 }
 
 /* Own blank/lower-case helpers: the payload may only import what 1.0.2

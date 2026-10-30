@@ -4,6 +4,7 @@
 #include "ctl.h"
 #include "gain.h"
 #include "http.h"
+#include "adapter_pref.h"
 #include "diag.h"
 #include "avrcp.h"
 #include "sdp_server.h"
@@ -12,6 +13,8 @@
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 void log_line(const char *fmt, ...) { (void)fmt; }
@@ -125,6 +128,39 @@ int main(int argc, char **argv)
     CHECK(c.req_stop, "stop");
     post(&c, "/api/reset");
     CHECK(c.req_reset, "reset");
+    {
+        char path[128];
+        snprintf(path, sizeof path, "%s/adapter_pref_test", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+        hb_adapter_path_override(path);
+        unlink(path);
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=usb");
+        CHECK(c.req_adapter && !strcmp(c.bt_pref, "usb"), "adapter: mode=usb saved + reopen requested");
+        CHECK(get(&c, "/api/status") > 0 && strstr(out, "\"pref\":\"usb\""), "adapter: pref in status");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=internal");
+        CHECK(!strcmp(c.bt_pref, "internal"), "adapter: mode=internal");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?node=ugen1.3");
+        CHECK(!strcmp(c.bt_pref, "ugen1.3") && c.req_adapter, "adapter: node=ugen1.3");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=auto");
+        CHECK(!strcmp(c.bt_pref, "auto"), "adapter: back to auto");
+        /* Console → USB → Auto must overwrite each time (the sticky-console bug). */
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=internal");
+        CHECK(!strcmp(c.bt_pref, "internal") && c.req_adapter, "adapter: console chip");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=usb");
+        CHECK(!strcmp(c.bt_pref, "usb") && c.req_adapter, "adapter: USB after console");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=auto");
+        CHECK(!strcmp(c.bt_pref, "auto") && c.req_adapter, "adapter: Auto after USB");
+        n = post(&c, "/api/adapter?mode=nope");
+        CHECK(!strncmp(out, "HTTP/1.1 400", 12), "adapter: bad mode -> 400");
+        unlink(path);
+        hb_adapter_path_override(NULL);
+    }
     n = get(&c, "/api/status");
     CHECK(strstr(out, "\"stable\":0") && strstr(out, "\"queue_ms\":200") &&
           strstr(out, "\"latency\":{\"target_ms\":200,"), "latency: 200 ms target by default");
@@ -209,13 +245,24 @@ int main(int argc, char **argv)
         char d[64];
         CHECK(btchip_vendor(0x1286) && !strcmp(btchip_vendor(0x1286), "Marvell/NXP"), "chip: 1286 is Marvell/NXP");
         CHECK(btchip_vendor(0x0e8d) && !strcmp(btchip_vendor(0x0e8d), "MediaTek"), "chip: 0e8d is MediaTek");
-        CHECK(!btchip_vendor(0x8087) && !btchip_vendor(-1), "chip: other VIDs unknown");
+        CHECK(btchip_vendor(0x0bda) && !strcmp(btchip_vendor(0x0bda), "Realtek"), "chip: 0bda is Realtek");
+        CHECK(btchip_vendor(0x0a12) && !strcmp(btchip_vendor(0x0a12), "CSR"), "chip: 0a12 is CSR");
+        CHECK(btchip_vendor(0x8087) && !strcmp(btchip_vendor(0x8087), "Intel"), "chip: 8087 is Intel");
+        CHECK(!btchip_vendor(0xabcd) && !btchip_vendor(-1), "chip: other VIDs unknown");
         CHECK(btchip_is_mediatek(0x0e8d) && !btchip_is_mediatek(0x1286) && !btchip_is_mediatek(-1),
               "chip: only 0e8d counts as MediaTek");
+        CHECK(btchip_is_realtek(0x0bda) && !btchip_is_realtek(0x0a12) && !btchip_is_realtek(-1),
+              "chip: only 0bda counts as Realtek");
+        CHECK(btchip_is_csr(0x0a12) && !btchip_is_csr(0x0bda) && !btchip_is_csr(-1),
+              "chip: only 0a12 counts as CSR");
         btchip_describe(0x1286, 0x2059, d, (int)sizeof d);
         CHECK(!strcmp(d, "Marvell/NXP (1286:2059)"), "chip: Marvell description");
         btchip_describe(0x0e8d, 0x0608, d, (int)sizeof d);
         CHECK(!strcmp(d, "MediaTek (0e8d:0608)"), "chip: MediaTek description");
+        btchip_describe(0x0a12, 0x0001, d, (int)sizeof d);
+        CHECK(!strcmp(d, "CSR8510 (0a12:0001)"), "chip: CSR8510 description");
+        btchip_describe(0x0a12, 0x0002, d, (int)sizeof d);
+        CHECK(!strcmp(d, "CSR (0a12:0002)"), "chip: other CSR PID keeps the vendor name");
         btchip_describe(0xabcd, 0x0012, d, (int)sizeof d);
         CHECK(!strcmp(d, "abcd:0012"), "chip: unknown vendor shows only the IDs");
         btchip_describe(-1, -1, d, (int)sizeof d);
@@ -224,10 +271,23 @@ int main(int argc, char **argv)
     get(&c, "/api/status");
     CHECK(strstr(out, "\"chip\":{\"vid\":\"\",\"pid\":\"\",\"vendor\":\"\",\"mediatek\":0,") != NULL,
           "status: empty chip until the controller is open");
+    CHECK(strstr(out, "\"adapter\":{\"external\":0,\"node\":\"\",\"pref\":\"auto\",\"nodes\":[]}") != NULL,
+          "status: no adapter before the controller is open");
+    c.bt_external = 1;
+    snprintf(c.bt_node, sizeof c.bt_node, "/dev/ugen1.2");
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"adapter\":{\"external\":1,\"node\":\"/dev/ugen1.2\",\"pref\":\"auto\",\"nodes\":[]}") != NULL,
+          "status: USB adapter and its node");
+    c.bt_external = 0;
+    c.bt_node[0] = 0;
     c.chip_vid = 0x1286; c.chip_pid = 0x2059;
     get(&c, "/api/status");
     CHECK(strstr(out, "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
           "status: Marvell chip, default profile");
+    c.chip_vid = 0x0a12; c.chip_pid = 0x0001;
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"chip\":{\"vid\":\"0a12\",\"pid\":\"0001\",\"vendor\":\"CSR\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
+          "status: CSR8510 chip line shows CSR");
     c.chip_vid = 0x0e8d; c.chip_pid = 0x0608;
     get(&c, "/api/status");
     CHECK(strstr(out, "\"vid\":\"0e8d\",\"pid\":\"0608\",\"vendor\":\"MediaTek\",\"mediatek\":1,\"profile\":\"mediatek\"") != NULL,

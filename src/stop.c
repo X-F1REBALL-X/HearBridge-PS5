@@ -59,6 +59,8 @@ void hb_stop_request(void)
 
 void hb_stop_init(void)
 {
+    /* FreeBSD/PS5 signal() does not restart syscalls, so SIGTERM wakes a
+     * blocking USB/network read and the old copy can exit for takeover. */
     signal(SIGTERM, on_signal);
     signal(SIGINT, on_signal);
     signal(SIGHUP, on_hup);

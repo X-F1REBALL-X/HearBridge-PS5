@@ -302,12 +302,10 @@ a2dp_session *a2dp_open(hci_t hci, const a2dp_open_opts *opts)
 
     if (!hci_cmd_sync(hci, HB_OP_READ_SSP_MODE, NULL, 0, cc, &cc_len, (int)sizeof cc)
         || cc_len < 7 || cc[6] != 1) {
-        if (!hci_cmd_sync(hci, HB_OP_WRITE_SSP_MODE, one, 1, cc, &cc_len, (int)sizeof cc)) {
-            log_line("a2dp: WRITE_SSP_MODE failed");
-            free(s);
-            return NULL;
-        }
-        log_line("a2dp: Simple Pairing turned on");
+        if (!hci_cmd_sync(hci, HB_OP_WRITE_SSP_MODE, one, 1, cc, &cc_len, (int)sizeof cc))
+            log_line("a2dp: WRITE_SSP_MODE failed (pairing may need a PIN)");
+        else
+            log_line("a2dp: Simple Pairing turned on");
     }
 
     if (hci_cmd_sync(hci, HB_OP_READ_BD_ADDR, NULL, 0, cc, &cc_len, (int)sizeof cc)
@@ -465,19 +463,14 @@ static int inquiry_once(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound
     inq[3] = (unsigned char)length_slots;
     inq[4] = 0x00;
 
-    /* Want RSSI/EIR results. Read the current mode; only if it is not
-     * already 2 set it for our scan and put it back afterwards. */
+    /* Keep the inquiry mode from bring-up. Forcing mode 2 here undid CSR's
+     * mode 1 (PS4-proven RSSI results) and produced Inquiry Complete with
+     * zero result events. */
     if (hci_cmd_sync(hci, 0x0C44, NULL, 0, cc, &cc_len, (int)sizeof cc) && cc_len >= 7)
         old_mode = cc[6];
-    if (old_mode >= 0 && old_mode != 2) {
-        unsigned char mode = 0x02;
-        if (!hci_cmd_sync(hci, 0x0C45, &mode, 1, NULL, NULL, 0)) {
-            log_line("inquiry: Write Inquiry Mode not accepted (mode %d kept)", old_mode);
-            old_mode = -1;
-        }
-    }
 
-    log_line("inquiry: starting (~%d s, length=%d, GIAC)", seconds, length_slots);
+    log_line("inquiry: starting (~%d s, length=%d, GIAC, mode %d)",
+             seconds, length_slots, old_mode);
     for (attempt = 1; attempt <= INQ_START_TRIES && !started; attempt++) {
         int st = -1;
         if (!hci.ops->cmd(hci.ctx, HB_OP_INQUIRY, inq, 5)) {
@@ -596,8 +589,6 @@ fail:
     return 0;
 }
 
-static const unsigned char k_evmask[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBF, 0x7D };
-
 /* Inquiry with recovery: when a whole inquiry brings no event at all (not
  * even its Command Status), the event path is re-armed (by the transport
  * pump), the event mask is sent again and the inquiry retried once. */
@@ -607,21 +598,30 @@ static int inquiry_scan_off(a2dp_session *s, a2dp_inq_dev *out, int max, int *nf
     g_inq_events = 0;
     g_inq_skipped = 0;
     ok = inquiry_once(s, out, max, nfound);
-    if (ok && *nfound == 0 && g_inq_events == 0 && !g_inq_skipped && !INQ_ABORTED() && s && s->hci.ops) {
+    /* CSR live: Inquiry started+completed but only 2 HCI events (Command
+     * Status + Complete) and 0 devices — mode 2 EIR events never arrived.
+     * Recover with the PS4-proven CSR mask + inquiry mode 1 (RSSI / 0x22). */
+    if (ok && *nfound == 0 && g_inq_events <= 3 && !g_inq_skipped && !INQ_ABORTED()
+        && s && s->hci.ops) {
+        static const unsigned char csr_mask[8] = {
+            0xFF, 0xFF, 0xFB, 0xFF, 0x07, 0xF8, 0xBF, 0x3D
+        };
+        unsigned char mode1 = 1;
         if (!a2dp_scan_evmask_sent) {
-            /* once per scan: inquiries are chained for the whole window */
             a2dp_scan_evmask_sent = 1;
-            log_line("inquiry: no HCI events at all, re-sending the event mask and retrying");
-            if (!hci_cmd_sync(s->hci, HB_OP_SET_EVENT_MASK, k_evmask, 8, NULL, NULL, 0))
+            log_line("inquiry: empty (%d event(s)), CSR/PS4 mask + mode 1 and retrying",
+                     g_inq_events);
+            if (!hci_cmd_sync(s->hci, HB_OP_SET_EVENT_MASK, csr_mask, 8, NULL, NULL, 0))
                 log_line("inquiry: SET_EVENT_MASK got no reply, event pipe looks stalled");
+            (void)hci_cmd_sync(s->hci, HB_OP_WRITE_INQUIRY_MODE, &mode1, 1, NULL, NULL, 0);
         } else {
-            log_line("inquiry: no HCI events at all, retrying (event mask already re-sent this scan)");
+            log_line("inquiry: empty again (%d event(s)), retrying", g_inq_events);
         }
         if (s->hci.ops->diag) s->hci.ops->diag(s->hci.ctx);
         g_inq_events = 0;
         ok = inquiry_once(s, out, max, nfound);
-        if (ok && *nfound == 0 && g_inq_events == 0)
-            log_line("inquiry: still no events after recovery");
+        if (ok && *nfound == 0 && g_inq_events <= 3)
+            log_line("inquiry: still empty after recovery (%d event(s))", g_inq_events);
     }
     return ok;
 }

@@ -77,6 +77,21 @@ static void test_usb_describe(void)
           f[0].out_ep == 0x02, "scan still finds the HCI interface");
     usbhci_describe(d, 9, out, sizeof out);
     CHECK(!strcmp(out, "no interfaces"), "config without interfaces");
+    {
+        /* Broadcom family sticks expose the same HCI endpoints on a
+         * vendor-specific ff/01/01 interface. */
+        static const unsigned char bcm[] = {
+            9, 2, 0x3e, 0, 1, 1, 0, 0xff, 50,
+            9, 4, 0, 0, 3, 0xff, 0x01, 0x01, 0,
+            7, 5, 0x81, 3, 0x10, 0, 1,
+            7, 5, 0x82, 2, 0x40, 0, 0,
+            7, 5, 0x02, 2, 0x40, 0, 0,
+        };
+        usbhci_describe(bcm, (int)sizeof bcm, out, sizeof out);
+        CHECK(strstr(out, "ff/01/01 (BT HCI)") != NULL, "vendor-specific HCI interface described");
+        CHECK(usbhci_scan(bcm, (int)sizeof bcm, f) == 1 && f[0].evt_ep == 0x81 &&
+              f[0].in_ep == 0x82 && f[0].out_ep == 0x02, "ff/01/01 adapter is found");
+    }
     CHECK(usbhci_describe(d, (int)sizeof d, tiny, sizeof tiny) == (int)sizeof tiny - 1 &&
           tiny[sizeof tiny - 1] == 0, "summary truncates safely");
     {

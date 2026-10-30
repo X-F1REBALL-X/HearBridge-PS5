@@ -24,9 +24,13 @@
 #include "sysinfo.h"
 #include "hci_cmd.h"
 #include "hci_usb.h"
+#include "adapter_pref.h"
+#include "adapter.h"
+#include "host_bdaddr.h"
 #include "blocklist.h"
 #include "hcidbg.h"
 #include "btchip.h"
+#include "realtek_fw.h"
 #include "acl_track.h"
 #include "lock.h"
 #include "log.h"
@@ -710,6 +714,7 @@ static int connect_abort(const unsigned char addr[6])
     CTL_LOCK(&g_ctl);
     reset = g_ctl.req_reset;
     disc = g_ctl.req_disconnect;
+    if (g_ctl.req_adapter) { CTL_UNLOCK(&g_ctl); return 1; }  /* Settings: leave this radio */
     CTL_UNLOCK(&g_ctl);
     if (reset) return 1;                 /* drop our page, not anyone else's */
     if (disc) return 1;                  /* Disconnect pressed while it was connecting */
@@ -2698,10 +2703,12 @@ stream_setup:
             v = btlink_avrcp_volume(link, &changed);
             avst = btlink_avrcp_state(link);
             CTL_LOCK(&g_ctl);
-            if (g_ctl.req_reset) {
+            if (g_ctl.req_reset || g_ctl.req_adapter) {
+                int ad = g_ctl.req_adapter;
                 g_ctl.req_reset = 0;
+                /* leave req_adapter set so the outer loop reopens the controller */
                 CTL_UNLOCK(&g_ctl);
-                note_event("Connection reset");
+                note_event(ad ? "Switching Bluetooth adapter" : "Connection reset");
                 btlink_disconnect(link);   /* our handle only */
                 set_why("off");
                 rc = RUN_AWAY;
@@ -3393,6 +3400,7 @@ static int gentle_rejoin_loop(hci_t hci, headset_ini *ini)
             int go = 0, reset = 0;
             CTL_LOCK(&g_ctl);
             reset = g_ctl.req_reset;
+            if (g_ctl.req_adapter) { CTL_UNLOCK(&g_ctl); return 0; }  /* reopen at the top */
             CTL_UNLOCK(&g_ctl);
             if (reset) return 0;          /* idle path clears our page / ACL */
             {
@@ -3508,11 +3516,64 @@ static void lw_tick(const headset_ini *ini)
     hci_usb_hint(g_stream_up, g_have_target, 1);
 }
 
+/* Remember which controller is in use (shown on the control page). */
+/* Fill Settings with one chip-labeled button per real BT adapter. */
+static void refresh_adapter_picks(void)
+{
+    struct hci_usb_adapter list[HB_BT_NODES_MAX];
+    int n, i, outn = 0;
+
+    n = hci_usb_list_adapters(list, HB_BT_NODES_MAX);
+    CTL_LOCK(&g_ctl);
+    outn = 0;
+    for (i = 0; i < n && outn < HB_BT_NODES_MAX; i++) {
+        const char *p = list[i].path;
+        if (!strncmp(p, "/dev/", 5)) p += 5;
+        snprintf(g_ctl.bt_nodes[outn], sizeof g_ctl.bt_nodes[0], "%s", p);
+        snprintf(g_ctl.bt_adapters[outn].node, sizeof g_ctl.bt_adapters[0].node, "%s", p);
+        snprintf(g_ctl.bt_adapters[outn].label, sizeof g_ctl.bt_adapters[0].label, "%s", list[i].label);
+        g_ctl.bt_adapters[outn].vid = list[i].vid;
+        g_ctl.bt_adapters[outn].pid = list[i].pid;
+        g_ctl.bt_adapters[outn].internal = list[i].internal;
+        outn++;
+    }
+    g_ctl.bt_nodes_n = outn;
+    g_ctl.bt_adapters_n = outn;
+    CTL_UNLOCK(&g_ctl);
+}
+
+static void note_adapter(void)
+{
+    int i, vid = -1, pid = -1;
+    refresh_adapter_picks();
+    CTL_LOCK(&g_ctl);
+    g_ctl.bt_external = hci_usb_is_external();
+    snprintf(g_ctl.bt_node, sizeof g_ctl.bt_node, "%s", hci_usb_node());
+    hb_adapter_pref_word(g_ctl.bt_pref, (int)sizeof g_ctl.bt_pref);
+    if (hci_usb_chip(&vid, &pid)) {
+        g_ctl.chip_vid = vid;
+        g_ctl.chip_pid = pid;
+    } else {
+        g_ctl.chip_vid = -1;
+        g_ctl.chip_pid = -1;
+    }
+    CTL_UNLOCK(&g_ctl);
+    log_line("adapter: using %s (%s), pref=%s, %d Bluetooth adapter(s) listed", hci_usb_node(),
+             hci_usb_is_external() ? "USB adapter, the console chip is untouched" : "the console's own chip",
+             g_ctl.bt_pref, g_ctl.bt_adapters_n);
+    for (i = 0; i < g_ctl.bt_adapters_n; i++)
+        log_line("adapter: pick %s = %s (%04x:%04x)%s",
+                 g_ctl.bt_adapters[i].node, g_ctl.bt_adapters[i].label,
+                 g_ctl.bt_adapters[i].vid & 0xffff, g_ctl.bt_adapters[i].pid & 0xffff,
+                 g_ctl.bt_adapters[i].internal ? " [console]" : "");
+}
+
 /* Rest mode resets the Bluetooth USB device: close everything and open it
  * again (quick tries first, then every 5 s) until it is back or Stop. */
 static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, headset_ini *ini)
 {
     int attempt = 0;
+    char why[160];
     note_event("Bluetooth adapter reset, starting it again");
     write_status("reconnecting");
     ctl_set_state("reconnecting", NULL);
@@ -3520,17 +3581,71 @@ static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, hea
     *asess = NULL;
     if (hci->ops && hci->ops->close) hci->ops->close(hci->ctx);
     memset(hci, 0, sizeof *hci);
+    /* Status must not keep showing the previous chip (often the console)
+     * while we hunt for the USB stick after Settings → Console → USB. */
+    CTL_LOCK(&g_ctl);
+    g_ctl.chip_vid = -1;
+    g_ctl.chip_pid = -1;
+    g_ctl.bt_node[0] = 0;
+    hb_adapter_pref_word(g_ctl.bt_pref, (int)sizeof g_ctl.bt_pref);
+    CTL_UNLOCK(&g_ctl);
     while (!hb_stop_requested()) {
-        int left = hb_reopen_delay_ms(attempt++);
-        while (left > 0 && !hb_stop_requested()) { usleep(250 * 1000); left -= 250; }
+        int left, ad = 0;
+        CTL_LOCK(&g_ctl);
+        ad = g_ctl.req_adapter;
+        if (ad) {
+            /* A later Settings pick (USB → Auto, etc.): drop the old reopen
+             * request's leftover and start again with the new preference. */
+            g_ctl.req_adapter = 0;
+            hb_adapter_pref_word(g_ctl.bt_pref, (int)sizeof g_ctl.bt_pref);
+        }
+        CTL_UNLOCK(&g_ctl);
+        if (ad) {
+            log_line("reopen: adapter preference changed to %s, trying that", g_ctl.bt_pref);
+            attempt = 0;
+        }
+        left = hb_reopen_delay_ms(attempt++);
+        while (left > 0 && !hb_stop_requested()) {
+            CTL_LOCK(&g_ctl);
+            ad = g_ctl.req_adapter;
+            CTL_UNLOCK(&g_ctl);
+            if (ad) break;               /* pick up the new choice without waiting out the delay */
+            usleep(250 * 1000);
+            left -= 250;
+        }
         if (hb_stop_requested()) break;
+        if (ad) continue;
         if (!hci_usb_open(hci)) {
-            if (attempt == 1 || attempt % 12 == 0) log_line("reopen: controller not back yet (try %d)", attempt);
+            char want[32], node[32];
+            int sel;
+            if (attempt == 1 || attempt % 12 == 0) {
+                log_line("reopen: controller not back yet (try %d, pref=%s)",
+                         attempt, g_ctl.bt_pref);
+                refresh_adapter_picks();
+            }
+            /* Explicit ugen that is not a Bluetooth adapter (e.g. a hub): say so. */
+            sel = hb_adapter_selection(node, (int)sizeof node);
+            if (sel == HB_SEL_NODE && attempt == 1) {
+                const char *p = node;
+                if (!strncmp(p, "/dev/", 5)) p += 5;
+                snprintf(want, sizeof want, "%s", p);
+                note_event("That USB node is not a Bluetooth adapter");
+                log_line("reopen: %s did not open as a Bluetooth controller", want);
+            }
+            continue;
+        }
+        note_adapter();
+        if (!bt_adapter_bringup(*hci, hci_usb_is_external(), why, (int)sizeof why)) {
+            log_line("reopen: adapter setup failed: %s", why[0] ? why : "unknown");
+            if (hci->ops && hci->ops->close) hci->ops->close(hci->ctx);
+            memset(hci, 0, sizeof *hci);
             continue;
         }
         if (ini->have_addr) memcpy(opts->prefer_addr, ini->addr, 6);
         *asess = a2dp_open(*hci, opts);
         if (*asess) {
+            if (!hci_usb_is_external())
+                hb_host_bdaddr_learn_console(*hci);
             log_line("bt: back after %d tries", attempt);
         note_event("Bluetooth is back");
             (void)diag_save();
@@ -3551,6 +3666,7 @@ int main(void)
     headset_ini ini;
     int rc = 2, mk_errno = 0, lock_rc, lock_errno = 0, log_ok;
     char prev_tail[360] = "";
+    char why[160] = "";
 
     /* First sign of life, before any file, lock or library work: if this
      * toast shows but nothing else happens, the payload did start and the
@@ -3591,6 +3707,9 @@ int main(void)
         }
     }
     log_ok = log_open(LOG_PATH);
+    /* Bundle Realtek USB firmware onto the console so a UB600 / RTL8761BU
+     * needs no manual copy under /data/hearbridge/firmware/. */
+    hb_rtl_ensure_firmware();
     diag_init(NULL);           /* file path set once we own the lock */
     diag_set("hearbridge", "%s (one build for all firmwares, compiled %s)", HEARBRIDGE_VERSION,
              __DATE__);
@@ -3598,27 +3717,21 @@ int main(void)
     /* A newly sent ELF always wins, whatever version is running (same
      * one included): the old instance is asked to stop (stop file +
      * SIGTERM; it closes the headset, the page and the Bluetooth device),
-     * killed if it has not stopped after 10 s, and this one starts. */
+     * killed if it has not stopped after a few seconds, and this one starts. */
     {
         long old_pid = 0;
-        lock_rc = lock_take_over(LOCK_PATH, HB_STOP_PATH, 10000, 3000, &lock_errno, &old_pid);
+        lock_rc = lock_take_over(LOCK_PATH, HB_STOP_PATH, 8000, 3000, &lock_errno, &old_pid);
         if (old_pid && lock_rc != LOCK_BUSY) {
-            /* The lock is free once its file is closed; the process may still
-             * be releasing the USB device. Wait until it is really gone. */
             if (!hb_wait_pid_gone(old_pid, 5000))
                 log_line("takeover: pid %ld still listed 5 s after it let go of the lock", old_pid);
-        } else if (lock_rc != LOCK_BUSY) {
-            /* No lock holder, but a copy may still run without one: its state
-             * folder was deleted (#25), or it is from before 1.3.1 and has no
-             * name of its own. Found by name, or by the page port it holds. */
-            old_pid = hb_stop_named(HB_PROC_NAME, HB_STOP_PATH, 10000);
-            if (hb_port_takeover(HB_HTTP_PORT, HB_STOP_PATH, 12000) > 0 && !old_pid) old_pid = -1;
-            if (old_pid && lock_rc == LOCK_OK) {
-                /* Its exit deleted the lock file we had just written: write it again. */
-                lock_release();
-                lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
-                if (lock_rc == LOCK_BUSY) lock_rc = LOCK_OK;   /* carry on, as before the takeover */
-            }
+        }
+        /* Always clear any leftover copy by name and page port — a stale
+         * lock file or a copy blocked in USB must not leave :8090 on an
+         * older version after a fresh send. */
+        hb_force_replace(HB_STOP_PATH);
+        if (lock_rc == LOCK_BUSY || lock_rc == LOCK_OK) {
+            lock_release();
+            lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
         }
         if (old_pid && lock_rc != LOCK_BUSY) {
             if (old_pid > 0)
@@ -3626,11 +3739,13 @@ int main(void)
             else
                 log_line("HearBridge PS5 %s: replaced the running instance (found by its page port)", HEARBRIDGE_VERSION);
             notify("HearBridge %s: replaced the running copy", HEARBRIDGE_VERSION);
-            usleep(500 * 1000);   /* let the controller settle after its teardown */
+            usleep(500 * 1000);
+        } else if (lock_rc != LOCK_BUSY) {
+            /* force_replace may have cleared a nameless / port-only copy. */
+            log_line("HearBridge PS5 %s: startup after replace sweep", HEARBRIDGE_VERSION);
         }
     }
     if (lock_rc == LOCK_BUSY) {
-        /* Could not stop it: still bring back a deleted icon. */
         log_line("HearBridge PS5 %s: the running instance would not stop; refreshing the home-screen icon only",
                  HEARBRIDGE_VERSION);
         home_tile(1);
@@ -3717,6 +3832,7 @@ int main(void)
     sysinfo_collect();
     (void)avcap2_probe();
     (void)hci_usb_survey();
+    refresh_adapter_picks();
     /* Game detection and the rest mode watch look their system calls up
      * here, one after the other: the kernel_dynlib_* helpers are not safe
      * to run from several threads at once (fw 10.20 lost lookups when the
@@ -3746,6 +3862,15 @@ int main(void)
         bt_failed_wait("error hci-open-failed");
         goto out;
     }
+    note_adapter();
+    if (!bt_adapter_bringup(hci, hci_usb_is_external(), why, (int)sizeof why)) {
+        log_line("hearbridge: Bluetooth adapter setup failed: %s", why[0] ? why : "unknown");
+        diag_set("bt adapter", "%s", why[0] ? why : "setup failed");
+        (void)diag_save();
+        notify("HearBridge: adapter setup failed\n%s", why[0] ? why : "see /api/diag");
+        bt_failed_wait("error adapter-setup-failed");
+        goto close_hci;
+    }
     {
         int vid, pid;
         if (hci_usb_chip(&vid, &pid)) {
@@ -3769,29 +3894,48 @@ int main(void)
         bt_failed_wait("error controller-setup-failed");
         goto close_hci;
     }
+    if (!hci_usb_is_external())
+        hb_host_bdaddr_learn_console(hci);
     hci_scan_check(hci);   /* page scan left off by a copy that died mid-pause */
 
     /* Stream until stopped; reconnect after a drop or failure. The web
      * page can pause (Disconnect) and resume (Connect). */
     for (;;) {
-        int r, paused;
-        if (transport_dead(hci)) {
+        int r, paused, want_ad = 0;
+        CTL_LOCK(&g_ctl);
+        want_ad = g_ctl.req_adapter;
+        if (want_ad) g_ctl.req_adapter = 0;
+        CTL_UNLOCK(&g_ctl);
+        if (want_ad || transport_dead(hci)) {
             CTL_LOCK(&g_ctl);
             paused = g_ctl.paused;
             CTL_UNLOCK(&g_ctl);
+            if (want_ad) note_event("Switching Bluetooth adapter");
             if (!reopen_bt(&hci, &asess, &opts, &ini)) { rc = 0; break; }
             (void)headset_ini_load(&ini);
             g_rest_resume = g_rest_wake = 0;   /* the reconnect below covers it */
             if (ini.ok && !paused && !held(ini.addr)) {
-                /* Back from rest mode: the headset we were using, right away. */
+                /* Rest mode or a Settings adapter change: the headset we were
+                 * using, right away. (Adapter switch used to skip this, so the
+                 * page left the headset disconnected after reopen.) */
                 memset(&g_pending, 0, sizeof g_pending);
                 g_pending.kind = CMD_RECONNECT;
+                if (want_ad) g_user_connect = 1;
             }
         }
         r = run_session(asess, hci, &ini);
         persist_gain_if_dirty();
         if (r == RUN_STOP) { rc = 0; break; }
         if (r == RUN_SWITCH || r == RUN_FORGOT) continue;   /* g_pending: the next step */
+        {
+            /* Adapter change mid-stream returns RUN_AWAY with req_adapter set:
+             * reopen + reconnect at the top, do not sit in idle first. */
+            int ad = 0;
+            CTL_LOCK(&g_ctl);
+            ad = g_ctl.req_adapter;
+            CTL_UNLOCK(&g_ctl);
+            if (ad) continue;
+        }
         CTL_LOCK(&g_ctl);
         paused = g_ctl.paused;
         g_ctl.req_connect = 0;
@@ -3843,6 +3987,13 @@ int main(void)
                 int go;
                 if (hb_stop_requested()) break;
                 if (transport_dead(hci)) break;          /* reopened at the top */
+                {
+                    int ad = 0;
+                    CTL_LOCK(&g_ctl);
+                    ad = g_ctl.req_adapter;
+                    CTL_UNLOCK(&g_ctl);
+                    if (ad) break;                       /* reopen at the top */
+                }
                 if (g_rest_resume && (g_rest_wake || woke_up())) {
                     /* We stopped it for rest mode: the same headset, now. */
                     g_rest_resume = g_rest_wake = 0;
