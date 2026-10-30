@@ -111,7 +111,15 @@ int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
     {
         int is_rtl = (vid >= 0) && btchip_is_realtek(vid);
         hb_host_bdaddr_sync_usb(hci, is_csr, is_rtl);
-        /* CSR warm reset / Realtek firmware Reset clear the event mask. */
+        /* Probe transport: a dead USB pipe after BD_ADDR work must fail
+         * bring-up cleanly so main can reopen, not limp into a2dp_open. */
+        if (!hci_cmd_sync(hci, HB_OP_READ_BD_ADDR, NULL, 0, cc, &cc_len, (int)sizeof cc)) {
+            fail(why, why_cap, "adapter USB went away after BD_ADDR sync");
+            log_line("adapter: HCI dead after BD_ADDR sync");
+            return 0;
+        }
+        /* Realtek firmware Reset clears the event mask; put it back. CSR
+         * no longer warm-resets here, but re-applying the mask is cheap. */
         if (is_csr) {
             if (!hci_cmd_sync(hci, HB_OP_SET_EVENT_MASK, g_evmask_csr, 8, cc, &cc_len,
                               (int)sizeof cc))

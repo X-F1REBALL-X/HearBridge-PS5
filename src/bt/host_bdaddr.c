@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "hci_cmd.h"
 #include "log.h"
@@ -142,26 +141,12 @@ static int csr_write_bdaddr(hci_t hci, const unsigned char addr[6])
     return 1;
 }
 
-static int csr_warm_reset(hci_t hci)
-{
-    unsigned char cmd[] = {
-        0x02, 0x00, 0x09, 0x00,
-        0x00, 0x00, 0x01, 0x40, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    };
-    unsigned char rp[64];
-    int rp_len = 0;
-
-    /* Warm reset often yields no tidy reply; fire and settle. */
-    (void)csr_vendor(hci, cmd, (int)sizeof cmd, rp, &rp_len, (int)sizeof rp);
-    usleep(500 * 1000);
-    return 1;
-}
-
+/* BCCMD warm reset (VARID 0x4001) drops the CSR8510 USB HCI pipe on PS5
+ * (Input/output error on the next command) and left bring-up dead. Persist
+ * PSKEY_BDADDR only; the new address loads on the next USB re-enumeration
+ * (unplug/replug or a later reopen). Soft HCI Reset does not reload PS. */
 static int csr_apply(hci_t hci, const unsigned char want[6])
 {
-    unsigned char cc[32];
-    int cc_len = 0;
     char astr[18];
 
     hci_addr_str(want, astr);
@@ -169,12 +154,9 @@ static int csr_apply(hci_t hci, const unsigned char want[6])
         log_line("host_bdaddr: CSR write %s failed", astr);
         return 0;
     }
-    log_line("host_bdaddr: CSR PSKEY_BDADDR set to %s, warm reset", astr);
-    csr_warm_reset(hci);
-    if (!hci_cmd_sync(hci, HB_OP_RESET, NULL, 0, cc, &cc_len, (int)sizeof cc)) {
-        log_line("host_bdaddr: HCI Reset after CSR warm reset failed");
-        return 0;
-    }
+    log_line("host_bdaddr: CSR PSKEY_BDADDR saved as %s "
+             "(no warm reset — unplug/replug this stick once to apply)",
+             astr);
     return 1;
 }
 
