@@ -503,6 +503,67 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 .band{grid-template-columns:5.6rem minmax(0,1fr) 3.6rem}
 .logp .evlog{max-height:14rem}
 }
+
+/* 1.3.16 lighter UI */
+:root{--ink:#f2f0eb;--ink2:#c8c4bb;--mute:#9e998f;--void:#121117;--deck:#1a1820;--card:#24212c;--edge:#353240;--edge2:#45414f;
+--lime:#9fd96a;--ember:#e8895a;--cyan:#6ebfd4;--violet:#a894d4;--blue:#7aa8e0;--teal:#8fb8b2;--rose:#d4a0c0;--warn:#e0b06a;--bad:#e07080;
+--gap:1.25rem}
+html{font-size:17px}
+body{background:radial-gradient(70vw 55vh at 90% -10%,rgba(232,137,90,.08),transparent 55%),
+radial-gradient(55vw 45vh at -5% 110%,rgba(159,217,106,.05),transparent 55%),var(--void)!important;
+line-height:1.45}
+.wrap{padding:var(--s4) var(--s5) 5rem;gap:var(--gap)}
+.bar{border-bottom:1px solid var(--edge);margin-bottom:var(--gap);padding-bottom:var(--s4)}
+.brand h1{font-size:1.35rem;letter-spacing:.14em}
+.logo{background:var(--lime);box-shadow:none;border-radius:.35rem;transform:none}
+.logo svg{transform:none}
+.ver{background:var(--card);color:var(--ink2);border:1px solid var(--edge);transform:none}
+.by{font-size:.85rem;font-weight:600;text-shadow:none;opacity:.85}
+.live{border-radius:.75rem;transform:none;border-width:1px;letter-spacing:.06em;min-height:2.8rem}
+.live i,.live span{transform:none}
+.live i{border-radius:50%;transform:none;width:.65rem;height:.65rem}
+.panel{border-radius:1rem;clip-path:none!important;border:1px solid var(--edge);border-inline-start:3px solid var(--acc,var(--ember));
+padding:var(--s4) var(--s5);box-shadow:0 .4rem 1.4rem rgba(0,0,0,.25)}
+[dir=rtl] .panel{clip-path:none!important}
+.label{letter-spacing:.12em;font-size:.85rem;margin-bottom:var(--s4)}
+.label:before{border-radius:50%;transform:none}
+button{min-height:3.2rem;font-size:1.05rem;border-radius:.55rem}
+button:before{transform:none!important;border-radius:.55rem;left:0;right:0}
+button:focus{transform:none}
+button:hover:before,button:focus:before{border-color:var(--lime);box-shadow:0 0 0 3px rgba(159,217,106,.28)}
+button.xl{min-height:3.8rem;font-size:1.3rem}
+button.act:before{background:var(--lime);border-color:var(--lime)}
+.hero{display:flex;flex-direction:column;gap:var(--s4);padding:var(--s5);margin-bottom:var(--gap);
+background:linear-gradient(165deg,rgba(255,255,255,.04),transparent 50%),var(--deck);
+border:1px solid var(--edge);border-radius:1.15rem;box-shadow:0 .6rem 1.8rem rgba(0,0,0,.3)}
+.hero .now{display:flex;align-items:center;gap:var(--s4)}
+.hero .nowico{width:3.2rem;height:3.2rem;display:flex;align-items:center;justify-content:center;
+background:var(--card);border-radius:.85rem;color:var(--lime)}
+.hero .nowico svg{width:1.9rem;height:1.9rem}
+.hero .dev{font-size:1.55rem;font-weight:800;margin:0;line-height:1.2}
+.hero .hsinfo{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+.hero .hsi{background:var(--card);border:1px solid var(--edge);border-radius:.75rem;padding:var(--s3) var(--s4);
+display:flex;flex-direction:column;gap:.2rem}
+.hero .hsi .k{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase}
+.hero .hsi .v{font-size:1.35rem}
+.hero .hsb{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);margin-top:var(--s2)}
+.hero .hsb button{min-height:3.6rem;font-size:1.15rem}
+.hero .idle2{font-size:1.05rem;margin:0}
+.adv{margin:var(--gap) 0;border:1px solid var(--edge);border-radius:1rem;background:var(--deck);padding:0}
+.adv>summary{list-style:none;cursor:pointer;padding:var(--s4) var(--s5);font-weight:800;font-size:1.05rem;
+display:flex;align-items:center;justify-content:space-between;min-height:3.4rem;color:var(--ink)}
+.adv>summary::-webkit-details-marker{display:none}
+.adv>summary:after{content:"+";font-size:1.4rem;color:var(--mute);font-weight:400}
+.adv[open]>summary:after{content:"–"}
+.adv>summary:hover,.adv>summary:focus{color:var(--lime)}
+.adv .advbody{padding:0 var(--s5) var(--s5);display:flex;flex-direction:column;gap:var(--gap)}
+.adv .panel{margin:0}
+.grid{grid-gap:var(--gap)}
+.col{gap:var(--gap)}
+@media (min-width:1100px){
+  .grid{grid-template-columns:minmax(0,1.1fr) minmax(0,1.2fr)}
+}
+
 </style>
 </head>
 <body><div class="wrap">
@@ -515,20 +576,18 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 </header>
 <div class="msg" id="msg"></div><div class="toast" id="toast"></div>
 <main class="grid">
-<div class="col c1">
-<section class="panel conn"><div class="phead"><p class="label" data-i18n="connection">Connection</p><button id="stop" class="red sm" data-i18n="stop">Stop HearBridge</button></div>
-<div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
-<p class="k note cno" id="codecno"></p>
-<p class="k note cno" id="xqnote"></p>
-<div class="latp latin"><p class="sub" data-i18n="latency">Latency</p>
-<div class="latm"><div class="lt lt1 la"><button type="button" id="latauto" class="sm" data-i18n="codecAuto">Auto</button><input type="range" id="lat" min="40" max="400" step="1"><span class="v" id="latt">-</span></div>
-<div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big"><span id="latv">-</span><span class="llsave" id="llsave"></span></span></div>
-</div>
-</div>
+<section class="hero" id="hspanel"><p class="label" data-i18n="headsetPanel">Headset</p>
+<div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
+<div class="hsinfo"><span class="hsi"><span class="k" data-i18n="battery">Battery</span><span class="v" id="batm">-</span></span><span class="hsi"><span class="k" data-i18n="signal">Signal</span><span class="v" id="lqm">-</span></span></div>
+<div id="stats" style="display:none"><div class="kv hskv">
+<span class="k" data-i18n="format">Format</span><span class="chips" id="fmt">-</span>
+<span class="k" data-i18n="link">Link quality</span><span class="v" id="lqv">-</span>
+</div></div>
+<p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p>
+<p class="sub" data-i18n="switchHs">Switch headset</p>
+<div class="qs" id="qs"></div>
+<div class="btns hsb"><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div>
 </section>
-<section class="panel logp"><p class="label" data-i18n="log">Log</p>
-<div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section>
-</div>
 <div class="col c2">
 <section class="panel eqp" id="eqp"><div class="phead"><p class="label" data-i18n="sound">Sound</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div>
 <div class="gline" id="gline" style="display:none"><span class="gic sm" id="glic"></span><span id="gltxt">-</span><button type="button" id="gupd" class="gup" disabled data-i18n="gameUpdate">Update Game Profile</button></div>
@@ -553,19 +612,18 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <button type="button" class="night" id="night"><span class="nt"><b data-i18n="night">Night mode</b><small data-i18n="nightHint">Quieter explosions, clearer voices</small></span><span class="sw" id="nightsw"></span></button>
 </section>
 </div>
-<div class="col c3">
-<section class="panel hs" id="hspanel"><p class="label" data-i18n="headsetPanel">Headset</p>
-<div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
-<div class="hsinfo"><span class="hsi"><span class="k" data-i18n="battery">Battery</span><span class="v" id="batm">-</span></span><span class="hsi"><span class="k" data-i18n="signal">Signal</span><span class="v" id="lqm">-</span></span></div>
-<div id="stats" style="display:none"><div class="kv hskv">
-<span class="k" data-i18n="format">Format</span><span class="chips" id="fmt">-</span>
-<span class="k" data-i18n="link">Link quality</span><span class="v" id="lqv">-</span>
-</div></div>
-<p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p>
-<p class="sub" data-i18n="switchHs">Switch headset</p>
-<div class="qs" id="qs"></div>
-<div class="btns hsb"><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div>
-</section>
+<div class="col c1">
+<details class="adv" id="advbox"><summary data-i18n="tabDetails">Details</summary><div class="advbody"><section class="panel conn"><div class="phead"><p class="label" data-i18n="connection">Connection</p><button id="stop" class="red sm" data-i18n="stop">Stop HearBridge</button></div>
+<div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
+<p class="k note cno" id="codecno"></p>
+<p class="k note cno" id="xqnote"></p>
+<div class="latp latin"><p class="sub" data-i18n="latency">Latency</p>
+<div class="latm"><div class="lt lt1 la"><button type="button" id="latauto" class="sm" data-i18n="codecAuto">Auto</button><input type="range" id="lat" min="40" max="400" step="1"><span class="v" id="latt">-</span></div>
+<div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big"><span id="latv">-</span><span class="llsave" id="llsave"></span></span></div>
+</div>
+</div>
+</section><section class="panel logp"><p class="label" data-i18n="log">Log</p>
+<div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section></div></details>
 </div>
 </main>
 </div>
