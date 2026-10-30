@@ -227,6 +227,10 @@ STATUS.chip = { vid: '0bda', pid: '8771', vendor: 'Realtek', mediatek: 0, profil
 STATUS.adapter = { external: 1, node: '/dev/ugen1.2' };
 global.hbTest.req('/api/status');
 check(el('chipv').textContent === 'USB adapter (ugen1.2) · Realtek (0bda:8771)', 'page: USB adapter');
+STATUS.chip = { vid: '0a12', pid: '0001', vendor: 'CSR', mediatek: 0, profile: 'default' };
+STATUS.adapter = { external: 1, node: '/dev/ugen2.2' };
+global.hbTest.req('/api/status');
+check(el('chipv').textContent === 'USB adapter (ugen2.2) · CSR (0a12:0001)', 'page: CSR USB adapter');
 STATUS.chip = { vid: '0e8d', pid: '3605', vendor: 'MediaTek', mediatek: 1, profile: 'mediatek' };
 STATUS.adapter = { external: 0, node: '/dev/ugen0.2' };
 global.hbTest.req('/api/status');

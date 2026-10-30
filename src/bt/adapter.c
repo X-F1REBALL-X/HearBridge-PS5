@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "btchip.h"
 #include "hci_cmd.h"
+#include "hci_usb.h"
 #include "log.h"
 #include "realtek_fw.h"
 
@@ -31,7 +33,22 @@ int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
     }
     log_line("adapter: HCI Reset done, controller is ours");
 
-    if (!hb_rtl_prepare(hci, why, why_cap)) return 0;
+    /* Realtek ROM-mode sticks need a patch upload. CSR8510 (0a12:0001) and
+     * other plain HCI / class e0:01:01 dongles do not: skip by USB VID when
+     * known so we never touch the Realtek path on them. Unknown VID still
+     * goes through prepare (it no-ops unless the LMP manufacturer is Realtek). */
+    {
+        int vid = -1, pid = -1;
+        int known = hci_usb_chip(&vid, &pid);
+        if (known && !btchip_is_realtek(vid)) {
+            char chip[64];
+            btchip_describe(vid, pid, chip, (int)sizeof chip);
+            log_line("adapter: %s plain HCI, no firmware download",
+                     chip[0] ? chip : "USB stick");
+        } else if (!hb_rtl_prepare(hci, why, why_cap)) {
+            return 0;
+        }
+    }
 
     /* A Low Energy only stick enumerates and answers HCI, but cannot do
      * A2DP; reject it instead of leaving an adapter that never streams.

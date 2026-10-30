@@ -246,14 +246,23 @@ int main(int argc, char **argv)
         CHECK(btchip_vendor(0x1286) && !strcmp(btchip_vendor(0x1286), "Marvell/NXP"), "chip: 1286 is Marvell/NXP");
         CHECK(btchip_vendor(0x0e8d) && !strcmp(btchip_vendor(0x0e8d), "MediaTek"), "chip: 0e8d is MediaTek");
         CHECK(btchip_vendor(0x0bda) && !strcmp(btchip_vendor(0x0bda), "Realtek"), "chip: 0bda is Realtek");
+        CHECK(btchip_vendor(0x0a12) && !strcmp(btchip_vendor(0x0a12), "CSR"), "chip: 0a12 is CSR");
         CHECK(btchip_vendor(0x8087) && !strcmp(btchip_vendor(0x8087), "Intel"), "chip: 8087 is Intel");
         CHECK(!btchip_vendor(0xabcd) && !btchip_vendor(-1), "chip: other VIDs unknown");
         CHECK(btchip_is_mediatek(0x0e8d) && !btchip_is_mediatek(0x1286) && !btchip_is_mediatek(-1),
               "chip: only 0e8d counts as MediaTek");
+        CHECK(btchip_is_realtek(0x0bda) && !btchip_is_realtek(0x0a12) && !btchip_is_realtek(-1),
+              "chip: only 0bda counts as Realtek");
+        CHECK(btchip_is_csr(0x0a12) && !btchip_is_csr(0x0bda) && !btchip_is_csr(-1),
+              "chip: only 0a12 counts as CSR");
         btchip_describe(0x1286, 0x2059, d, (int)sizeof d);
         CHECK(!strcmp(d, "Marvell/NXP (1286:2059)"), "chip: Marvell description");
         btchip_describe(0x0e8d, 0x0608, d, (int)sizeof d);
         CHECK(!strcmp(d, "MediaTek (0e8d:0608)"), "chip: MediaTek description");
+        btchip_describe(0x0a12, 0x0001, d, (int)sizeof d);
+        CHECK(!strcmp(d, "CSR8510 (0a12:0001)"), "chip: CSR8510 description");
+        btchip_describe(0x0a12, 0x0002, d, (int)sizeof d);
+        CHECK(!strcmp(d, "CSR (0a12:0002)"), "chip: other CSR PID keeps the vendor name");
         btchip_describe(0xabcd, 0x0012, d, (int)sizeof d);
         CHECK(!strcmp(d, "abcd:0012"), "chip: unknown vendor shows only the IDs");
         btchip_describe(-1, -1, d, (int)sizeof d);
@@ -275,6 +284,10 @@ int main(int argc, char **argv)
     get(&c, "/api/status");
     CHECK(strstr(out, "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
           "status: Marvell chip, default profile");
+    c.chip_vid = 0x0a12; c.chip_pid = 0x0001;
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"chip\":{\"vid\":\"0a12\",\"pid\":\"0001\",\"vendor\":\"CSR\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
+          "status: CSR8510 chip line shows CSR");
     c.chip_vid = 0x0e8d; c.chip_pid = 0x0608;
     get(&c, "/api/status");
     CHECK(strstr(out, "\"vid\":\"0e8d\",\"pid\":\"0608\",\"vendor\":\"MediaTek\",\"mediatek\":1,\"profile\":\"mediatek\"") != NULL,

@@ -3519,11 +3519,18 @@ static void lw_tick(const headset_ini *ini)
 static void note_adapter(void)
 {
     char list[HB_BT_NODES_MAX][32];
-    int n, i, outn = 0;
+    int n, i, outn = 0, vid = -1, pid = -1;
     CTL_LOCK(&g_ctl);
     g_ctl.bt_external = hci_usb_is_external();
     snprintf(g_ctl.bt_node, sizeof g_ctl.bt_node, "%s", hci_usb_node());
     hb_adapter_pref_word(g_ctl.bt_pref, (int)sizeof g_ctl.bt_pref);
+    if (hci_usb_chip(&vid, &pid)) {
+        g_ctl.chip_vid = vid;
+        g_ctl.chip_pid = pid;
+    } else {
+        g_ctl.chip_vid = -1;
+        g_ctl.chip_pid = -1;
+    }
     n = hci_usb_list_nodes(list, HB_BT_NODES_MAX);
     for (i = 0; i < n && outn < HB_BT_NODES_MAX; i++) {
         const char *p = list[i];

@@ -64,6 +64,9 @@ int main(void)
 
     /* profile by VID */
     CHECK(btchip_profile(0x1286, -1) == BTCHIP_PROFILE_DEFAULT, "profile: Marvell/NXP 1286 gets the default profile");
+    CHECK(btchip_profile(0x0a12, -1) == BTCHIP_PROFILE_DEFAULT, "profile: CSR 0a12 gets the default profile");
+    CHECK(btchip_is_csr(0x0a12) && btchip_is_realtek(0x0bda) && !btchip_is_realtek(0x0a12),
+          "profile: CSR / Realtek helpers");
     CHECK(btchip_profile(0x0e8d, -1) == BTCHIP_PROFILE_MEDIATEK, "profile: MediaTek 0e8d gets the mediatek profile");
     CHECK(btchip_profile(0xabcd, -1) == BTCHIP_PROFILE_DEFAULT && btchip_profile(-1, -1) == BTCHIP_PROFILE_DEFAULT,
           "profile: unknown or missing VID keeps the default profile");
