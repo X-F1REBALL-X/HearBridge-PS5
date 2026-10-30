@@ -6,23 +6,29 @@
 
 Developed by **X-F1REBALL-X**
 
-🇺🇸 **English** · 🇸🇦 [العربية](README.ar.md) · 🇪🇸 [Español](README.es.md) · 🇫🇷 [Français](README.fr.md) · 🇩🇪 [Deutsch](README.de.md) · 🇧🇷 [Português](README.pt.md) · 🇷🇺 [Русский](README.ru.md) · 🇯🇵 [日本語](README.ja.md) · 🇨🇳 [中文](README.zh.md) · 🇮🇹 [Italiano](README.it.md)
+🇺🇸 **English** · 🇸🇦 [العربية](README.ar.md)
 
 </div>
 
 **HearBridge family:** [PS5](https://github.com/X-F1REBALL-X/HearBridge-PS5) · [PS4](https://github.com/X-F1REBALL-X/HearBridge-PS4) · [Browser](https://github.com/X-F1REBALL-X/HearBridge-Browser)
 
+HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on regular Bluetooth headphones, using the console's own Bluetooth or a USB stick. You control it from a web page served by the console.
 
-HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on regular Bluetooth headphones, using the console's own Bluetooth. You control it from a web page served by the console.
-
-<p align="center"><img src="docs/img/ui-tv.png" alt="HearBridge PS5 web page" width="440"> <img src="docs/img/ui-settings.png" alt="HearBridge PS5 web page" width="440"></p>
+<p align="center">
+<img src="docs/img/ui-tv.png" alt="HearBridge home" width="440">
+<img src="docs/img/ui-details.png" alt="HearBridge Details" width="440">
+</p>
+<p align="center">
+<img src="docs/img/ui-adapter.png" alt="Bluetooth adapter picker" width="640">
+</p>
 
 ## Highlights
 
-- One file for every PS5, Marvell/NXP or MediaTek Bluetooth.
-- **USB Bluetooth adapters too**, including Realtek sticks that boot in ROM mode.
-- Game profiles: your sound follows the game and the headset.
-- Battery percent, night mode and one-tap headset switching.
+- One file for every PS5 (Marvell/NXP or MediaTek Bluetooth).
+- **USB Bluetooth adapters:** Realtek RTL8761BU (bundled firmware) and CSR8510, plus the console chip.
+- **Adapter picker** in Settings with instant switching; one pairing shared across adapters.
+- Single-screen UI for a 1080p TV: larger controls, Details panel for EQ, codecs and the log.
+- Game profiles, battery percent, night mode and one-tap headset switching.
 
 ## Install
 
@@ -34,56 +40,36 @@ Everything else, from features to troubleshooting, is in the **[guide](https://x
 
 ## USB Bluetooth adapter
 
-Plug in a USB Bluetooth adapter and HearBridge uses it automatically; without
-one it uses the console's own chip. An adapter is not shared with the console's
-gamepad, so the controller can connect and reconnect normally while audio is
-streaming.
+Plug in a USB stick and HearBridge can use it instead of the console chip. The stick is not shared with the DualSense, so the controller keeps connecting normally while audio streams.
 
-Pick the controller under **Settings > Details > Bluetooth adapter**:
-**Auto** (USB stick when one is plugged in, else the console chip), **Console
-chip**, **USB adapter**, or a listed ugen node when more than one stick is
-present. A change is written to `/data/hearbridge/adapter` and Bluetooth is
-restarted. You can still create that file by hand with one line:
+Supported sticks today:
+
+- **Realtek RTL8761BU** (UB500 / UB600, USB id `0BDA:B00C` / `0BDA:8771`) — firmware is **bundled in the ELF** and written to `/data/hearbridge/firmware/` on start.
+- **CSR8510** — works as a plain USB HCI adapter, no extra firmware.
+
+Under **Settings → Details → Bluetooth adapter** pick **Auto**, **Console chip**, or a listed stick (for example Realtek / CSR). The change is saved to `/data/hearbridge/adapter` and Bluetooth restarts right away. Pairing is shared across adapters, so you do not have to pair the same headset again after switching.
+
+You can still set the preference by hand with one line in `/data/hearbridge/adapter`:
 
 ```text
-auto        # default: a USB adapter if one is present, else the console chip
-internal    # always the console's own chip
-usb         # always a USB adapter (start fails if there is none)
+auto        # USB stick when present, else the console chip
+internal    # always the console chip
+usb         # always a USB adapter
 ugen1.2     # one specific ugen node
 ```
 
-The same Details page shows which adapter is in use and its chip under **Chip**.
-
 ### Realtek ROM-only adapters
 
-Some Realtek sticks (RTL8761BU/UB500/UB600 and other USB parts) start in a ROM
-mode that answers Bluetooth commands but cannot scan until a patch is uploaded.
-HearBridge uploads it the same way Linux's `btrtl` does, from files under
-`/data/hearbridge/firmware/`.
-
-For the RTL8761BU (UB500/UB600, USB id `0BDA:B00C` / `0BDA:8771`) the matching
-files are **bundled in the ELF** and written there automatically on start:
+Some Realtek sticks start in ROM mode and need a patch before they can scan. HearBridge uploads it the same way Linux `btrtl` does. For RTL8761BU the files are bundled:
 
 ```text
 /data/hearbridge/firmware/rtl8761bu_fw.bin
 /data/hearbridge/firmware/rtl8761bu_config.bin
 ```
 
-No manual copy is needed for that stick. Other Realtek USB parts the loader
-knows still need their files placed there by hand. Those files are in the
-`linux-firmware` package (`/lib/firmware/rtl_bt/` on Linux, `firmware-realtek`
-on Debian and Ubuntu) or in the
-[`rtl_bt` tree of linux-firmware](https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/rtl_bt).
-The adapter name and the file it needs are in the log
-(`/data/hearbridge/hearbridge.log`). Only the RTL8761BU (the UB600) has been
-tested on hardware. The loader also knows the other USB chips in Linux's
-`btrtl` table, but they are untested; in particular the secure-boot parts
-(RTL8852AU/BU/CU, RTL8851BU, RTL8922AU, RTL8852BTU) take their patch from the
-key-id security sections, a path that has not been run on a console yet.
-
-Pairing keys belong to one Bluetooth controller. A headset paired with the
-console's chip may have to be paired once more after switching to a USB adapter
-(or the other way round).
+Other Realtek USB parts the loader knows still need their blobs from
+[`linux-firmware` `rtl_bt`](https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/rtl_bt)
+placed under `/data/hearbridge/firmware/`. Only RTL8761BU has been tested on hardware.
 
 ## Build
 
