@@ -28,6 +28,7 @@
 
 #include "acl_track.h"
 #include "hci_usb.h"
+#include "adapter_pref.h"
 #include "hcidbg.h"
 #include "usb_hci_desc.h"
 #include "hci_cmd.h"
@@ -827,15 +828,14 @@ fail:
  * old one may still hold the controller's transfer slots for a moment. */
 #define HCI_BUSY_RETRY_MS 8000
 #define HB_INTERNAL_NODE  "/dev/ugen0.2"
-#define HB_ADAPTER_PATH   "/data/hearbridge/adapter"
 #define HCI_MAX_NODES     24
 
 /* Defined with the diagnostics survey below. */
 static int list_ugen(char names[][32], int max);
 
-/* Which controller the user asked for:
- *   auto (default), internal, usb (adapter or nothing), or ugenX.Y. */
-enum { SEL_AUTO, SEL_INTERNAL, SEL_USB, SEL_NODE };
+/* Which controller the user asked for (see adapter_pref.h). */
+enum { SEL_AUTO = HB_SEL_AUTO, SEL_INTERNAL = HB_SEL_INTERNAL,
+       SEL_USB = HB_SEL_USB, SEL_NODE = HB_SEL_NODE };
 
 static int is_internal_node(const char *path)
 {
@@ -861,39 +861,6 @@ static void sort_nodes(char names[][32], int n)
         }
 }
 
-/* Reads /data/hearbridge/adapter. Missing/blank = auto. An explicit
- * ugenX.Y (with or without /dev/) is used as it is. */
-static int adapter_selection(char *node, int cap)
-{
-    FILE *f;
-    char line[64], word[16];
-    int n = 0, i;
-
-    if (node && cap > 0) node[0] = 0;
-    f = fopen(HB_ADAPTER_PATH, "r");
-    if (!f) return SEL_AUTO;
-    if (!fgets(line, sizeof line, f)) line[0] = 0;
-    fclose(f);
-    line[strcspn(line, "\r\n")] = 0;
-    while (line[n] == ' ' || line[n] == '\t') n++;
-    for (i = 0; line[n] && line[n] != ' ' && line[n] != '\t' && i < (int)sizeof word - 1; n++) {
-        char c = line[n];
-        word[i++] = (c >= 'A' && c <= 'Z') ? (char)(c - 'A' + 'a') : c;
-    }
-    word[i] = 0;
-    if (!word[0] || !strcmp(word, "auto")) return SEL_AUTO;
-    if (!strcmp(word, "internal") || !strcmp(word, "console")) return SEL_INTERNAL;
-    if (!strcmp(word, "usb") || !strcmp(word, "external") || !strcmp(word, "adapter"))
-        return SEL_USB;
-    if (!strncmp(word, "/dev/ugen", 9) || !strncmp(word, "ugen", 4)) {
-        if (node && cap > 0)
-            snprintf(node, (size_t)cap, "%s%s", word[0] == '/' ? "" : "/dev/", word);
-        return SEL_NODE;
-    }
-    log_line("hci_usb: %s says \"%s\", using auto", HB_ADAPTER_PATH, word);
-    return SEL_AUTO;
-}
-
 int hci_usb_open(hci_t *out)
 {
     static const char *const fallback[] = {
@@ -901,7 +868,7 @@ int hci_usb_open(hci_t *out)
         "/dev/ugen1.4", "/dev/ugen2.2", "/dev/ugen2.3",
     };
     char choice[32] = "";
-    int sel = adapter_selection(choice, (int)sizeof choice);
+    int sel = hb_adapter_selection(choice, (int)sizeof choice);
     struct usb_hci *u;
     long until = now_ms() + HCI_BUSY_RETRY_MS;
     int tries = 0;
@@ -1055,6 +1022,30 @@ static int list_ugen(char names[][32], int max)
             snprintf(names[n++], 32, "/dev/%.24s", e->d_name);
     cd(dir);
     return n;
+}
+
+
+/* Candidate Bluetooth nodes for the Settings picker: every ugen except
+ * root hubs (ugenX.1). The open path still probes which ones speak HCI. */
+int hci_usb_list_nodes(char names[][32], int max)
+{
+    char all[HCI_MAX_NODES][32];
+    int n = list_ugen(all, HCI_MAX_NODES), i, outn = 0;
+
+    if (!n) {
+        static const char *const fallback[] = {
+            "/dev/ugen0.2", "/dev/ugen0.3", "/dev/ugen1.2", "/dev/ugen1.3",
+            "/dev/ugen2.2", "/dev/ugen2.3",
+        };
+        for (i = 0; i < (int)(sizeof fallback / sizeof fallback[0]) && n < HCI_MAX_NODES; i++)
+            snprintf(all[n++], sizeof all[0], "%s", fallback[i]);
+    }
+    sort_nodes(all, n);
+    for (i = 0; i < n && outn < max; i++) {
+        if (is_root_hub(all[i])) continue;
+        snprintf(names[outn++], 32, "%s", all[i]);
+    }
+    return outn;
 }
 
 int hci_usb_survey(void)

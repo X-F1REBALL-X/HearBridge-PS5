@@ -178,6 +178,10 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .apick{color:var(--lime);font-weight:800}
 .seg button{overflow:hidden;text-overflow:ellipsis}
 .seg button.cur:before{border-color:rgba(200,255,61,.75);box-shadow:inset 0 0 0 1px rgba(200,255,61,.35)}
+#adnodes{grid-auto-flow:row;grid-template-columns:1fr 1fr;margin-top:var(--s1)}
+#adnodes:empty{display:none}
+#admsg{min-height:1.2em}
+
 .evlog{margin:0;font-size:.9rem;line-height:1.4;color:#e8edf2}
 .evlog .bad{color:#ff8a8a}.evlog .good{color:var(--lime)}.evlog .press{color:var(--cyan)}.evlog .k{color:var(--ink2)}
 .evlog div{padding:.12rem 0;border-top:1px solid var(--edge)}
@@ -626,6 +630,11 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 <div class="lkeys" id="lkeys"></div></div>
 <p class="sub" data-i18n="connection">Connection</p>
 <p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p>
+<p class="sub" data-i18n="adapterPick">Bluetooth adapter</p>
+<p class="k note" data-i18n="adapterHint">Auto prefers a USB stick when one is plugged in. Changing this restarts Bluetooth.</p>
+<div class="seg" id="adseg"><button type="button" id="adauto" data-i18n="adapterAuto">Auto</button><button type="button" id="adint" data-i18n="adapterInternal">Console chip</button><button type="button" id="adusb" data-i18n="adapterUsb">USB adapter</button></div>
+<div class="seg" id="adnodes"></div>
+<p class="k note" id="admsg"></p>
 <div class="chiprow"><span class="k" data-i18n="chip">Chip</span><span class="v" id="chipv">-</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div>
 </div>
 </div>
@@ -773,6 +782,18 @@ function evKind(s){return /could not|did not|didn't|busy|hung up|lost|not an aud
 /^playing|turned on|connected securely|reconnected|is back|^connecting to|signal good|night mode on|game sound on|^saved|restored|backup saved|downloaded/i.test(s)?'good':
 /^(connecting|disconnecting|reconnecting|forgetting|scan started)/i.test(s)?'press':''}
 function setHtml(id,h){var e=$(id);if(e.hbHtml!==h){e.hbHtml=h;e.innerHTML=h}}
+function drawAd(){var ad=S&&S.adapter||{},pref=ad.pref||'auto',nodes=ad.nodes||[],i,h='',cur;
+$('adauto').className=pref==='auto'?'act':'';
+$('adint').className=pref==='internal'?'act':'';
+$('adusb').className=pref==='usb'?'act':'';
+for(i=0;i<nodes.length;i++){cur=pref===nodes[i];
+h+='<button type="button" data-node="'+esc(nodes[i])+'" class="'+(cur?'act':'')+'">'+esc(nodes[i])+'</button>'}
+setHtml('adnodes',h);
+var b=$('adnodes').getElementsByTagName('button');
+for(i=0;i<b.length;i++)b[i].onclick=function(){pickAd(null,this.getAttribute('data-node'))}
+}
+function pickAd(mode,node){var p=mode?'/api/adapter?mode='+encodeURIComponent(mode):'/api/adapter?node='+encodeURIComponent(node);
+$('admsg').textContent=t('adapterRestart');act(p,function(){$('admsg').textContent=t('adapterSaved')})}
 function draw(){
 $('msg').textContent=MSGK?t(MSGK):'';
 $('ver').textContent=S.version;
@@ -803,6 +824,7 @@ var ch=S.chip||{},ad=S.adapter||{};
 var ct=(ad.node||ch.vid)?((ad.external?t('adapterUsb'):t('adapterInternal'))+(ad.node?' ('+ad.node.replace('/dev/','')+')':'')):'';
 var ci=ch.vid?(ch.vendor?ch.vendor+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'';
 $('chipv').textContent=(ct?(ci?ct+' · '+ci:ct):ci)||'-';
+drawAd();
 var ev=S.events||[],eh='';
 if(!ev.length)eh='<div class="k">'+esc(t('logEmpty'))+'</div>';
 else for(var ei=0;ei<ev.length;ei++)eh+='<div class="'+evKind(ev[ei])+'">'+esc(ev[ei])+'</div>';
@@ -985,6 +1007,7 @@ function markLat(){latTouch=1;$('latt').textContent=$('lat').value+' ms';pushLat
 $('lat').oninput=markLat;$('lat').onchange=markLat;
 $('lat').onmouseup=markLat;$('lat').ontouchend=markLat;$('lat').onpointerup=markLat;
 for(var cj=0;cj<4;cj++)$('cd'+cj).onclick=(function(m){return function(){if(!this.disabled)act('/api/codec?mode='+m)}})(cj);
+$('adauto').onclick=function(){pickAd('auto')};$('adint').onclick=function(){pickAd('internal')};$('adusb').onclick=function(){pickAd('usb')};
 function armScan(){scanLive=Date.now()+12000;$('scanning').style.display='';devices()}
 $('scan').onclick=scanPress;$('blkadd').onclick=blockAdd;
 $('stop').onclick=function(){if(confirm(t('stopConfirm')))act('/api/stop')};

@@ -103,6 +103,9 @@ check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150',
           'page: Settings > Details has the counters, AVRCP, peaks and latency breakdown');
     check(pg4.indexOf('id="chipv"') > 0 && pg4.indexOf('id="latnote"') > 0 && pg4.indexOf('id="fmtd"') > 0 && main.indexOf('id="chipv"') < 0,
           'page: chip, latency hint and full format details live in Settings > Details');
+    check(pg4.indexOf('id="adseg"') > 0 && pg4.indexOf('id="adnodes"') > 0 && pg4.indexOf('data-i18n="adapterPick"') > 0 &&
+          pg4.indexOf('id="adauto"') > 0 && pg4.indexOf('id="adint"') > 0 && pg4.indexOf('id="adusb"') > 0,
+          'page: Settings > Details has Bluetooth adapter Auto / Console / USB picker');
   }
   check(!/[\u2013\u2014]/.test(html) && !/[\u2013\u2014]/.test(i18n), 'page: no em / en dashes anywhere the user reads');
 }
@@ -228,6 +231,23 @@ STATUS.chip = { vid: '0e8d', pid: '3605', vendor: 'MediaTek', mediatek: 1, profi
 STATUS.adapter = { external: 0, node: '/dev/ugen0.2' };
 global.hbTest.req('/api/status');
 check(el('chipv').textContent === 'Console chip (ugen0.2) · MediaTek (0e8d:3605)', 'page: MediaTek chip');
+
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'auto', nodes: ['ugen0.2', 'ugen1.2'] };
+global.hbTest.req('/api/status');
+check(el('adauto').className === 'act' && el('adint').className === '' && el('adusb').className === '', 'page: adapter Auto selected');
+check(/data-node="ugen1\.2"/.test(el('adnodes').innerHTML) && /data-node="ugen0\.2"/.test(el('adnodes').innerHTML),
+      'page: adapter lists detected ugen nodes');
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'usb', nodes: ['ugen1.2'] };
+global.hbTest.req('/api/status');
+check(el('adusb').className === 'act' && el('adauto').className === '', 'page: adapter USB selected');
+STATUS.adapter = { external: 0, node: '/dev/ugen0.2', pref: 'ugen1.3', nodes: ['ugen0.2', 'ugen1.3'] };
+global.hbTest.req('/api/status');
+check(el('adauto').className === '' && /data-node="ugen1\.3"[^>]*class="act"|class="act"[^>]*data-node="ugen1\.3"/.test(el('adnodes').innerHTML),
+      'page: explicit ugen node selected');
+calls.length = 0; el('adusb').onclick();
+check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/adapter?mode=usb' && calls[0].h['X-HB-Token'],
+      'page: USB adapter button POSTs /api/adapter?mode=usb with token');
+
 // battery: level when the headset reports it, "—" when it does not
 STATUS.battery = { status: '', level: -1 };
 global.hbTest.req('/api/status');

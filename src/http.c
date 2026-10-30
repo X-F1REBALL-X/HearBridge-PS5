@@ -10,6 +10,7 @@
 #include "log.h"
 #include "rate.h"
 #include "btchip.h"
+#include "adapter_pref.h"
 #include "backup.h"
 #include "avrcp.h"
 #include "version.h"
@@ -107,6 +108,7 @@ static int is_write_path(const char *path)
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
         "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean", "/api/night",
         "/api/hci", "/api/game", "/api/backup", "/api/restore", "/api/keyvol", "/api/block",
+        "/api/adapter",
     };
     size_t i;
     for (i = 0; i < sizeof w / sizeof w[0]; i++)
@@ -117,7 +119,10 @@ static int is_write_path(const char *path)
 static int status_json(hb_ctl *c, char *o, int max)
 {
     char dev[140], st[70], url[140], det[200], why[40], ev[2400], cid[2][8], gname[100], gfrom[70];
+    char pref[20], adpref[48];
+    int ni, nn;
     static char gl[32 * 600];
+    static char nodes[HB_BT_NODES_MAX * 28];
     const char *cven = btchip_vendor(c->chip_vid);
     int ei, en, chip_ok = c->chip_vid >= 0 && c->chip_vid <= 0xffff &&
                           c->chip_pid >= 0 && c->chip_pid <= 0xffff;
@@ -167,6 +172,19 @@ static int status_json(hb_ctl *c, char *o, int max)
         snprintf(cid[0], sizeof cid[0], "%04x", c->chip_vid);
         snprintf(cid[1], sizeof cid[1], "%04x", c->chip_pid);
     }
+    hb_adapter_pref_word(pref, (int)sizeof pref);
+    snprintf(c->bt_pref, sizeof c->bt_pref, "%s", pref);
+    json_esc(adpref, sizeof adpref, pref);
+    nodes[0] = '[';
+    nn = 1;
+    for (ni = 0; ni < c->bt_nodes_n && ni < HB_BT_NODES_MAX; ni++) {
+        char one[48];
+        json_esc(one, sizeof one, c->bt_nodes[ni]);
+        nn += snprintf(nodes + nn, sizeof nodes - (size_t)nn, "%s\"%s\"", ni ? "," : "", one);
+        if (nn < 1 || nn >= (int)sizeof nodes - 2) break;
+    }
+    if (nn > 0 && nn < (int)sizeof nodes) nodes[nn++] = ']';
+    nodes[nn < (int)sizeof nodes ? nn : (int)sizeof nodes - 1] = 0;
     return snprintf(o, (size_t)max,
         "{\"version\":\"%s\",\"token\":\"%s\",\"connected\":%d,\"detail\":\"%s\",\"why\":\"%s\",\"state\":\"%s\",\"device\":\"%s\",\"url\":\"%s\","
         "\"gain_pct\":%d,\"muted\":%d,\"tone\":%d,\"paused\":%d,"
@@ -177,7 +195,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,"
         "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},"
-        "\"adapter\":{\"external\":%d,\"node\":\"%s\"},"
+        "\"adapter\":{\"external\":%d,\"node\":\"%s\",\"pref\":\"%s\",\"nodes\":%s},"
         "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d,\"auto\":%d,\"auto_ms\":%d},"
         "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"src\":\"%s\",\"none\":%d},\"hs_moves\":%d,"
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
@@ -197,7 +215,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->xq_low, cid[0], cid[1], chip_ok && cven ? cven : "",
         chip_ok && btchip_is_mediatek(c->chip_vid),
         chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "",
-        c->bt_external, c->bt_node,
+        c->bt_external, c->bt_node, adpref, nodes,
         c->lat_backoff_ms, c->lat_normal_ms, c->latency_auto != 0, c->lat_auto_ms,
         avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->batt_pct,
         c->batt_pct < 0 ? "" : c->batt_src == 1 ? "hf" : c->batt_src == 2 ? "apple" : "", c->batt_none, c->hs_moves,
@@ -803,6 +821,17 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         c->paused = 1;
     } else if (!strcmp(path, "/api/stop")) {
         c->req_stop = 1;
+    } else if (!strcmp(path, "/api/adapter")) {
+        char mode[32] = "", node[32] = "", word[40];
+        if (query_word(q, "mode", mode, sizeof mode))
+            snprintf(word, sizeof word, "%s", mode);
+        else if (query_word(q, "node", node, sizeof node))
+            snprintf(word, sizeof word, "%s", node);
+        else goto bad;
+        if (!hb_adapter_pref_set(word)) goto bad;
+        hb_adapter_pref_word(c->bt_pref, (int)sizeof c->bt_pref);
+        c->req_adapter = 1;
+        ctl_event_locked(c, "Bluetooth adapter selection saved");
     } else if (!strcmp(path, "/api/reset")) {
         /* Our page and our headset ACL only. Not an HCI reset. */
         c->req_reset = 1;

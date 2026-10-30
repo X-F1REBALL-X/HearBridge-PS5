@@ -230,7 +230,12 @@
    "gameFrom": "from %s",
    "gameHsUse": "Use the %s profile now",
    "gameHsNone": "Not saved for a headset yet",
-   "gameHsRemoveConfirm": "Remove this headset's profile for this game?"
+   "gameHsRemoveConfirm": "Remove this headset's profile for this game?",
+   "adapterPick": "Bluetooth adapter",
+   "adapterHint": "Auto prefers a USB stick when one is plugged in. Changing this restarts Bluetooth.",
+   "adapterAuto": "Auto",
+   "adapterRestart": "Restarting Bluetooth…",
+   "adapterSaved": "Adapter choice saved"
   },
   "ar": {
    "language": "اللغة",
@@ -410,7 +415,12 @@
    "gameFrom": "من %s",
    "gameHsUse": "استخدم ملف %s الآن",
    "gameHsNone": "لم يُحفظ لأي سماعة بعد",
-   "gameHsRemoveConfirm": "إزالة ملف هذه السماعة لهذه اللعبة؟"
+   "gameHsRemoveConfirm": "إزالة ملف هذه السماعة لهذه اللعبة؟",
+   "adapterPick": "محول بلوتوث",
+   "adapterHint": "تلقائي يفضّل عصا USB عند توصيلها. التغيير يعيد تشغيل البلوتوث.",
+   "adapterAuto": "تلقائي",
+   "adapterRestart": "جارٍ إعادة تشغيل البلوتوث…",
+   "adapterSaved": "تم حفظ اختيار المحول"
   },
   "es": {
    "language": "Idioma",
@@ -590,7 +600,12 @@
    "gameFrom": "de %s",
    "gameHsUse": "Usar ahora el perfil de %s",
    "gameHsNone": "Aún no guardado para ningunos auriculares",
-   "gameHsRemoveConfirm": "¿Quitar el perfil de estos auriculares para este juego?"
+   "gameHsRemoveConfirm": "¿Quitar el perfil de estos auriculares para este juego?",
+   "adapterPick": "Adaptador Bluetooth",
+   "adapterHint": "Auto prefiere un adaptador USB si hay uno. Cambiarlo reinicia Bluetooth.",
+   "adapterAuto": "Auto",
+   "adapterRestart": "Reiniciando Bluetooth…",
+   "adapterSaved": "Elección de adaptador guardada"
   },
   "fr": {
    "language": "Langue",
@@ -770,7 +785,12 @@
    "gameFrom": "de %s",
    "gameHsUse": "Utiliser maintenant le profil de %s",
    "gameHsNone": "Pas encore enregistré pour un casque",
-   "gameHsRemoveConfirm": "Supprimer le profil de ce casque pour ce jeu ?"
+   "gameHsRemoveConfirm": "Supprimer le profil de ce casque pour ce jeu ?",
+   "adapterPick": "Adaptateur Bluetooth",
+   "adapterHint": "Auto préfère une clé USB si elle est branchée. Changer redémarre le Bluetooth.",
+   "adapterAuto": "Auto",
+   "adapterRestart": "Redémarrage du Bluetooth…",
+   "adapterSaved": "Choix d’adaptateur enregistré"
   },
   "de": {
    "language": "Sprache",
@@ -950,7 +970,12 @@
    "gameFrom": "von %s",
    "gameHsUse": "Profil von %s jetzt verwenden",
    "gameHsNone": "Noch für kein Headset gespeichert",
-   "gameHsRemoveConfirm": "Profil dieses Headsets für dieses Spiel entfernen?"
+   "gameHsRemoveConfirm": "Profil dieses Headsets für dieses Spiel entfernen?",
+   "adapterPick": "Bluetooth-Adapter",
+   "adapterHint": "Auto nimmt einen USB-Stick, wenn einer steckt. Eine Änderung startet Bluetooth neu.",
+   "adapterAuto": "Auto",
+   "adapterRestart": "Bluetooth wird neu gestartet…",
+   "adapterSaved": "Adapterwahl gespeichert"
   },
   "pt": {
    "language": "Idioma",
@@ -1130,7 +1155,12 @@
    "gameFrom": "de %s",
    "gameHsUse": "Usar agora o perfil de %s",
    "gameHsNone": "Ainda não salvo para nenhum headset",
-   "gameHsRemoveConfirm": "Remover o perfil deste headset para este jogo?"
+   "gameHsRemoveConfirm": "Remover o perfil deste headset para este jogo?",
+   "adapterPick": "Adaptador Bluetooth",
+   "adapterHint": "Auto prefere um adaptador USB se houver um. Mudar reinicia o Bluetooth.",
+   "adapterAuto": "Auto",
+   "adapterRestart": "Reiniciando o Bluetooth…",
+   "adapterSaved": "Escolha de adaptador salva"
   },
   "ru": {
    "language": "Язык",
@@ -1310,7 +1340,12 @@
    "gameFrom": "из %s",
    "gameHsUse": "Использовать профиль %s сейчас",
    "gameHsNone": "Пока не сохранено ни для одной гарнитуры",
-   "gameHsRemoveConfirm": "Удалить профиль этой гарнитуры для этой игры?"
+   "gameHsRemoveConfirm": "Удалить профиль этой гарнитуры для этой игры?",
+   "adapterPick": "Bluetooth-адаптер",
+   "adapterHint": "Авто предпочитает USB-адаптер, если он подключён. Смена перезапускает Bluetooth.",
+   "adapterAuto": "Авто",
+   "adapterRestart": "Перезапуск Bluetooth…",
+   "adapterSaved": "Выбор адаптера сохранён"
   },
   "ja": {
    "language": "言語",
@@ -1490,7 +1525,12 @@
    "gameFrom": "%sから",
    "gameHsUse": "%sのプロファイルを今すぐ使う",
    "gameHsNone": "まだどのヘッドセットにも保存されていません",
-   "gameHsRemoveConfirm": "このゲームのこのヘッドセットのプロファイルを削除しますか？"
+   "gameHsRemoveConfirm": "このゲームのこのヘッドセットのプロファイルを削除しますか？",
+   "adapterPick": "Bluetoothアダプター",
+   "adapterHint": "自動はUSBアダプターがあれば優先します。変更するとBluetoothが再起動します。",
+   "adapterAuto": "自動",
+   "adapterRestart": "Bluetoothを再起動しています…",
+   "adapterSaved": "アダプターの選択を保存しました"
   },
   "zh": {
    "language": "语言",
@@ -1670,7 +1710,12 @@
    "gameFrom": "来自 %s",
    "gameHsUse": "现在使用 %s 的配置",
    "gameHsNone": "尚未为任何耳机保存",
-   "gameHsRemoveConfirm": "删除此耳机在该游戏中的配置？"
+   "gameHsRemoveConfirm": "删除此耳机在该游戏中的配置？",
+   "adapterPick": "蓝牙适配器",
+   "adapterHint": "自动会优先使用已插入的 USB 适配器。更改后会重启蓝牙。",
+   "adapterAuto": "自动",
+   "adapterRestart": "正在重启蓝牙…",
+   "adapterSaved": "适配器选择已保存"
   },
   "it": {
    "language": "Lingua",
@@ -1850,7 +1895,12 @@
    "gameFrom": "da %s",
    "gameHsUse": "Usa ora il profilo di %s",
    "gameHsNone": "Non ancora salvato per nessuna cuffia",
-   "gameHsRemoveConfirm": "Rimuovere il profilo di queste cuffie per questo gioco?"
+   "gameHsRemoveConfirm": "Rimuovere il profilo di queste cuffie per questo gioco?",
+   "adapterPick": "Adattatore Bluetooth",
+   "adapterHint": "Auto preferisce un adattatore USB se è collegato. Cambiare riavvia il Bluetooth.",
+   "adapterAuto": "Auto",
+   "adapterRestart": "Riavvio Bluetooth…",
+   "adapterSaved": "Scelta adattatore salvata"
   }
  }
 }

@@ -43,6 +43,9 @@ void hci_usb_hint(int streaming, int connecting, int sticky);
  * its VID:PID, names, interfaces (class/subclass/protocol) and endpoints,
  * then close it again. Nothing is sent to any device. Call before
  * hci_usb_open(). Returns the number of nodes listed. */
+/* Candidate ugen nodes for Settings (no root hubs). names[i] is "/dev/ugenX.Y". */
+int hci_usb_list_nodes(char names[][32], int max);
+
 int hci_usb_survey(void);
 
 #endif

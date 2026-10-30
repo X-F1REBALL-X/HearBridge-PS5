@@ -61,6 +61,11 @@ typedef struct {
     int chip_vid, chip_pid; /* Bluetooth controller USB IDs, -1 until known */
     int bt_external;       /* 1: a USB adapter (ours alone), 0: console chip */
     char bt_node[20];      /* its ugen node, "" until known */
+    char bt_pref[20];      /* auto|internal|usb|ugenX.Y from the adapter file */
+#define HB_BT_NODES_MAX 8
+    int bt_nodes_n;        /* candidate ugen nodes for Settings */
+    char bt_nodes[HB_BT_NODES_MAX][20]; /* "ugenX.Y" without /dev/ */
+    int req_adapter;       /* page picked a controller: reopen Bluetooth */
 #define HB_EVENT_N   14
 #define HB_EVENT_LEN 80
     char events[HB_EVENT_N][HB_EVENT_LEN]; /* last codec switches / disconnects */

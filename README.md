@@ -39,8 +39,11 @@ one it uses the console's own chip. An adapter is not shared with the console's
 gamepad, so the controller can connect and reconnect normally while audio is
 streaming.
 
-To choose the controller yourself, create `/data/hearbridge/adapter` with one
-line (it is read when HearBridge starts):
+Pick the controller under **Settings > Details > Bluetooth adapter**:
+**Auto** (USB stick when one is plugged in, else the console chip), **Console
+chip**, **USB adapter**, or a listed ugen node when more than one stick is
+present. A change is written to `/data/hearbridge/adapter` and Bluetooth is
+restarted. You can still create that file by hand with one line:
 
 ```text
 auto        # default: a USB adapter if one is present, else the console chip
@@ -49,8 +52,7 @@ usb         # always a USB adapter (start fails if there is none)
 ugen1.2     # one specific ugen node
 ```
 
-The control page shows the adapter and its node under **Settings > Details >
-Chip**.
+The same Details page shows which adapter is in use and its chip under **Chip**.
 
 ### Realtek ROM-only adapters
 

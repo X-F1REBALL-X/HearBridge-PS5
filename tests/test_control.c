@@ -4,6 +4,7 @@
 #include "ctl.h"
 #include "gain.h"
 #include "http.h"
+#include "adapter_pref.h"
 #include "diag.h"
 #include "avrcp.h"
 #include "sdp_server.h"
@@ -12,6 +13,8 @@
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 void log_line(const char *fmt, ...) { (void)fmt; }
@@ -125,6 +128,29 @@ int main(int argc, char **argv)
     CHECK(c.req_stop, "stop");
     post(&c, "/api/reset");
     CHECK(c.req_reset, "reset");
+    {
+        char path[128];
+        snprintf(path, sizeof path, "%s/adapter_pref_test", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+        hb_adapter_path_override(path);
+        unlink(path);
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=usb");
+        CHECK(c.req_adapter && !strcmp(c.bt_pref, "usb"), "adapter: mode=usb saved + reopen requested");
+        CHECK(get(&c, "/api/status") > 0 && strstr(out, "\"pref\":\"usb\""), "adapter: pref in status");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=internal");
+        CHECK(!strcmp(c.bt_pref, "internal"), "adapter: mode=internal");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?node=ugen1.3");
+        CHECK(!strcmp(c.bt_pref, "ugen1.3") && c.req_adapter, "adapter: node=ugen1.3");
+        c.req_adapter = 0;
+        post(&c, "/api/adapter?mode=auto");
+        CHECK(!strcmp(c.bt_pref, "auto"), "adapter: back to auto");
+        n = post(&c, "/api/adapter?mode=nope");
+        CHECK(!strncmp(out, "HTTP/1.1 400", 12), "adapter: bad mode -> 400");
+        unlink(path);
+        hb_adapter_path_override(NULL);
+    }
     n = get(&c, "/api/status");
     CHECK(strstr(out, "\"stable\":0") && strstr(out, "\"queue_ms\":200") &&
           strstr(out, "\"latency\":{\"target_ms\":200,"), "latency: 200 ms target by default");
@@ -226,12 +252,12 @@ int main(int argc, char **argv)
     get(&c, "/api/status");
     CHECK(strstr(out, "\"chip\":{\"vid\":\"\",\"pid\":\"\",\"vendor\":\"\",\"mediatek\":0,") != NULL,
           "status: empty chip until the controller is open");
-    CHECK(strstr(out, "\"adapter\":{\"external\":0,\"node\":\"\"}") != NULL,
+    CHECK(strstr(out, "\"adapter\":{\"external\":0,\"node\":\"\",\"pref\":\"auto\",\"nodes\":[]}") != NULL,
           "status: no adapter before the controller is open");
     c.bt_external = 1;
     snprintf(c.bt_node, sizeof c.bt_node, "/dev/ugen1.2");
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"adapter\":{\"external\":1,\"node\":\"/dev/ugen1.2\"}") != NULL,
+    CHECK(strstr(out, "\"adapter\":{\"external\":1,\"node\":\"/dev/ugen1.2\",\"pref\":\"auto\",\"nodes\":[]}") != NULL,
           "status: USB adapter and its node");
     c.bt_external = 0;
     c.bt_node[0] = 0;

@@ -24,6 +24,7 @@
 #include "sysinfo.h"
 #include "hci_cmd.h"
 #include "hci_usb.h"
+#include "adapter_pref.h"
 #include "adapter.h"
 #include "blocklist.h"
 #include "hcidbg.h"
@@ -2700,10 +2701,12 @@ stream_setup:
             v = btlink_avrcp_volume(link, &changed);
             avst = btlink_avrcp_state(link);
             CTL_LOCK(&g_ctl);
-            if (g_ctl.req_reset) {
+            if (g_ctl.req_reset || g_ctl.req_adapter) {
+                int ad = g_ctl.req_adapter;
                 g_ctl.req_reset = 0;
+                /* leave req_adapter set so the outer loop reopens the controller */
                 CTL_UNLOCK(&g_ctl);
-                note_event("Connection reset");
+                note_event(ad ? "Switching Bluetooth adapter" : "Connection reset");
                 btlink_disconnect(link);   /* our handle only */
                 set_why("off");
                 rc = RUN_AWAY;
@@ -3513,12 +3516,23 @@ static void lw_tick(const headset_ini *ini)
 /* Remember which controller is in use (shown on the control page). */
 static void note_adapter(void)
 {
+    char list[HB_BT_NODES_MAX][32];
+    int n, i, outn = 0;
     CTL_LOCK(&g_ctl);
     g_ctl.bt_external = hci_usb_is_external();
     snprintf(g_ctl.bt_node, sizeof g_ctl.bt_node, "%s", hci_usb_node());
+    hb_adapter_pref_word(g_ctl.bt_pref, (int)sizeof g_ctl.bt_pref);
+    n = hci_usb_list_nodes(list, HB_BT_NODES_MAX);
+    for (i = 0; i < n && outn < HB_BT_NODES_MAX; i++) {
+        const char *p = list[i];
+        if (!strncmp(p, "/dev/", 5)) p += 5;
+        snprintf(g_ctl.bt_nodes[outn++], sizeof g_ctl.bt_nodes[0], "%s", p);
+    }
+    g_ctl.bt_nodes_n = outn;
     CTL_UNLOCK(&g_ctl);
-    log_line("adapter: using %s (%s)", hci_usb_node(),
-             hci_usb_is_external() ? "USB adapter, the console chip is untouched" : "the console's own chip");
+    log_line("adapter: using %s (%s), pref=%s", hci_usb_node(),
+             hci_usb_is_external() ? "USB adapter, the console chip is untouched" : "the console's own chip",
+             g_ctl.bt_pref);
 }
 
 /* Rest mode resets the Bluetooth USB device: close everything and open it
@@ -3808,15 +3822,20 @@ int main(void)
     /* Stream until stopped; reconnect after a drop or failure. The web
      * page can pause (Disconnect) and resume (Connect). */
     for (;;) {
-        int r, paused;
-        if (transport_dead(hci)) {
+        int r, paused, want_ad = 0;
+        CTL_LOCK(&g_ctl);
+        want_ad = g_ctl.req_adapter;
+        if (want_ad) g_ctl.req_adapter = 0;
+        CTL_UNLOCK(&g_ctl);
+        if (want_ad || transport_dead(hci)) {
             CTL_LOCK(&g_ctl);
             paused = g_ctl.paused;
             CTL_UNLOCK(&g_ctl);
+            if (want_ad) note_event("Switching Bluetooth adapter");
             if (!reopen_bt(&hci, &asess, &opts, &ini)) { rc = 0; break; }
             (void)headset_ini_load(&ini);
             g_rest_resume = g_rest_wake = 0;   /* the reconnect below covers it */
-            if (ini.ok && !paused && !held(ini.addr)) {
+            if (ini.ok && !paused && !held(ini.addr) && !want_ad) {
                 /* Back from rest mode: the headset we were using, right away. */
                 memset(&g_pending, 0, sizeof g_pending);
                 g_pending.kind = CMD_RECONNECT;
@@ -3877,6 +3896,13 @@ int main(void)
                 int go;
                 if (hb_stop_requested()) break;
                 if (transport_dead(hci)) break;          /* reopened at the top */
+                {
+                    int ad = 0;
+                    CTL_LOCK(&g_ctl);
+                    ad = g_ctl.req_adapter;
+                    CTL_UNLOCK(&g_ctl);
+                    if (ad) break;                       /* reopen at the top */
+                }
                 if (g_rest_resume && (g_rest_wake || woke_up())) {
                     /* We stopped it for rest mode: the same headset, now. */
                     g_rest_resume = g_rest_wake = 0;
