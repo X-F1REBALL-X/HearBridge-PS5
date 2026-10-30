@@ -101,8 +101,11 @@ static int csr_vendor(hci_t hci, const unsigned char *body, int body_len,
     if (!hci_cmd_vendor(hci, HB_OP_CSR_BCCMD, cp, body_len + 1, rp, &n, rp_max))
         return 0;
     if (rp_len) *rp_len = n;
-    if (n < 1 || rp[0] != 0xc2) {
-        log_line("host_bdaddr: CSR BCCMD reply missing 0xc2 header");
+    if (n == 0)
+        return 1; /* Command Complete only — verify after warm reset */
+    if (rp[0] != 0xc2) {
+        log_line("host_bdaddr: CSR BCCMD reply missing 0xc2 (n=%d first=%02x%02x%02x)",
+                 n, n > 0 ? rp[0] : 0, n > 1 ? rp[1] : 0, n > 2 ? rp[2] : 0);
         return 0;
     }
     return 1;
