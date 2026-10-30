@@ -23,8 +23,14 @@ long hb_stop_named(const char *name, const char *stop_path, int graceful_ms);
 
 /* The page port is still held (a copy from before 1.3.1, which has no
  * process name of its own, or one still closing): ask it to stop with the
- * stop file and wait up to ms for the port to be free. 0 = it was free,
+ * stop file and wait up to ms for the port to be free. Also SIGTERM/SIGKILL
+ * any hearbridge.elf / payload.elf still listed. 0 = it was free,
  * 1 = freed, -1 = still held (something else owns it). */
 int hb_port_takeover(int port, const char *stop_path, int ms);
+
+/* Force any other HearBridge off the machine: stop file, every known
+ * process name, every page port 8090..8095. Call before taking the lock
+ * again so a freshly sent ELF always replaces the running copy. */
+void hb_force_replace(const char *stop_path);
 
 #endif

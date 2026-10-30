@@ -4,6 +4,7 @@
 #include "util.h"
 
 #include <signal.h>
+#include <string.h>
 #include <unistd.h>
 
 #define STOP_POLL_MS 500
@@ -59,9 +60,22 @@ void hb_stop_request(void)
 
 void hb_stop_init(void)
 {
-    signal(SIGTERM, on_signal);
-    signal(SIGINT, on_signal);
-    signal(SIGHUP, on_hup);
+    struct sigaction sa, hup;
+
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_signal;
+    sigemptyset(&sa.sa_mask);
+    /* No SA_RESTART: a SIGTERM must wake blocking USB/network reads so the
+     * running copy can exit when a newly sent ELF asks it to stop. */
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+
+    memset(&hup, 0, sizeof hup);
+    hup.sa_handler = on_hup;
+    sigemptyset(&hup.sa_mask);
+    hup.sa_flags = SA_RESTART;
+    sigaction(SIGHUP, &hup, NULL);
+
     signal(SIGPIPE, SIG_IGN);       /* a vanished network peer must not kill the payload */
     unlink(HB_STOP_PATH);
 }

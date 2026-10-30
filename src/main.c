@@ -3714,27 +3714,21 @@ int main(void)
     /* A newly sent ELF always wins, whatever version is running (same
      * one included): the old instance is asked to stop (stop file +
      * SIGTERM; it closes the headset, the page and the Bluetooth device),
-     * killed if it has not stopped after 10 s, and this one starts. */
+     * killed if it has not stopped after a few seconds, and this one starts. */
     {
         long old_pid = 0;
-        lock_rc = lock_take_over(LOCK_PATH, HB_STOP_PATH, 10000, 3000, &lock_errno, &old_pid);
+        lock_rc = lock_take_over(LOCK_PATH, HB_STOP_PATH, 8000, 3000, &lock_errno, &old_pid);
         if (old_pid && lock_rc != LOCK_BUSY) {
-            /* The lock is free once its file is closed; the process may still
-             * be releasing the USB device. Wait until it is really gone. */
             if (!hb_wait_pid_gone(old_pid, 5000))
                 log_line("takeover: pid %ld still listed 5 s after it let go of the lock", old_pid);
-        } else if (lock_rc != LOCK_BUSY) {
-            /* No lock holder, but a copy may still run without one: its state
-             * folder was deleted (#25), or it is from before 1.3.1 and has no
-             * name of its own. Found by name, or by the page port it holds. */
-            old_pid = hb_stop_named(HB_PROC_NAME, HB_STOP_PATH, 10000);
-            if (hb_port_takeover(HB_HTTP_PORT, HB_STOP_PATH, 12000) > 0 && !old_pid) old_pid = -1;
-            if (old_pid && lock_rc == LOCK_OK) {
-                /* Its exit deleted the lock file we had just written: write it again. */
-                lock_release();
-                lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
-                if (lock_rc == LOCK_BUSY) lock_rc = LOCK_OK;   /* carry on, as before the takeover */
-            }
+        }
+        /* Always clear any leftover copy by name and page port — a stale
+         * lock file or a copy blocked in USB must not leave :8090 on an
+         * older version after a fresh send. */
+        hb_force_replace(HB_STOP_PATH);
+        if (lock_rc == LOCK_BUSY || lock_rc == LOCK_OK) {
+            lock_release();
+            lock_rc = lock_take_ex(LOCK_PATH, &lock_errno);
         }
         if (old_pid && lock_rc != LOCK_BUSY) {
             if (old_pid > 0)
@@ -3742,11 +3736,13 @@ int main(void)
             else
                 log_line("HearBridge PS5 %s: replaced the running instance (found by its page port)", HEARBRIDGE_VERSION);
             notify("HearBridge %s: replaced the running copy", HEARBRIDGE_VERSION);
-            usleep(500 * 1000);   /* let the controller settle after its teardown */
+            usleep(500 * 1000);
+        } else if (lock_rc != LOCK_BUSY) {
+            /* force_replace may have cleared a nameless / port-only copy. */
+            log_line("HearBridge PS5 %s: startup after replace sweep", HEARBRIDGE_VERSION);
         }
     }
     if (lock_rc == LOCK_BUSY) {
-        /* Could not stop it: still bring back a deleted icon. */
         log_line("HearBridge PS5 %s: the running instance would not stop; refreshing the home-screen icon only",
                  HEARBRIDGE_VERSION);
         home_tile(1);

@@ -34,6 +34,8 @@ $(ELF): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 	sh scripts/check_imports.sh $@ scripts/imports-1.0.2.txt || { rm -f $@; exit 1; }
 
-$(BUILD)/%.o: src/%.c
+# version.h is the single source: any bump must rebuild every translation unit
+# that can embed HEARBRIDGE_VERSION (main, http, ctl path, …).
+$(BUILD)/%.o: src/%.c src/version.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
