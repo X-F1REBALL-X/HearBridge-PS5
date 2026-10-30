@@ -3835,16 +3835,28 @@ int main(void)
             if (!reopen_bt(&hci, &asess, &opts, &ini)) { rc = 0; break; }
             (void)headset_ini_load(&ini);
             g_rest_resume = g_rest_wake = 0;   /* the reconnect below covers it */
-            if (ini.ok && !paused && !held(ini.addr) && !want_ad) {
-                /* Back from rest mode: the headset we were using, right away. */
+            if (ini.ok && !paused && !held(ini.addr)) {
+                /* Rest mode or a Settings adapter change: the headset we were
+                 * using, right away. (Adapter switch used to skip this, so the
+                 * page left the headset disconnected after reopen.) */
                 memset(&g_pending, 0, sizeof g_pending);
                 g_pending.kind = CMD_RECONNECT;
+                if (want_ad) g_user_connect = 1;
             }
         }
         r = run_session(asess, hci, &ini);
         persist_gain_if_dirty();
         if (r == RUN_STOP) { rc = 0; break; }
         if (r == RUN_SWITCH || r == RUN_FORGOT) continue;   /* g_pending: the next step */
+        {
+            /* Adapter change mid-stream returns RUN_AWAY with req_adapter set:
+             * reopen + reconnect at the top, do not sit in idle first. */
+            int ad = 0;
+            CTL_LOCK(&g_ctl);
+            ad = g_ctl.req_adapter;
+            CTL_UNLOCK(&g_ctl);
+            if (ad) continue;
+        }
         CTL_LOCK(&g_ctl);
         paused = g_ctl.paused;
         g_ctl.req_connect = 0;
