@@ -3,7 +3,7 @@
 #define HEARBRIDGE_VERSION_H
 
 #ifndef HEARBRIDGE_VERSION
-#define HEARBRIDGE_VERSION "1.3.18"
+#define HEARBRIDGE_VERSION "1.4.0"
 #endif
 
 #endif
