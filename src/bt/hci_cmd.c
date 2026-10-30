@@ -79,6 +79,59 @@ int hci_cmd_sync_once(hci_t hci, unsigned op, const void *params, int plen,
     return cmd_sync(hci, op, params, plen, out, out_len, out_max, 1, 3000, 3000);
 }
 
+int hci_cmd_vendor(hci_t hci, unsigned op, const void *params, int plen,
+                   unsigned char *out, int *out_len, int out_max)
+{
+    long deadline;
+    unsigned char ev[HCI_PKT_MAX];
+
+    if (!hci.ops || !hci.ctx) return 0;
+    if (!hci.ops->cmd(hci.ctx, op, params, plen)) {
+        log_line("hci_cmd: transport error sending vendor %#06x", op);
+        return 0;
+    }
+    deadline = now_ms() + 2000;
+    while (now_ms() < deadline) {
+        int n, pr;
+        pr = hci.ops->pump(hci.ctx, 20);
+        if (pr < 0) {
+            log_line("hci_cmd: transport lost waiting vendor %#06x", op);
+            return 0;
+        }
+        while ((n = hci.ops->next_event(hci.ctx, ev, (int)sizeof ev)) > 0) {
+            /* Vendor-Specific Event 0xFF: length, then payload. */
+            if (ev[0] == 0xFF && n >= 2) {
+                if (out && out_len && out_max > 0) {
+                    int copy = n < out_max ? n : out_max;
+                    memcpy(out, ev, (size_t)copy);
+                    *out_len = copy;
+                }
+                return 1;
+            }
+            /* Some stacks also emit Command Complete for 0xFC00 — accept it. */
+            if (ev[0] == 0x0E && n >= 6) {
+                unsigned rop = (unsigned)ev[3] | ((unsigned)ev[4] << 8);
+                if (rop == op) {
+                    if (out && out_len && out_max > 0) {
+                        int copy = n < out_max ? n : out_max;
+                        memcpy(out, ev, (size_t)copy);
+                        *out_len = copy;
+                    }
+                    if (ev[5] != 0) {
+                        log_line("hci_cmd: vendor %#06x status %#04x", op, ev[5]);
+                        return 0;
+                    }
+                    return 1;
+                }
+            }
+        }
+        while (hci.ops->next_acl(hci.ctx, ev, (int)sizeof ev) > 0) { }
+    }
+    log_line("hci_cmd: vendor %#06x no reply", op);
+    return 0;
+}
+
+
 int hci_cmd_status(hci_t hci, unsigned op, const void *params, int plen)
 {
     int attempt;

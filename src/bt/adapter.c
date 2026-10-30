@@ -10,6 +10,7 @@
 #include "hci_usb.h"
 #include "log.h"
 #include "realtek_fw.h"
+#include "host_bdaddr.h"
 
 /* Audio/Video major class, minor "unclassified" (0x000400). */
 static const unsigned char g_cod[3] = { 0x00, 0x04, 0x00 };
@@ -61,6 +62,14 @@ int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
     if (!is_csr)
         usleep(250 * 1000);
 
+    /* Shared host BD_ADDR: tell Realtek prepare to bake it into the config
+     * blob. CSR cloning happens after prepare (plain HCI, no firmware step). */
+    {
+        unsigned char want[6];
+        if (!is_csr && btchip_is_realtek(vid) && hb_host_bdaddr_load(want))
+            hb_rtl_bdaddr_override(want);
+    }
+
     /* Event mask BEFORE inquiry mode. CSR uses the PS4-proven mask; others
      * get the wider EIR-capable mask. */
     if (is_csr) {
@@ -91,7 +100,26 @@ int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
             log_line("adapter: %s plain HCI, no firmware download",
                      chip[0] ? chip : "USB stick");
         } else if (!hb_rtl_prepare(hci, why, why_cap)) {
+            hb_rtl_bdaddr_override(NULL);
             return 0;
+        }
+        hb_rtl_bdaddr_override(NULL);
+    }
+
+    /* Clone the shared host BD_ADDR onto this stick (CSR BCCMD / Realtek
+     * config). First stick with no saved address becomes the shared one. */
+    {
+        int is_rtl = (vid >= 0) && btchip_is_realtek(vid);
+        hb_host_bdaddr_sync_usb(hci, is_csr, is_rtl);
+        /* CSR warm reset / Realtek firmware Reset clear the event mask. */
+        if (is_csr) {
+            if (!hci_cmd_sync(hci, HB_OP_SET_EVENT_MASK, g_evmask_csr, 8, cc, &cc_len,
+                              (int)sizeof cc))
+                log_line("adapter: SET_EVENT_MASK after BD_ADDR sync failed");
+        } else if (is_rtl) {
+            if (!hci_cmd_sync(hci, HB_OP_SET_EVENT_MASK, g_evmask, 8, cc, &cc_len,
+                              (int)sizeof cc))
+                log_line("adapter: SET_EVENT_MASK after BD_ADDR sync failed");
         }
     }
 

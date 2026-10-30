@@ -87,4 +87,14 @@ int hb_rtl_ensure_firmware(void);
  * why (for example: the firmware file is missing). */
 int hb_rtl_prepare(hci_t hci, char *why, int why_cap);
 
+
+/* Shared host BD_ADDR for the next firmware+config upload. addr NULL clears.
+ * Injected as vendor-config offset 0x0030 (not HCI 0xFC61 — that opcode is
+ * Read_REG16 on Realtek). */
+void hb_rtl_bdaddr_override(const unsigned char addr[6]);
+
+/* Drop any loaded patch (0xFC66), re-upload firmware with the shared BD_ADDR
+ * in the config blob, HCI Reset. 1 on success. */
+int hb_rtl_repatch_bdaddr(hci_t hci, const unsigned char addr[6]);
+
 #endif

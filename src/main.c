@@ -26,6 +26,7 @@
 #include "hci_usb.h"
 #include "adapter_pref.h"
 #include "adapter.h"
+#include "host_bdaddr.h"
 #include "blocklist.h"
 #include "hcidbg.h"
 #include "btchip.h"
@@ -3643,6 +3644,8 @@ static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, hea
         if (ini->have_addr) memcpy(opts->prefer_addr, ini->addr, 6);
         *asess = a2dp_open(*hci, opts);
         if (*asess) {
+            if (!hci_usb_is_external())
+                hb_host_bdaddr_learn_console(*hci);
             log_line("bt: back after %d tries", attempt);
         note_event("Bluetooth is back");
             (void)diag_save();
@@ -3891,6 +3894,8 @@ int main(void)
         bt_failed_wait("error controller-setup-failed");
         goto close_hci;
     }
+    if (!hci_usb_is_external())
+        hb_host_bdaddr_learn_console(hci);
     hci_scan_check(hci);   /* page scan left off by a copy that died mid-pause */
 
     /* Stream until stopped; reconnect after a drop or failure. The web

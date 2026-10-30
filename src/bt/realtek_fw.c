@@ -25,6 +25,40 @@
 #define OP_READ_REG16       0xfc61
 #define OP_DROP_FIRMWARE    0xfc66
 
+/* Optional BD_ADDR (wire order) to inject into the vendor config at offset
+ * 0x0030 on the next install_chip / prepare upload. */
+static unsigned char g_bdaddr_override[6];
+static int g_bdaddr_override_set;
+
+void hb_rtl_bdaddr_override(const unsigned char addr[6])
+{
+    if (!addr) {
+        g_bdaddr_override_set = 0;
+        memset(g_bdaddr_override, 0, sizeof g_bdaddr_override);
+        return;
+    }
+    memcpy(g_bdaddr_override, addr, 6);
+    g_bdaddr_override_set = 1;
+}
+
+/* Realtek vendor config: magic 0x8723ab55, total_len, then entries
+ * {offset le16, len u8, data[]}. BD_ADDR lives at offset 0x0030. */
+static void inject_bdaddr_config(unsigned char *cfg, size_t *cfg_len, size_t cap)
+{
+    char astr[18];
+    if (!g_bdaddr_override_set || !cfg || !cfg_len || cap < 15)
+        return;
+    cfg[0] = 0x55; cfg[1] = 0xab; cfg[2] = 0x23; cfg[3] = 0x87;
+    cfg[4] = 0x09; cfg[5] = 0x00;           /* total_len = 9 */
+    cfg[6] = 0x30; cfg[7] = 0x00;           /* offset 0x0030 */
+    cfg[8] = 0x06;                          /* 6 address bytes */
+    memcpy(cfg + 9, g_bdaddr_override, 6);
+    *cfg_len = 15;
+    hci_addr_str(g_bdaddr_override, astr);
+    log_line("adapter: Realtek config BD_ADDR %s (offset 0x0030)", astr);
+}
+
+
 #define REALTEK_MANUFACTURER 0x005d
 #define FRAGMENT_SIZE        252
 #define MAX_FIRMWARE_FILE    (512u * 1024u)
@@ -584,6 +618,8 @@ static int install_chip(hci_t hci, const hb_rtl_chip *chip, char *why, int why_c
             }
             cfg_len = 0;
         }
+        /* Shared host address overrides any factory config BD_ADDR entry. */
+        inject_bdaddr_config(cfg, &cfg_len, MAX_FIRMWARE_FILE);
     }
     target.lmp_subversion = chip->lmp_subversion;
     target.rom_version = rom_version;
@@ -716,6 +752,39 @@ int hb_rtl_prepare(hci_t hci, char *why, int why_cap)
     log_line("adapter: %s in ROM mode, uploading %s", chip->name, file);
     if (!install_chip(hci, chip, why, why_cap)) {
         log_line("adapter: %s", why && why[0] ? why : "firmware upload failed");
+        return 0;
+    }
+    return 1;
+}
+
+int hb_rtl_repatch_bdaddr(hci_t hci, const unsigned char addr[6])
+{
+    hb_chip_identity id;
+    const hb_rtl_chip *chip;
+    char why[160];
+
+    if (!addr) return 0;
+    hb_rtl_bdaddr_override(addr);
+    hb_rtl_ensure_firmware();
+
+    /* Drop loaded firmware back to ROM so the next upload carries the config. */
+    if (hci.ops && hci.ops->cmd)
+        hci.ops->cmd(hci.ctx, OP_DROP_FIRMWARE, NULL, 0);
+    usleep(200 * 1000);
+
+    if (!read_identity(hci, &id)) {
+        log_line("adapter: Realtek repatch: no local version after drop");
+        return 0;
+    }
+    chip = hb_rtl_chip_for(&id);
+    if (!chip) {
+        log_line("adapter: Realtek repatch: chip still unknown after 0xFC66");
+        return 0;
+    }
+    why[0] = 0;
+    log_line("adapter: %s re-uploading with shared BD_ADDR", chip->name);
+    if (!install_chip(hci, chip, why, (int)sizeof why)) {
+        log_line("adapter: Realtek repatch failed: %s", why[0] ? why : "unknown");
         return 0;
     }
     return 1;

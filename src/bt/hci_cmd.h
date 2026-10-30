@@ -72,6 +72,11 @@ void hci_scan_resume(hci_t hci);
 void hci_set_mediatek(int on);
 int  hci_is_mediatek(void);
 
+/* CSR BCCMD and similar: wait for Vendor-Specific event 0xFF (not Command
+ * Complete). Copies the event payload (code..params) into out on success. */
+int hci_cmd_vendor(hci_t hci, unsigned op, const void *params, int plen,
+                   unsigned char *out, int *out_len, int out_max);
+
 void hci_addr_str(const unsigned char addr[6], char buf[18]);
 
 /* Stop / exit: undo a scan pause still in effect (fired, not waited for). */
