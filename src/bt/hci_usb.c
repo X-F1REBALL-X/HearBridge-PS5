@@ -864,8 +864,9 @@ static int is_internal_node(const char *path)
 /* Root hubs are ugenX.1 only (not ugenX.11 / ugenX.21). */
 static int is_root_hub(const char *path)
 {
-    const char *dot = strrchr(path, '.');
-    return dot && dot[1] == '1' && dot[2] == '\0';
+    size_t n = strlen(path);
+    /* Exact suffix ".1" (ugenX.1). ugenX.11 ends in "11", not ".1". */
+    return n >= 2 && path[n - 2] == '.' && path[n - 1] == '1';
 }
 
 static void settle_usb_if_needed(void)

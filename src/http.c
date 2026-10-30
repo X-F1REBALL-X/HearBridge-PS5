@@ -847,12 +847,12 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         if (query_word(q, "mode", mode, sizeof mode))
             snprintf(word, sizeof word, "%s", mode);
         else if (query_word(q, "node", node, sizeof node)) {
-            const char *dot;
+            size_t nlen;
             snprintf(word, sizeof word, "%s", node);
-            /* Root hubs only (ugenX.1) — never ugenX.11. No allowlist: a
-             * stale Settings list must not reject a real stick behind a hub. */
-            dot = strrchr(word, '.');
-            if (dot && dot[1] == '1' && !dot[2]) goto bad;
+            nlen = strlen(word);
+            /* Root hubs only (exact ".1"). No allowlist: a stale Settings
+             * list must not reject a real stick behind a hub. */
+            if (nlen >= 2 && word[nlen - 2] == '.' && word[nlen - 1] == '1') goto bad;
         } else goto bad;
         if (!hb_adapter_pref_set(word)) goto bad;
         hb_adapter_pref_word(c->bt_pref, (int)sizeof c->bt_pref);
