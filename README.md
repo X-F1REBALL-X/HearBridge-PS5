@@ -56,15 +56,19 @@ Chip**.
 
 Some Realtek sticks (RTL8761BU/UB500/UB600 and other USB parts) start in a ROM
 mode that answers Bluetooth commands but cannot scan until a patch is uploaded.
-HearBridge uploads it the same way Linux's `btrtl` does, from files you put on
-the console:
+HearBridge uploads it the same way Linux's `btrtl` does, from files under
+`/data/hearbridge/firmware/`.
+
+For the RTL8761BU (UB500/UB600, USB id `0BDA:B00C` / `0BDA:8771`) the matching
+files are **bundled in the ELF** and written there automatically on start:
 
 ```text
 /data/hearbridge/firmware/rtl8761bu_fw.bin
-/data/hearbridge/firmware/rtl8761bu_config.bin   (optional, required on some parts)
+/data/hearbridge/firmware/rtl8761bu_config.bin
 ```
 
-Create the folder with your usual file-transfer payload. The files are in the
+No manual copy is needed for that stick. Other Realtek USB parts the loader
+knows still need their files placed there by hand. Those files are in the
 `linux-firmware` package (`/lib/firmware/rtl_bt/` on Linux, `firmware-realtek`
 on Debian and Ubuntu) or in the
 [`rtl_bt` tree of linux-firmware](https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/rtl_bt).
@@ -90,6 +94,13 @@ make test
 ## Credits
 
 MediaTek scan-pause and USB pipe fix, plus HCI debug tool, by [ZiZc3](https://github.com/ZiZc3) ([#6](https://github.com/X-F1REBALL-X/HearBridge-PS5/pull/6))
+
+USB Bluetooth adapter path and Realtek ROM uploader by [jamesst20](https://github.com/jamesst20) ([#45](https://github.com/X-F1REBALL-X/HearBridge-PS5/pull/45))
+
+Bundled RTL8761BU firmware blobs are from the
+[linux-firmware](https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/rtl_bt)
+`rtl_bt` tree (Realtek Semiconductor Corporation). See
+[assets/firmware/LICENCE.rtlwifi_firmware.txt](assets/firmware/LICENCE.rtlwifi_firmware.txt).
 
 ## License
 

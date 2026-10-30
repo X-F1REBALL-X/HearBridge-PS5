@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "hci.h"
 #include "realtek_fw.h"
@@ -279,9 +280,29 @@ static void test_fragments(void)
     for (i = 0; i < f.frags; i++) CHECK(f.op_seen[i] == 0xfc20, "fragment sent with 0xfc20");
 }
 
-int main(void)
+
+static void test_ensure(const char *dir)
+{
+    char path[512];
+    struct stat st;
+    int n;
+
+    CHECK(dir && dir[0], "ensure dir argument");
+    n = hb_rtl_ensure_firmware_dir(dir);
+    CHECK(n >= 0, "ensure creates dir (%d)", n);
+    CHECK(n >= 1, "ensure writes at least the fw blob (%d)", n);
+    snprintf(path, sizeof path, "%s/rtl8761bu_fw.bin", dir);
+    CHECK(stat(path, &st) == 0 && st.st_size == 44484, "rtl8761bu_fw.bin size");
+    snprintf(path, sizeof path, "%s/rtl8761bu_config.bin", dir);
+    CHECK(stat(path, &st) == 0 && st.st_size == 6, "rtl8761bu_config.bin size");
+    n = hb_rtl_ensure_firmware_dir(dir);
+    CHECK(n == 0, "second ensure is a no-op when sizes match (%d)", n);
+}
+
+int main(int argc, char **argv)
 {
     test_identity();
+    if (argc > 1) test_ensure(argv[1]);
     test_v1();
     test_v2();
     test_fragments();

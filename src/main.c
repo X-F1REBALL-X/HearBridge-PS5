@@ -28,6 +28,7 @@
 #include "blocklist.h"
 #include "hcidbg.h"
 #include "btchip.h"
+#include "realtek_fw.h"
 #include "acl_track.h"
 #include "lock.h"
 #include "log.h"
@@ -3612,6 +3613,9 @@ int main(void)
         }
     }
     log_ok = log_open(LOG_PATH);
+    /* Bundle Realtek USB firmware onto the console so a UB600 / RTL8761BU
+     * needs no manual copy under /data/hearbridge/firmware/. */
+    hb_rtl_ensure_firmware();
     diag_init(NULL);           /* file path set once we own the lock */
     diag_set("hearbridge", "%s (one build for all firmwares, compiled %s)", HEARBRIDGE_VERSION,
              __DATE__);

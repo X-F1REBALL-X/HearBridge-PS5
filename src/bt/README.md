@@ -19,7 +19,8 @@ Shared `util`, `log` and `lock` live in `src/`.
 
 **Adapter selection:** `/data/hearbridge/adapter` may contain `auto` (default),
 `internal`, `usb`, or an explicit `ugenX.Y`. Realtek patches are read from
-`/data/hearbridge/firmware/`.
+`/data/hearbridge/firmware/`. The RTL8761BU blobs are bundled in the ELF and
+written there automatically on start (`hb_rtl_ensure_firmware`).
 
 **Conflict:** for the console's own chip, only one payload may own the first
 HCI interface at a time. A USB adapter has no such conflict; that is why it is

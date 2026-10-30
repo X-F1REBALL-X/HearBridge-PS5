@@ -2,8 +2,9 @@
  *
  * Some Realtek sticks boot into a ROM that answers HCI and can be opened,
  * but whose radio cannot scan until the host uploads the matching patch.
- * The patch is not part of HearBridge: it is read from the firmware
- * directory below, the same way Linux's btrtl reads it.
+ * HearBridge ships the common RTL8761BU files and writes them under the
+ * firmware directory below on start (same layout as Linux's btrtl). Other
+ * chips still accept a manual copy into that folder.
  *
  * The parsers and the fragmenter are pure functions (host-tested in
  * tests/test_realtek_fw.c); only hb_rtl_prepare() talks to the controller.
@@ -70,6 +71,15 @@ int hb_rtl_build_image(const unsigned char *fw, size_t fw_len,
 /* Upload an image in 252-byte fragments with 0xfc20, then HCI Reset. */
 int hb_rtl_upload(hci_t hci, const unsigned char *image, size_t image_len,
                   char *why, int why_cap);
+
+/* Write bundled Realtek firmware blobs into dir when missing or the size
+ * differs (so a newer ELF refreshes the files). dir NULL uses HB_RTL_FW_DIR.
+ * Returns the number of files written, or -1 if the directory cannot be made. */
+int hb_rtl_ensure_firmware_dir(const char *dir);
+
+/* Same as hb_rtl_ensure_firmware_dir(HB_RTL_FW_DIR). Call once after the
+ * state directory exists so USB adapters find their patch without a manual copy. */
+int hb_rtl_ensure_firmware(void);
 
 /* Read Local Version; when this is a Realtek USB part still in ROM mode,
  * read its firmware files from HB_RTL_FW_DIR and upload the patch.

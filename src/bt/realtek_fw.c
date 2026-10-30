@@ -7,14 +7,17 @@
  * like btrtl does. */
 #include "realtek_fw.h"
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "hci_cmd.h"
 #include "log.h"
+#include "rtl_fw_blobs.h"
 #include "util.h"
 
 #define OP_READ_ROM_VERSION 0xfc6d
@@ -610,6 +613,68 @@ static int read_identity(hci_t hci, hb_chip_identity *id)
     return hb_chip_identity_from_cc(cc, cc_len, id);
 }
 
+
+/* ---- bundled firmware install ------------------------------------------ */
+
+static int file_size_matches(const char *path, size_t expect)
+{
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return (size_t)st.st_size == expect;
+}
+
+static int write_blob(const char *dir, const hb_rtl_fw_blob *blob)
+{
+    char path[256], tmp[280];
+    FILE *f;
+    size_t n;
+
+    if (!blob || !blob->name || !blob->data) return 0;
+    snprintf(path, sizeof path, "%s/%s", dir, blob->name);
+    if (file_size_matches(path, blob->len)) return 0;   /* already current */
+
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    f = fopen(tmp, "wb");
+    if (!f) {
+        log_line("adapter: cannot write %s (errno %d)", tmp, errno);
+        return 0;
+    }
+    n = fwrite(blob->data, 1, blob->len, f);
+    if (fclose(f) != 0 || n != blob->len) {
+        unlink(tmp);
+        log_line("adapter: short write for %s", blob->name);
+        return 0;
+    }
+    if (rename(tmp, path) != 0) {
+        unlink(tmp);
+        log_line("adapter: cannot install %s (errno %d)", path, errno);
+        return 0;
+    }
+    log_line("adapter: installed bundled firmware %s (%u bytes)", blob->name,
+             (unsigned)blob->len);
+    return 1;
+}
+
+int hb_rtl_ensure_firmware_dir(const char *dir)
+{
+    size_t i;
+    int wrote = 0;
+
+    if (!dir || !dir[0]) dir = HB_RTL_FW_DIR;
+    if (mkdir(dir, 0755) != 0 && errno != EEXIST) {
+        log_line("adapter: cannot create %s (errno %d)", dir, errno);
+        return -1;
+    }
+    for (i = 0; i < HB_RTL_FW_BLOB_COUNT; i++)
+        wrote += write_blob(dir, &hb_rtl_fw_blobs[i]);
+    return wrote;
+}
+
+int hb_rtl_ensure_firmware(void)
+{
+    return hb_rtl_ensure_firmware_dir(HB_RTL_FW_DIR);
+}
+
 int hb_rtl_prepare(hci_t hci, char *why, int why_cap)
 {
     hb_chip_identity id;
@@ -617,6 +682,8 @@ int hb_rtl_prepare(hci_t hci, char *why, int why_cap)
     const char *file;
 
     if (why && why_cap > 0) why[0] = 0;
+    /* Make sure the bundled RTL8761BU files are on disk before we look them up. */
+    hb_rtl_ensure_firmware();
     if (!read_identity(hci, &id)) {
         log_line("adapter: local version not answered, no firmware step");
         return 1;
