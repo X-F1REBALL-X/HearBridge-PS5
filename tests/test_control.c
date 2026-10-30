@@ -271,12 +271,12 @@ int main(int argc, char **argv)
     get(&c, "/api/status");
     CHECK(strstr(out, "\"chip\":{\"vid\":\"\",\"pid\":\"\",\"vendor\":\"\",\"mediatek\":0,") != NULL,
           "status: empty chip until the controller is open");
-    CHECK(strstr(out, "\"adapter\":{\"external\":0,\"node\":\"\",\"pref\":\"auto\",\"nodes\":[]}") != NULL,
+    CHECK(strstr(out, "\"adapter\":{\"external\":0,\"node\":\"\",\"pref\":\"auto\",\"nodes\":[],\"adapters\":[]}") != NULL,
           "status: no adapter before the controller is open");
     c.bt_external = 1;
     snprintf(c.bt_node, sizeof c.bt_node, "/dev/ugen1.2");
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"adapter\":{\"external\":1,\"node\":\"/dev/ugen1.2\",\"pref\":\"auto\",\"nodes\":[]}") != NULL,
+    CHECK(strstr(out, "\"adapter\":{\"external\":1,\"node\":\"/dev/ugen1.2\",\"pref\":\"auto\",\"nodes\":[],\"adapters\":[]}") != NULL,
           "status: USB adapter and its node");
     c.bt_external = 0;
     c.bt_node[0] = 0;
