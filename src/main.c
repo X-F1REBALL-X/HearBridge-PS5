@@ -3516,10 +3516,35 @@ static void lw_tick(const headset_ini *ini)
 }
 
 /* Remember which controller is in use (shown on the control page). */
+/* Fill Settings with one chip-labeled button per real BT adapter. */
+static void refresh_adapter_picks(void)
+{
+    struct hci_usb_adapter list[HB_BT_NODES_MAX];
+    int n, i, outn = 0;
+
+    n = hci_usb_list_adapters(list, HB_BT_NODES_MAX);
+    CTL_LOCK(&g_ctl);
+    outn = 0;
+    for (i = 0; i < n && outn < HB_BT_NODES_MAX; i++) {
+        const char *p = list[i].path;
+        if (!strncmp(p, "/dev/", 5)) p += 5;
+        snprintf(g_ctl.bt_nodes[outn], sizeof g_ctl.bt_nodes[0], "%s", p);
+        snprintf(g_ctl.bt_adapters[outn].node, sizeof g_ctl.bt_adapters[0].node, "%s", p);
+        snprintf(g_ctl.bt_adapters[outn].label, sizeof g_ctl.bt_adapters[0].label, "%s", list[i].label);
+        g_ctl.bt_adapters[outn].vid = list[i].vid;
+        g_ctl.bt_adapters[outn].pid = list[i].pid;
+        g_ctl.bt_adapters[outn].internal = list[i].internal;
+        outn++;
+    }
+    g_ctl.bt_nodes_n = outn;
+    g_ctl.bt_adapters_n = outn;
+    CTL_UNLOCK(&g_ctl);
+}
+
 static void note_adapter(void)
 {
-    char list[HB_BT_NODES_MAX][32];
-    int n, i, outn = 0, vid = -1, pid = -1;
+    int i, vid = -1, pid = -1;
+    refresh_adapter_picks();
     CTL_LOCK(&g_ctl);
     g_ctl.bt_external = hci_usb_is_external();
     snprintf(g_ctl.bt_node, sizeof g_ctl.bt_node, "%s", hci_usb_node());
@@ -3531,17 +3556,15 @@ static void note_adapter(void)
         g_ctl.chip_vid = -1;
         g_ctl.chip_pid = -1;
     }
-    n = hci_usb_list_nodes(list, HB_BT_NODES_MAX);
-    for (i = 0; i < n && outn < HB_BT_NODES_MAX; i++) {
-        const char *p = list[i];
-        if (!strncmp(p, "/dev/", 5)) p += 5;
-        snprintf(g_ctl.bt_nodes[outn++], sizeof g_ctl.bt_nodes[0], "%s", p);
-    }
-    g_ctl.bt_nodes_n = outn;
     CTL_UNLOCK(&g_ctl);
-    log_line("adapter: using %s (%s), pref=%s", hci_usb_node(),
+    log_line("adapter: using %s (%s), pref=%s, %d Bluetooth adapter(s) listed", hci_usb_node(),
              hci_usb_is_external() ? "USB adapter, the console chip is untouched" : "the console's own chip",
-             g_ctl.bt_pref);
+             g_ctl.bt_pref, g_ctl.bt_adapters_n);
+    for (i = 0; i < g_ctl.bt_adapters_n; i++)
+        log_line("adapter: pick %s = %s (%04x:%04x)%s",
+                 g_ctl.bt_adapters[i].node, g_ctl.bt_adapters[i].label,
+                 g_ctl.bt_adapters[i].vid & 0xffff, g_ctl.bt_adapters[i].pid & 0xffff,
+                 g_ctl.bt_adapters[i].internal ? " [console]" : "");
 }
 
 /* Rest mode resets the Bluetooth USB device: close everything and open it
@@ -3592,8 +3615,22 @@ static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, hea
         if (hb_stop_requested()) break;
         if (ad) continue;
         if (!hci_usb_open(hci)) {
-            if (attempt == 1 || attempt % 12 == 0) log_line("reopen: controller not back yet (try %d, pref=%s)",
-                                                             attempt, g_ctl.bt_pref);
+            char want[32], node[32];
+            int sel;
+            if (attempt == 1 || attempt % 12 == 0) {
+                log_line("reopen: controller not back yet (try %d, pref=%s)",
+                         attempt, g_ctl.bt_pref);
+                refresh_adapter_picks();
+            }
+            /* Explicit ugen that is not a Bluetooth adapter (e.g. a hub): say so. */
+            sel = hb_adapter_selection(node, (int)sizeof node);
+            if (sel == HB_SEL_NODE && attempt == 1) {
+                const char *p = node;
+                if (!strncmp(p, "/dev/", 5)) p += 5;
+                snprintf(want, sizeof want, "%s", p);
+                note_event("That USB node is not a Bluetooth adapter");
+                log_line("reopen: %s did not open as a Bluetooth controller", want);
+            }
             continue;
         }
         note_adapter();
@@ -3796,6 +3833,7 @@ int main(void)
     sysinfo_collect();
     (void)avcap2_probe();
     (void)hci_usb_survey();
+    refresh_adapter_picks();
     /* Game detection and the rest mode watch look their system calls up
      * here, one after the other: the kernel_dynlib_* helpers are not safe
      * to run from several threads at once (fw 10.20 lost lookups when the

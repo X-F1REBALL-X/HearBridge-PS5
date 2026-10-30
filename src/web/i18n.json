@@ -235,7 +235,8 @@
    "adapterHint": "Auto prefers a USB stick when one is plugged in. Changing this restarts Bluetooth.",
    "adapterAuto": "Auto",
    "adapterRestart": "Restarting Bluetooth…",
-   "adapterSaved": "Adapter choice saved"
+   "adapterSaved": "Adapter choice saved",
+   "adapterFail": "Could not switch adapter"
   },
   "ar": {
    "language": "اللغة",
@@ -420,7 +421,8 @@
    "adapterHint": "تلقائي يفضّل عصا USB عند توصيلها. التغيير يعيد تشغيل البلوتوث.",
    "adapterAuto": "تلقائي",
    "adapterRestart": "جارٍ إعادة تشغيل البلوتوث…",
-   "adapterSaved": "تم حفظ اختيار المحول"
+   "adapterSaved": "تم حفظ اختيار المحول",
+   "adapterFail": "تعذر تبديل المحول"
   },
   "es": {
    "language": "Idioma",
@@ -605,7 +607,8 @@
    "adapterHint": "Auto prefiere un adaptador USB si hay uno. Cambiarlo reinicia Bluetooth.",
    "adapterAuto": "Auto",
    "adapterRestart": "Reiniciando Bluetooth…",
-   "adapterSaved": "Elección de adaptador guardada"
+   "adapterSaved": "Elección de adaptador guardada",
+   "adapterFail": "No se pudo cambiar el adaptador"
   },
   "fr": {
    "language": "Langue",
@@ -790,7 +793,8 @@
    "adapterHint": "Auto préfère une clé USB si elle est branchée. Changer redémarre le Bluetooth.",
    "adapterAuto": "Auto",
    "adapterRestart": "Redémarrage du Bluetooth…",
-   "adapterSaved": "Choix d’adaptateur enregistré"
+   "adapterSaved": "Choix d’adaptateur enregistré",
+   "adapterFail": "Impossible de changer d'adaptateur"
   },
   "de": {
    "language": "Sprache",
@@ -975,7 +979,8 @@
    "adapterHint": "Auto nimmt einen USB-Stick, wenn einer steckt. Eine Änderung startet Bluetooth neu.",
    "adapterAuto": "Auto",
    "adapterRestart": "Bluetooth wird neu gestartet…",
-   "adapterSaved": "Adapterwahl gespeichert"
+   "adapterSaved": "Adapterwahl gespeichert",
+   "adapterFail": "Adapterwechsel fehlgeschlagen"
   },
   "pt": {
    "language": "Idioma",
@@ -1160,7 +1165,8 @@
    "adapterHint": "Auto prefere um adaptador USB se houver um. Mudar reinicia o Bluetooth.",
    "adapterAuto": "Auto",
    "adapterRestart": "Reiniciando o Bluetooth…",
-   "adapterSaved": "Escolha de adaptador salva"
+   "adapterSaved": "Escolha de adaptador salva",
+   "adapterFail": "Não foi possível trocar o adaptador"
   },
   "ru": {
    "language": "Язык",
@@ -1345,7 +1351,8 @@
    "adapterHint": "Авто предпочитает USB-адаптер, если он подключён. Смена перезапускает Bluetooth.",
    "adapterAuto": "Авто",
    "adapterRestart": "Перезапуск Bluetooth…",
-   "adapterSaved": "Выбор адаптера сохранён"
+   "adapterSaved": "Выбор адаптера сохранён",
+   "adapterFail": "Не удалось сменить адаптер"
   },
   "ja": {
    "language": "言語",
@@ -1530,7 +1537,8 @@
    "adapterHint": "自動はUSBアダプターがあれば優先します。変更するとBluetoothが再起動します。",
    "adapterAuto": "自動",
    "adapterRestart": "Bluetoothを再起動しています…",
-   "adapterSaved": "アダプターの選択を保存しました"
+   "adapterSaved": "アダプターの選択を保存しました",
+   "adapterFail": "アダプターを切り替えられませんでした"
   },
   "zh": {
    "language": "语言",
@@ -1715,7 +1723,8 @@
    "adapterHint": "自动会优先使用已插入的 USB 适配器。更改后会重启蓝牙。",
    "adapterAuto": "自动",
    "adapterRestart": "正在重启蓝牙…",
-   "adapterSaved": "适配器选择已保存"
+   "adapterSaved": "适配器选择已保存",
+   "adapterFail": "无法切换适配器"
   },
   "it": {
    "language": "Lingua",
@@ -1900,7 +1909,8 @@
    "adapterHint": "Auto preferisce un adattatore USB se è collegato. Cambiare riavvia il Bluetooth.",
    "adapterAuto": "Auto",
    "adapterRestart": "Riavvio Bluetooth…",
-   "adapterSaved": "Scelta adattatore salvata"
+   "adapterSaved": "Scelta adattatore salvata",
+   "adapterFail": "Impossibile cambiare adattatore"
   }
  }
 }

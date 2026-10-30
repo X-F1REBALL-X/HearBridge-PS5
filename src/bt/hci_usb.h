@@ -46,6 +46,18 @@ void hci_usb_hint(int streaming, int connecting, int sticky);
 /* Candidate ugen nodes for Settings (no root hubs). names[i] is "/dev/ugenX.Y". */
 int hci_usb_list_nodes(char names[][32], int max);
 
+/* One real Bluetooth adapter for Settings: chip-labeled, hubs excluded. */
+struct hci_usb_adapter {
+    char path[32];   /* /dev/ugenX.Y */
+    char label[24];  /* Realtek, CSR, Console chip, Realtek 2 */
+    int vid, pid;
+    int internal;
+};
+
+/* Probe every ugen (read-only): keep Bluetooth HCI only, skip hubs and
+ * non-BT devices. labels are chip names with " 2" suffixes on duplicates. */
+int hci_usb_list_adapters(struct hci_usb_adapter *out, int max);
+
 int hci_usb_survey(void);
 
 #endif

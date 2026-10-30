@@ -63,8 +63,17 @@ typedef struct {
     char bt_node[20];      /* its ugen node, "" until known */
     char bt_pref[20];      /* auto|internal|usb|ugenX.Y from the adapter file */
 #define HB_BT_NODES_MAX 8
-    int bt_nodes_n;        /* candidate ugen nodes for Settings */
+#define HB_BT_ADAPTER_LABEL 24
+    int bt_nodes_n;        /* candidate ugen nodes for Settings (legacy) */
     char bt_nodes[HB_BT_NODES_MAX][20]; /* "ugenX.Y" without /dev/ */
+    /* Real Bluetooth adapters for the Settings picker (hubs filtered out). */
+    int bt_adapters_n;
+    struct {
+        char node[16];     /* ugenX.Y */
+        char label[HB_BT_ADAPTER_LABEL]; /* Realtek, CSR, Console chip, Realtek 2 */
+        int vid, pid;
+        int internal;      /* 1 = console chip */
+    } bt_adapters[HB_BT_NODES_MAX];
     int req_adapter;       /* page picked a controller: reopen Bluetooth */
 #define HB_EVENT_N   14
 #define HB_EVENT_LEN 80

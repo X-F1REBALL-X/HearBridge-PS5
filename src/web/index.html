@@ -663,8 +663,8 @@ function takeTok(j){if(j&&typeof j.token=='string'&&/^[0-9a-f]{32}$/.test(j.toke
 function xhr(m,p,cb,again){var x=new XMLHttpRequest();x.open(m,p,true);x.timeout=4000;if(m=='POST')x.setRequestHeader('X-HB-Token',TOKEN);
 x.onload=function(){if(x.status==200){if(m=='POST'&&MSGK=='reload'){MSGK='';$('msg').textContent=''}try{var j=JSON.parse(x.responseText);if(j&&j.version!==undefined){S=j;takeTok(j);okT=Date.now();draw()}}catch(e){}}
 else if(x.status==403&&m=='POST'&&!again){xhr('GET','/api/status',function(){xhr(m,p,cb,1)});return}
-else if(x.status==403){MSGK='reload';$('msg').textContent=t('reload')}if(cb)cb()};
-x.onerror=x.ontimeout=function(){$('msg').textContent=t('unreachable');$('live').className='live bad';if(cb)cb()};
+else if(x.status==403){MSGK='reload';$('msg').textContent=t('reload')}if(cb)cb(x.status)};
+x.onerror=x.ontimeout=function(){$('msg').textContent=t('unreachable');$('live').className='live bad';if(cb)cb(0)};
 x.send()}
 function req(p,cb){xhr('GET',p,cb)}
 function act(p,cb){xhr('POST',p,cb)}
@@ -782,20 +782,23 @@ function evKind(s){return /could not|did not|didn't|busy|hung up|lost|not an aud
 /^playing|turned on|connected securely|reconnected|is back|^connecting to|signal good|night mode on|game sound on|^saved|restored|backup saved|downloaded/i.test(s)?'good':
 /^(connecting|disconnecting|reconnecting|forgetting|scan started)/i.test(s)?'press':''}
 function setHtml(id,h){var e=$(id);if(e.hbHtml!==h){e.hbHtml=h;e.innerHTML=h}}
-function drawAd(){var ad=S&&S.adapter||{},pref=ad.pref||'auto',nodes=ad.nodes||[],i,h='',cur;
+function drawAd(){var ad=S&&S.adapter||{},pref=ad.pref||'auto',ads=ad.adapters||[],nodes=ad.nodes||[],i,h='',cur,lab,n;
 $('adauto').className=pref==='auto'?'act':'';
 $('adint').className=pref==='internal'?'act':'';
 $('adusb').className=pref==='usb'?'act':'';
-for(i=0;i<nodes.length;i++){cur=pref===nodes[i];
-h+='<button type="button" data-node="'+esc(nodes[i])+'" class="'+(cur?'act':'')+'">'+esc(nodes[i])+'</button>'}
+if(ads.length){for(i=0;i<ads.length;i++){n=ads[i].node||'';lab=ads[i].internal?t('adapterInternal'):(ads[i].label||n);cur=pref===n;
+h+='<button type="button" data-node="'+esc(n)+'" class="'+(cur?'act':'')+'">'+esc(lab)+'</button>'}}
+else{for(i=0;i<nodes.length;i++){cur=pref===nodes[i];
+h+='<button type="button" data-node="'+esc(nodes[i])+'" class="'+(cur?'act':'')+'">'+esc(nodes[i])+'</button>'}}
 setHtml('adnodes',h);
 var b=$('adnodes').getElementsByTagName('button');
 for(i=0;i<b.length;i++)b[i].onclick=function(){pickAd(null,this.getAttribute('data-node'))}
 }
 function pickAd(mode,node){var p=mode?'/api/adapter?mode='+encodeURIComponent(mode):'/api/adapter?node='+encodeURIComponent(node);
 var want=mode||node;if(want==='console')want='internal';if(want==='external'||want==='adapter')want='usb';
+if(S&&S.adapter){S.adapter.pref=want;drawAd()}
 $('admsg').textContent=t('adapterRestart');
-xhr('POST',p,function(){var pref=S&&S.adapter&&S.adapter.pref;if(pref&&pref===want)$('admsg').textContent=t('adapterSaved');else if(!MSGK)$('admsg').textContent=''})}
+xhr('POST',p,function(st){var pref=S&&S.adapter&&S.adapter.pref;if(st===200&&pref&&pref===want)$('admsg').textContent=t('adapterSaved');else{$('admsg').textContent=t('adapterFail');drawAd()}})}
 function draw(){
 $('msg').textContent=MSGK?t(MSGK):'';
 $('ver').textContent=S.version;

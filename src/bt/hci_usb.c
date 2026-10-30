@@ -1064,8 +1064,106 @@ static int list_ugen(char names[][32], int max)
 }
 
 
-/* Candidate Bluetooth nodes for the Settings picker: every ugen except
- * root hubs (ugenX.1). The open path still probes which ones speak HCI. */
+/* 1 when the USB device is a hub (class 0x09). Root hubs and external
+ * hub dongles must never appear as Bluetooth adapter picks. */
+static int is_usb_hub_fd(int fd)
+{
+    struct usb_device_descriptor dd;
+    memset(&dd, 0, sizeof dd);
+    if (ioctl(fd, USB_GET_DEVICE_DESC, &dd) != 0) return 0;
+    return dd.bDeviceClass == 0x09;
+}
+
+/* Read-only: 1 if path is a Bluetooth HCI controller (not a hub / pad). */
+static int probe_bt_adapter(const char *path, int *vid, int *pid)
+{
+    static uint8_t cfg[1024];
+    struct usbhci_iface found[USBHCI_MAX_IFACES];
+    char id[128];
+    int fd, n, k, v = -1, p = -1;
+
+    if (vid) *vid = -1;
+    if (pid) *pid = -1;
+
+    /* Already claimed by us: trust the open chip ids (do not re-open). */
+    if (g_open && g_open->node[0] && !strcmp(g_open->node, path) && g_chip_vid >= 0) {
+        if (vid) *vid = g_chip_vid;
+        if (pid) *pid = g_chip_pid;
+        return 1;
+    }
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0) fd = open(path, O_RDWR);
+    if (fd < 0) return 0;
+
+    device_id(fd, id, sizeof id, &v, &p);
+    if (vid) *vid = v;
+    if (pid) *pid = p;
+
+    if (is_usb_hub_fd(fd)) {
+        close(fd);
+        return 0;
+    }
+    /* DualSense / PS Link audio: never a controller for us. */
+    if (v == 0x054c && (p == 0x0ce6 || p == 0x0ecc)) {
+        close(fd);
+        return 0;
+    }
+
+    n = read_config(fd, cfg, (int)sizeof cfg);
+    k = n > 0 ? usbhci_scan(cfg, n, found) : 0;
+    if (k > 0) {
+        close(fd);
+        return 1;
+    }
+    /* No readable config: only accept a known BT vendor or class e0. */
+    if (n <= 0 && bt_by_device(fd, v)) {
+        close(fd);
+        return 1;
+    }
+    close(fd);
+    return 0;
+}
+
+static void adapter_base_label(struct hci_usb_adapter *a)
+{
+    const char *v;
+    if (a->internal) {
+        snprintf(a->label, sizeof a->label, "Console chip");
+        return;
+    }
+    v = btchip_vendor(a->vid);
+    if (v) snprintf(a->label, sizeof a->label, "%s", v);
+    else snprintf(a->label, sizeof a->label, "USB HCI");
+}
+
+/* First Realtek stays "Realtek"; a second becomes "Realtek 2". */
+static void adapter_dedupe_labels(struct hci_usb_adapter *a, int n)
+{
+    char base[HCI_MAX_NODES][24];
+    int i, j, total, ord;
+
+    for (i = 0; i < n; i++) {
+        adapter_base_label(&a[i]);
+        snprintf(base[i], sizeof base[i], "%s", a[i].label);
+    }
+    for (i = 0; i < n; i++) {
+        if (a[i].internal) continue;
+        total = 0;
+        ord = 0;
+        for (j = 0; j < n; j++) {
+            if (a[j].internal) continue;
+            if (strcmp(base[j], base[i])) continue;
+            total++;
+            if (j <= i) ord++;
+        }
+        if (total > 1 && ord > 1)
+            snprintf(a[i].label, sizeof a[i].label, "%s %d", base[i], ord);
+    }
+}
+
+/* Candidate Bluetooth nodes for Settings: every ugen except root hubs.
+ * Prefer hci_usb_list_adapters() for the picker (BT-only + chip labels). */
 int hci_usb_list_nodes(char names[][32], int max)
 {
     char all[HCI_MAX_NODES][32];
@@ -1084,6 +1182,36 @@ int hci_usb_list_nodes(char names[][32], int max)
         if (is_root_hub(all[i])) continue;
         snprintf(names[outn++], 32, "%s", all[i]);
     }
+    return outn;
+}
+
+int hci_usb_list_adapters(struct hci_usb_adapter *out, int max)
+{
+    char all[HCI_MAX_NODES][32];
+    int n = list_ugen(all, HCI_MAX_NODES), i, outn = 0;
+
+    if (!out || max < 1) return 0;
+    if (!n) {
+        static const char *const fallback[] = {
+            "/dev/ugen0.2", "/dev/ugen0.3", "/dev/ugen1.2", "/dev/ugen1.3",
+            "/dev/ugen2.2", "/dev/ugen2.3",
+        };
+        for (i = 0; i < (int)(sizeof fallback / sizeof fallback[0]) && n < HCI_MAX_NODES; i++)
+            snprintf(all[n++], sizeof all[0], "%s", fallback[i]);
+    }
+    sort_nodes(all, n);
+    for (i = 0; i < n && outn < max; i++) {
+        int vid = -1, pid = -1;
+        if (is_root_hub(all[i])) continue;
+        if (!probe_bt_adapter(all[i], &vid, &pid)) continue;
+        memset(&out[outn], 0, sizeof out[outn]);
+        snprintf(out[outn].path, sizeof out[outn].path, "%s", all[i]);
+        out[outn].vid = vid;
+        out[outn].pid = pid;
+        out[outn].internal = is_internal_node(all[i]);
+        outn++;
+    }
+    adapter_dedupe_labels(out, outn);
     return outn;
 }
 

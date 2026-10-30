@@ -68,6 +68,7 @@ void ctl_init(hb_ctl *c, const char *version)
     c->chip_vid = c->chip_pid = -1;
     c->bt_pref[0] = 0;
     c->bt_nodes_n = 0;
+    c->bt_adapters_n = 0;
     c->req_adapter = 0;
     c->battery = -1;
     c->batt_pct = -1;

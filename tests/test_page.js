@@ -236,18 +236,23 @@ STATUS.adapter = { external: 0, node: '/dev/ugen0.2' };
 global.hbTest.req('/api/status');
 check(el('chipv').textContent === 'Console chip (ugen0.2) · MediaTek (0e8d:3605)', 'page: MediaTek chip');
 
-STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'auto', nodes: ['ugen0.2', 'ugen1.2'] };
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'auto',
+  adapters: [{node:'ugen0.2',label:'Console chip',vid:'1286',pid:'2059',internal:1},
+             {node:'ugen1.2',label:'Realtek',vid:'0bda',pid:'8771',internal:0}] };
 global.hbTest.req('/api/status');
 check(el('adauto').className === 'act' && el('adint').className === '' && el('adusb').className === '', 'page: adapter Auto selected');
-check(/data-node="ugen1\.2"/.test(el('adnodes').innerHTML) && /data-node="ugen0\.2"/.test(el('adnodes').innerHTML),
-      'page: adapter lists detected ugen nodes');
-STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'usb', nodes: ['ugen1.2'] };
+check(/data-node="ugen1\.2"/.test(el('adnodes').innerHTML) && /Realtek/.test(el('adnodes').innerHTML) &&
+      /data-node="ugen0\.2"/.test(el('adnodes').innerHTML) && !/>ugen1\.2</.test(el('adnodes').innerHTML),
+      'page: adapter buttons use chip labels, not raw ugen');
+STATUS.adapter = { external: 1, node: '/dev/ugen1.2', pref: 'usb', adapters: [{node:'ugen1.2',label:'Realtek',internal:0}] };
 global.hbTest.req('/api/status');
 check(el('adusb').className === 'act' && el('adauto').className === '', 'page: adapter USB selected');
-STATUS.adapter = { external: 0, node: '/dev/ugen0.2', pref: 'ugen1.3', nodes: ['ugen0.2', 'ugen1.3'] };
+STATUS.adapter = { external: 0, node: '/dev/ugen0.2', pref: 'ugen1.3',
+  adapters: [{node:'ugen0.2',label:'Console chip',internal:1},{node:'ugen1.3',label:'CSR',vid:'0a12',pid:'0001',internal:0}] };
 global.hbTest.req('/api/status');
-check(el('adauto').className === '' && /data-node="ugen1\.3"[^>]*class="act"|class="act"[^>]*data-node="ugen1\.3"/.test(el('adnodes').innerHTML),
-      'page: explicit ugen node selected');
+check(el('adauto').className === '' && /data-node="ugen1\.3"[^>]*class="act"|class="act"[^>]*data-node="ugen1\.3"/.test(el('adnodes').innerHTML) &&
+      /CSR/.test(el('adnodes').innerHTML),
+      'page: explicit ugen node selected by chip button');
 calls.length = 0; el('adusb').onclick();
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/adapter?mode=usb' && calls[0].h['X-HB-Token'],
       'page: USB adapter button POSTs /api/adapter?mode=usb with token');
