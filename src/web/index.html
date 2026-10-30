@@ -178,8 +178,9 @@ repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(255,255,255,.
 .apick{color:var(--lime);font-weight:800}
 .seg button{overflow:hidden;text-overflow:ellipsis}
 .seg button.cur:before{border-color:rgba(200,255,61,.75);box-shadow:inset 0 0 0 1px rgba(200,255,61,.35)}
-#adnodes{grid-auto-flow:row;grid-template-columns:1fr 1fr;margin-top:var(--s1)}
+#adnodes{margin-top:0}
 #adnodes:empty{display:none}
+#adusb.hid{display:none}
 #admsg{min-height:1.2em}
 
 .evlog{margin:0;font-size:.9rem;line-height:1.4;color:#e8edf2}
@@ -782,17 +783,20 @@ function evKind(s){return /could not|did not|didn't|busy|hung up|lost|not an aud
 /^playing|turned on|connected securely|reconnected|is back|^connecting to|signal good|night mode on|game sound on|^saved|restored|backup saved|downloaded/i.test(s)?'good':
 /^(connecting|disconnecting|reconnecting|forgetting|scan started)/i.test(s)?'press':''}
 function setHtml(id,h){var e=$(id);if(e.hbHtml!==h){e.hbHtml=h;e.innerHTML=h}}
-function drawAd(){var ad=S&&S.adapter||{},pref=ad.pref||'auto',ads=ad.adapters||[],nodes=ad.nodes||[],i,h='',cur,lab,n;
+function drawAd(){var ad=S&&S.adapter||{},pref=ad.pref||'auto',ads=ad.adapters||[],nodes=ad.nodes||[],i,h='',n,lab,seg,b,ext=[];
 $('adauto').className=pref==='auto'?'act':'';
 $('adint').className=pref==='internal'?'act':'';
-$('adusb').className=pref==='usb'?'act':'';
-if(ads.length){for(i=0;i<ads.length;i++){n=ads[i].node||'';lab=ads[i].internal?t('adapterInternal'):(ads[i].label||n);cur=pref===n;
-h+='<button type="button" data-node="'+esc(n)+'" class="'+(cur?'act':'')+'">'+esc(lab)+'</button>'}}
-else{for(i=0;i<nodes.length;i++){cur=pref===nodes[i];
-h+='<button type="button" data-node="'+esc(nodes[i])+'" class="'+(cur?'act':'')+'">'+esc(nodes[i])+'</button>'}}
-setHtml('adnodes',h);
-var b=$('adnodes').getElementsByTagName('button');
-for(i=0;i<b.length;i++)b[i].onclick=function(){pickAd(null,this.getAttribute('data-node'))}
+for(i=0;i<ads.length;i++)if(ads[i]&&!ads[i].internal&&ads[i].node)ext.push(ads[i]);
+seg=$('adseg');b=seg.querySelectorAll('button[data-node]');for(i=0;i<b.length;i++)b[i].parentNode.removeChild(b[i]);
+if(ext.length){$('adusb').className='hid';
+for(i=0;i<ext.length;i++){n=ext[i].node;lab=ext[i].label||n;b=document.createElement('button');b.type='button';
+b.setAttribute('data-node',n);b.className=pref===n?'act':'';b.textContent=lab;
+b.onclick=function(){pickAd(null,this.getAttribute('data-node'))};seg.appendChild(b)}
+setHtml('adnodes','')}
+else{$('adusb').className=pref==='usb'?'act':'';
+for(i=0;i<nodes.length;i++){if(nodes[i]==='ugen0.2')continue;h+='<button type="button" data-node="'+esc(nodes[i])+'" class="'+(pref===nodes[i]?'act':'')+'">'+esc(nodes[i])+'</button>'}
+setHtml('adnodes',h);b=$('adnodes').getElementsByTagName('button');
+for(i=0;i<b.length;i++)b[i].onclick=function(){pickAd(null,this.getAttribute('data-node'))}}
 }
 function pickAd(mode,node){var p=mode?'/api/adapter?mode='+encodeURIComponent(mode):'/api/adapter?node='+encodeURIComponent(node);
 var want=mode||node;if(want==='console')want='internal';if(want==='external'||want==='adapter')want='usb';

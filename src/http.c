@@ -847,17 +847,12 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         if (query_word(q, "mode", mode, sizeof mode))
             snprintf(word, sizeof word, "%s", mode);
         else if (query_word(q, "node", node, sizeof node)) {
-            int i, ok = 0, nlen;
+            const char *dot;
             snprintf(word, sizeof word, "%s", node);
-            nlen = (int)strlen(word);
-            /* Root hubs (ugenX.1) are never selectable. */
-            if (nlen >= 2 && word[nlen - 2] == '.' && word[nlen - 1] == '1') goto bad;
-            /* When Settings has a BT list, only those nodes may be picked. */
-            if (c->bt_adapters_n > 0) {
-                for (i = 0; i < c->bt_adapters_n; i++)
-                    if (!strcmp(c->bt_adapters[i].node, word)) { ok = 1; break; }
-                if (!ok) goto bad;
-            }
+            /* Root hubs only (ugenX.1) — never ugenX.11. No allowlist: a
+             * stale Settings list must not reject a real stick behind a hub. */
+            dot = strrchr(word, '.');
+            if (dot && dot[1] == '1' && !dot[2]) goto bad;
         } else goto bad;
         if (!hb_adapter_pref_set(word)) goto bad;
         hb_adapter_pref_word(c->bt_pref, (int)sizeof c->bt_pref);

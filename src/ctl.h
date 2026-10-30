@@ -69,7 +69,7 @@ typedef struct {
     /* Real Bluetooth adapters for the Settings picker (hubs filtered out). */
     int bt_adapters_n;
     struct {
-        char node[16];     /* ugenX.Y */
+        char node[20];     /* ugenX.Y */
         char label[HB_BT_ADAPTER_LABEL]; /* Realtek, CSR, Console chip, Realtek 2 */
         int vid, pid;
         int internal;      /* 1 = console chip */

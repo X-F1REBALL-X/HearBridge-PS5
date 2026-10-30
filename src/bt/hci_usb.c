@@ -861,11 +861,20 @@ static int is_internal_node(const char *path)
     return !strcmp(path, HB_INTERNAL_NODE);
 }
 
-/* Root hubs are ugenX.1; they have no Bluetooth interface. */
+/* Root hubs are ugenX.1 only (not ugenX.11 / ugenX.21). */
 static int is_root_hub(const char *path)
 {
-    size_t n = strlen(path);
-    return n >= 2 && path[n - 2] == '.' && path[n - 1] == '1';
+    const char *dot = strrchr(path, '.');
+    return dot && dot[1] == '1' && dot[2] == '\0';
+}
+
+static void settle_usb_if_needed(void)
+{
+    int ms = g_settle_usb_ms;
+    if (ms <= 0) return;
+    g_settle_usb_ms = 0;
+    log_line("hci_usb: waiting %d ms after releasing the console chip before USB probe", ms);
+    usleep(ms * 1000);
 }
 
 static void sort_nodes(char names[][32], int n)
@@ -908,41 +917,53 @@ int hci_usb_open(hci_t *out)
             if (r == 1) found = 1;
             else if (r < 0) busy = 1;
         } else if (sel == SEL_NODE) {
-            /* Explicit ugen is external unless it is the console chip. */
-            int r = try_node(u, choice, !is_internal_node(choice));
+            /* Explicit ugen is external unless it is the console chip.
+             * Wait out the console-chip release: skipping this raced the bus
+             * when Settings picked Realtek/CSR right after Auto/Console. */
+            int r;
+            settle_usb_if_needed();
+            r = try_node(u, choice, !is_internal_node(choice));
             if (r == 1) found = 1;
             else if (r < 0) busy = 1;
         } else {
             char names[HCI_MAX_NODES][32];
-            int n, i;
+            struct hci_usb_adapter ads[HCI_MAX_NODES];
+            int n, i, na;
 
-            if (g_settle_usb_ms > 0) {
-                int ms = g_settle_usb_ms;
-                g_settle_usb_ms = 0;
-                log_line("hci_usb: waiting %d ms after releasing the console chip before USB probe", ms);
-                usleep(ms * 1000);
-            }
-            n = list_ugen(names, HCI_MAX_NODES);
-
-            if (!n) {
-                for (i = 0; i < (int)(sizeof fallback / sizeof fallback[0]) && n < HCI_MAX_NODES; i++)
-                    snprintf(names[n++], sizeof names[0], "%s", fallback[i]);
-            }
-            sort_nodes(names, n);
-            /* One busy/ENOMEM node must not stop the scan: after the console
-             * chip was released, another ugen can look held for a moment while
-             * the Realtek stick further down the list is already free. A
-             * break here made Settings → USB (and then Auto) fall back to the
-             * console chip and look "stuck" on it. */
-            for (i = 0; i < n; i++) {
+            settle_usb_if_needed();
+            /* Prefer real BT sticks from a read-only probe (hubs / pads skipped).
+             * Auto must open Realtek or CSR when one is present, not fall through
+             * to the console chip after wasting tries on non-BT ugen nodes. */
+            na = hci_usb_list_adapters(ads, HCI_MAX_NODES);
+            for (i = 0; i < na; i++) {
                 int r;
-                if (is_internal_node(names[i]) || is_root_hub(names[i])) continue;
-                r = try_node(u, names[i], 1);
+                if (ads[i].internal) continue;
+                r = try_node(u, ads[i].path, 1);
                 if (r == 1) { found = 1; break; }
                 if (r < 0) {
                     busy = 1;
-                    log_line("hci_usb: %s busy/held, trying the next USB node", names[i]);
+                    log_line("hci_usb: %s busy/held, trying the next USB adapter", ads[i].path);
                     continue;
+                }
+            }
+            if (!found) {
+                n = list_ugen(names, HCI_MAX_NODES);
+                if (!n) {
+                    for (i = 0; i < (int)(sizeof fallback / sizeof fallback[0]) && n < HCI_MAX_NODES; i++)
+                        snprintf(names[n++], sizeof names[0], "%s", fallback[i]);
+                }
+                sort_nodes(names, n);
+                /* One busy/ENOMEM node must not stop the scan. */
+                for (i = 0; i < n; i++) {
+                    int r;
+                    if (is_internal_node(names[i]) || is_root_hub(names[i])) continue;
+                    r = try_node(u, names[i], 1);
+                    if (r == 1) { found = 1; break; }
+                    if (r < 0) {
+                        busy = 1;
+                        log_line("hci_usb: %s busy/held, trying the next USB node", names[i]);
+                        continue;
+                    }
                 }
             }
             if (!found && sel == SEL_USB)
@@ -1100,10 +1121,6 @@ static int probe_bt_adapter(const char *path, int *vid, int *pid)
     if (vid) *vid = v;
     if (pid) *pid = p;
 
-    if (is_usb_hub_fd(fd)) {
-        close(fd);
-        return 0;
-    }
     /* DualSense / PS Link audio: never a controller for us. */
     if (v == 0x054c && (p == 0x0ce6 || p == 0x0ecc)) {
         close(fd);
@@ -1112,6 +1129,12 @@ static int probe_bt_adapter(const char *path, int *vid, int *pid)
 
     n = read_config(fd, cfg, (int)sizeof cfg);
     k = n > 0 ? usbhci_scan(cfg, n, found) : 0;
+    /* Pure hubs (class 0x09, no HCI iface) stay out of the picker. A stick
+     * behind a hub is a separate ugen with a real HCI iface — keep it. */
+    if (is_usb_hub_fd(fd) && k <= 0) {
+        close(fd);
+        return 0;
+    }
     if (k > 0) {
         close(fd);
         return 1;
