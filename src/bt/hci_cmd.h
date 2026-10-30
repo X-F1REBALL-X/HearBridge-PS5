@@ -20,6 +20,7 @@
 #define HB_OP_IO_CAP_REPLY        0x042B
 #define HB_OP_USER_CONFIRM_REPLY  0x042C
 #define HB_OP_RESET               0x0C03
+#define HB_OP_SET_EVENT_FILTER    0x0C05
 #define HB_OP_SET_EVENT_MASK      0x0C01
 #define HB_OP_WRITE_LOCAL_NAME    0x0C13
 #define HB_OP_READ_SCAN_ENABLE    0x0C19
