@@ -14,12 +14,21 @@
 /* Audio/Video major class, minor "unclassified" (0x000400). */
 static const unsigned char g_cod[3] = { 0x00, 0x04, 0x00 };
 
-/* Same widened mask as a2dp_open: default + SSP + Inquiry Result with RSSI
- * + Extended Inquiry Result. Must be set BEFORE Write Inquiry Mode 2, or a
- * stick that only emits 0x22/0x2F (and not plain 0x02) returns zero devices. */
+/* Default / Realtek: widen the mask so mode-2 (EIR) result events arrive.
+ * Value 0x7DBFFFFFFFFFFFFF little-endian. */
 static const unsigned char g_evmask[8] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBF, 0x7D
 };
+
+/* Proven CSR8510 mask from HearBridge-PS4 (ps4-port probe.c setup_controller):
+ * 0x3DBFF807FFFBFFFF. Enables Inquiry Result + Inquiry Result with RSSI
+ * (mode 1) and SSP/auth events; does NOT enable Extended Inquiry Result. */
+static const unsigned char g_evmask_csr[8] = {
+    0xFF, 0xFF, 0xFB, 0xFF, 0x07, 0xF8, 0xBF, 0x3D
+};
+
+/* Same page timeout PS4 uses (0x4000 * 0.625 ms = 10.24 s). */
+static const unsigned char g_page_timeout[2] = { 0x00, 0x40 };
 
 static void fail(char *why, int cap, const char *text)
 {
@@ -42,29 +51,40 @@ int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
     }
     log_line("adapter: HCI Reset done, controller is ours");
 
-    /* CSR8510 (and clones) need a short pause after Reset before further
-     * commands stick; without it inquiry can complete with zero results. */
-    usleep(250 * 1000);
-
-    /* Event mask first — before inquiry mode — so mode-2 result events are
-     * not filtered. Clear any leftover event filter while we are at it. */
-    if (!hci_cmd_sync(hci, HB_OP_SET_EVENT_MASK, g_evmask, 8, cc, &cc_len,
-                      (int)sizeof cc))
-        log_line("adapter: SET_EVENT_MASK failed (inquiry results may be missing)");
-    else
-        log_line("adapter: event mask 0x7DBFFFFFFFFFFFFF");
-    filt = 0;                            /* clear all filters */
-    if (!hci_cmd_sync(hci, HB_OP_SET_EVENT_FILTER, &filt, 1, cc, &cc_len,
-                      (int)sizeof cc))
-        log_line("adapter: SET_EVENT_FILTER clear failed");
-
-    /* Realtek ROM-mode sticks need a patch upload. CSR8510 (0a12:0001) and
-     * other plain HCI / class e0:01:01 dongles do not: skip by USB VID when
-     * known so we never touch the Realtek path on them. Unknown VID still
-     * goes through prepare (it no-ops unless the LMP manufacturer is Realtek). */
     {
         int known = hci_usb_chip(&vid, &pid);
         is_csr = known && btchip_is_csr(vid);
+    }
+
+    /* PS4 CSR path goes straight to Read_BD_ADDR after Reset (no settle).
+     * Non-CSR sticks keep a short pause so ROM-mode Realtek is ready. */
+    if (!is_csr)
+        usleep(250 * 1000);
+
+    /* Event mask BEFORE inquiry mode. CSR uses the PS4-proven mask; others
+     * get the wider EIR-capable mask. */
+    if (is_csr) {
+        if (!hci_cmd_sync(hci, HB_OP_SET_EVENT_MASK, g_evmask_csr, 8, cc, &cc_len,
+                          (int)sizeof cc))
+            log_line("adapter: SET_EVENT_MASK failed (inquiry results may be missing)");
+        else
+            log_line("adapter: event mask 0x3DBFF807FFFBFFFF (CSR/PS4)");
+    } else {
+        if (!hci_cmd_sync(hci, HB_OP_SET_EVENT_MASK, g_evmask, 8, cc, &cc_len,
+                          (int)sizeof cc))
+            log_line("adapter: SET_EVENT_MASK failed (inquiry results may be missing)");
+        else
+            log_line("adapter: event mask 0x7DBFFFFFFFFFFFFF");
+        filt = 0;                        /* clear leftover filters (non-CSR) */
+        if (!hci_cmd_sync(hci, HB_OP_SET_EVENT_FILTER, &filt, 1, cc, &cc_len,
+                          (int)sizeof cc))
+            log_line("adapter: SET_EVENT_FILTER clear failed");
+    }
+
+    /* Realtek ROM-mode sticks need a patch upload. CSR8510 (0a12:0001) and
+     * other plain HCI / class e0:01:01 dongles do not. */
+    {
+        int known = (vid >= 0);
         if (known && !btchip_is_realtek(vid)) {
             char chip[64];
             btchip_describe(vid, pid, chip, (int)sizeof chip);
@@ -86,14 +106,31 @@ int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
         return 0;
     }
 
-    /* Inquiry mode 2 = RSSI + EIR. Some CSR8510 clones accept mode 2 but
-     * never emit 0x22/0x2F (live: Inquiry Complete with only 2 HCI events,
-     * zero devices). Mode 0 still uses plain Inquiry Result (0x02). */
-    one = is_csr ? 0 : 2;
+    /* Inquiry mode: PS4 CSR bring-up uses mode 1 (Inquiry Result with RSSI,
+     * event 0x22). Mode 2 (EIR) is accepted by some CSR clones but they never
+     * emit 0x22/0x2F — live PS5 saw Inquiry Complete with only 2 HCI events.
+     * Mode 0 works for plain 0x02 but PS4's proven path is mode 1. */
+    one = is_csr ? 1 : 2;
     if (!hci_cmd_sync(hci, HB_OP_WRITE_INQUIRY_MODE, &one, 1, cc, &cc_len, (int)sizeof cc))
         log_line("adapter: WRITE_INQUIRY_MODE failed (names may be missing)");
     else
-        log_line("adapter: inquiry mode %u%s", one, is_csr ? " (CSR: plain results)" : "");
+        log_line("adapter: inquiry mode %u%s", one,
+                 is_csr ? " (CSR/PS4: RSSI results)" : "");
+
+    /* PS4 enables SSP during controller setup (before any scan/page). */
+    one = 1;
+    if (!hci_cmd_sync(hci, HB_OP_WRITE_SSP_MODE, &one, 1, cc, &cc_len, (int)sizeof cc))
+        log_line("adapter: WRITE_SSP_MODE failed (continuing)");
+    else
+        log_line("adapter: Simple Pairing enabled");
+
+    if (is_csr) {
+        if (!hci_cmd_sync(hci, HB_OP_WRITE_PAGE_TIMEOUT, g_page_timeout, 2, cc, &cc_len,
+                          (int)sizeof cc))
+            log_line("adapter: WRITE_PAGE_TIMEOUT failed (continuing)");
+        else
+            log_line("adapter: page timeout 0x4000 (CSR/PS4)");
+    }
 
     if (!hci_cmd_sync(hci, HB_OP_WRITE_CLASS_OF_DEV, g_cod, 3, cc, &cc_len, (int)sizeof cc))
         log_line("adapter: WRITE_CLASS_OF_DEVICE failed");

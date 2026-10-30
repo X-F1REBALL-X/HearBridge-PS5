@@ -464,7 +464,8 @@ static int inquiry_once(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound
     inq[4] = 0x00;
 
     /* Keep the inquiry mode from bring-up. Forcing mode 2 here undid CSR's
-     * mode 0 and produced Inquiry Complete with zero result events. */
+     * mode 1 (PS4-proven RSSI results) and produced Inquiry Complete with
+     * zero result events. */
     if (hci_cmd_sync(hci, 0x0C44, NULL, 0, cc, &cc_len, (int)sizeof cc) && cc_len >= 7)
         old_mode = cc[6];
 
@@ -588,8 +589,6 @@ fail:
     return 0;
 }
 
-static const unsigned char k_evmask[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBF, 0x7D };
-
 /* Inquiry with recovery: when a whole inquiry brings no event at all (not
  * even its Command Status), the event path is re-armed (by the transport
  * pump), the event mask is sent again and the inquiry retried once. */
@@ -600,18 +599,21 @@ static int inquiry_scan_off(a2dp_session *s, a2dp_inq_dev *out, int max, int *nf
     g_inq_skipped = 0;
     ok = inquiry_once(s, out, max, nfound);
     /* CSR live: Inquiry started+completed but only 2 HCI events (Command
-     * Status + Complete) and 0 devices — mode 2 result events never arrived.
-     * Recover by re-arming the event mask, dropping to inquiry mode 0, retry. */
+     * Status + Complete) and 0 devices — mode 2 EIR events never arrived.
+     * Recover with the PS4-proven CSR mask + inquiry mode 1 (RSSI / 0x22). */
     if (ok && *nfound == 0 && g_inq_events <= 3 && !g_inq_skipped && !INQ_ABORTED()
         && s && s->hci.ops) {
-        unsigned char mode0 = 0;
+        static const unsigned char csr_mask[8] = {
+            0xFF, 0xFF, 0xFB, 0xFF, 0x07, 0xF8, 0xBF, 0x3D
+        };
+        unsigned char mode1 = 1;
         if (!a2dp_scan_evmask_sent) {
             a2dp_scan_evmask_sent = 1;
-            log_line("inquiry: empty (%d event(s)), re-sending event mask + mode 0 and retrying",
+            log_line("inquiry: empty (%d event(s)), CSR/PS4 mask + mode 1 and retrying",
                      g_inq_events);
-            if (!hci_cmd_sync(s->hci, HB_OP_SET_EVENT_MASK, k_evmask, 8, NULL, NULL, 0))
+            if (!hci_cmd_sync(s->hci, HB_OP_SET_EVENT_MASK, csr_mask, 8, NULL, NULL, 0))
                 log_line("inquiry: SET_EVENT_MASK got no reply, event pipe looks stalled");
-            (void)hci_cmd_sync(s->hci, HB_OP_WRITE_INQUIRY_MODE, &mode0, 1, NULL, NULL, 0);
+            (void)hci_cmd_sync(s->hci, HB_OP_WRITE_INQUIRY_MODE, &mode1, 1, NULL, NULL, 0);
         } else {
             log_line("inquiry: empty again (%d event(s)), retrying", g_inq_events);
         }
