@@ -922,7 +922,8 @@ int hci_usb_open(hci_t *out)
             if (r == 1) found = 1;
             else if (r < 0) busy = 1;
         } else if (sel == SEL_NODE) {
-            int r = try_node(u, choice, 0);
+            /* Explicit ugen is external unless it is the console chip. */
+            int r = try_node(u, choice, !is_internal_node(choice));
             if (r == 1) found = 1;
             else if (r < 0) busy = 1;
         } else {
