@@ -26,6 +26,8 @@ function mkEl(tag) {
     querySelector(sel) { const a = this.querySelectorAll(sel.replace(/\.act$/, ''));
       if (/\.act$/.test(sel)) return a.find(c => /\bact\b/.test(c.className)) || null;
       return a[0] || null; },
+    addEventListener() {},
+    removeEventListener() {},
   };
   return o;
 }
@@ -47,7 +49,7 @@ const STATUS = { version: '1.1.0', state: 'streaming', connected: 1, device: 'X'
   codec: 'SBC-XQ', codec_pref: 0, codec_avail: 10, eq: { on: 1, db: [6, 3, 0, 0, 0] } };
 const ctx = {
   document: { getElementById: el, querySelectorAll: () => [], documentElement: {},
-    createElement(tag) { return mkEl(tag); } },
+    createElement(tag) { return mkEl(tag); }, addEventListener() {}, removeEventListener() {}, hidden: false },
   XMLHttpRequest: XHR, localStorage: { getItem: () => 'en', setItem() {} }, navigator: { language: 'en' },
   location: { search: '' }, confirm: () => true, setInterval() {}, setTimeout(fn) { fn(); return 1; }, clearTimeout() {}, Date, JSON, Math, String, parseInt,
 };
@@ -85,36 +87,41 @@ calls.length = 0; el('lat').value = 150; el('lat').oninput.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150', 'page: moving the slider posts the buffer target');
 {
   const main0 = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
-  check(main0.indexOf('class="panel logp"') > 0 && main0.indexOf('id="evlog"') > 0 && main0.indexOf('class="panel status"') < 0 &&
+  const adv0 = html.slice(html.indexOf('id="advbox"'));
+  check(main0.indexOf('class="panel logp"') < 0 && main0.indexOf('id="evlog"') < 0 && main0.indexOf('class="panel status"') < 0 &&
     main0.slice(main0.indexOf('id="hspanel"')).indexOf('id="fmt"') > 0 &&
-    html.indexOf('data-i18n="logEmpty"') > 0, 'page: status merged into the Headset panel, log on the main screen');
-  check(main0.indexOf('class="panel conn"') > 0 && main0.indexOf('id="codecs"') > 0 && main0.indexOf('id="stop"') > 0,
-    'page: connection (codec, chip, stop) is on the main screen');
+    adv0.indexOf('class="panel logp"') > 0 && adv0.indexOf('id="evlog"') > 0 &&
+    html.indexOf('data-i18n="logEmpty"') > 0, 'page: status merged into the Headset panel, log in Details');
+  check(main0.indexOf('class="panel conn"') < 0 && adv0.indexOf('class="panel conn"') > 0 &&
+    adv0.indexOf('id="codecs"') > 0 && adv0.indexOf('id="stop"') > 0,
+    'page: connection (codec, chip, stop) is in Details');
   const hdr = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
   check(hdr.indexOf('id="setbtn"') >= 0 && hdr.indexOf('id="setbtn"') < hdr.indexOf('class="brand"') &&
     /class="drawer" id="setm"/.test(html), 'page: settings button top left, opens a drawer');
 }
 {
   const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+  const adv = html.slice(html.indexOf('id="advbox"'));
   check(main.indexOf('id="savedlist"') < 0 && main.indexOf('id="devlist"') < 0 &&
         main.indexOf('id="bkdo"') < 0 && main.indexOf('id="gsave"') < 0,
         'page: device lists, game profiles and backup stay in Settings');
-  check(main.indexOf('id="eqp"') < main.indexOf('id="eq0"') && main.indexOf('id="eq4"') > 0 && main.indexOf('id="eqline"') > 0,
-        'page: the full equalizer (5 bands + curve) is on the main screen, in Sound');
-  const c1 = main.slice(main.indexOf('class="col c1"'), main.indexOf('class="col c2"'));
-  const c3 = main.slice(main.indexOf('class="col c3"'));
-  check(c1.indexOf('class="panel conn"') > 0 && c1.indexOf('id="codecnote"') < 0 && /id="stop" class="red sm"/.test(c1),
+  check(main.indexOf('id="eq0"') < 0 && adv.indexOf('id="eq0"') > 0 && adv.indexOf('id="eq4"') > 0 &&
+        adv.indexOf('id="eqline"') > 0,
+        'page: the full equalizer (5 bands + curve) is in Details');
+  check(adv.indexOf('class="panel conn"') > 0 && /id="stop" class="red sm"/.test(adv) &&
+        adv.indexOf('id="codecs"') > 0 && adv.indexOf('id="chipv"') > 0,
         'page: connection is compact (codec, chip, small stop button)');
-  const c2 = main.slice(main.indexOf('class="col c2"'), main.indexOf('class="col c3"'));
-  check(c3.indexOf('id="hspanel"') > 0 && c2.indexOf('id="eqp"') >= 0 && c2.indexOf('id="gain"') > c2.indexOf('id="eqp"') &&
-        c1.indexOf('class="panel conn"') < c1.indexOf('class="panel logp"') && c1.indexOf('id="lat"') > c1.indexOf('class="panel conn"'),
-        'page: 4 panels: headset (with status) | sound (with volume) | connection (with latency), log');
-  check((main.match(/<section class="panel/g) || []).length === 4, 'page: main screen has 4 panels');
+  const c2 = main.slice(main.indexOf('class="col c2"'));
+  check(main.indexOf('id="hspanel"') > 0 && c2.indexOf('id="eqp"') >= 0 && c2.indexOf('id="gain"') > c2.indexOf('id="eqp"') &&
+        c2.indexOf('id="lat"') > c2.indexOf('id="gain"') && adv.indexOf('class="panel conn"') < adv.indexOf('class="panel logp"'),
+        'page: main: headset | sound (volume + latency); Details: EQ, connection, log');
+  check((main.match(/<section class="panel/g) || []).length === 1, 'page: main screen has 1 sound panel');
   check(/class="side"><p class="navgrp"/.test(html) && /class="dmain"/.test(html) && /id="pgtitle"/.test(html),
         'page: settings side menu (categories left, page right)');
   check(main.indexOf('id="qs"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="gain"') > 0 && main.indexOf('id="hs"') > 0 &&
-        main.indexOf('id="lat"') > 0 && main.indexOf('id="latv"') > 0 && main.indexOf('id="pr0"') > 0 && main.indexOf('id="night"') > 0,
-        'page: main screen has headset switch, battery, volume, latency + estimate, EQ presets and night mode');
+        main.indexOf('id="lat"') > 0 && main.indexOf('id="latv"') > 0 && main.indexOf('id="pr0"') < 0 &&
+        adv.indexOf('id="pr0"') > 0 && adv.indexOf('id="night"') > 0,
+        'page: main has headset switch, battery, volume, latency; EQ presets and night mode in Details');
   check(main.indexOf('id="pk"') < 0 && main.indexOf('id="av"') < 0 && main.indexOf('id="m1"') < 0 && main.indexOf('id="lbar"') < 0 &&
         main.indexOf('id="fmt"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="lqv"') > 0,
         'page: headset shows format, battery, link; counters, AVRCP, peaks and latency breakdown are in Settings');
@@ -393,7 +400,7 @@ check(/toast\(t\('battToast'\)\.replace\('%s',ba\.level\)\)/.test(html) && /hb_b
   check(!i18n.langs.some(l => l.code === 'he') && !i18n.strings.he && i18n.langs.length === 10 && !/[\u0590-\u05ff]/.test(html),
     'page: no Hebrew (language list, strings, text)');
   const de = {}; let saved = null;
-  const c2 = Object.assign({}, ctx, { document: { getElementById: el, querySelectorAll: () => [], documentElement: de },
+  const c2 = Object.assign({}, ctx, { document: { getElementById: el, querySelectorAll: () => [], documentElement: de, addEventListener() {}, removeEventListener() {}, hidden: false },
     localStorage: { getItem: () => 'he', setItem(k, v) { saved = v; } } });
   new Function(...Object.keys(c2), js)(...Object.values(c2));
   check(de.lang === 'en' && de.dir === 'ltr' && saved === 'en', 'page: a saved he preference falls back to English');
@@ -430,9 +437,13 @@ check(!/id="setclose"/.test(html) && /<nav class="tabs" id="tabs">\n<button type
     'page: Home at the top of the settings menu closes it, no Close button');
 check(/\.drawer\{width:100vw;grid-template-columns:22rem/.test(html) && /\.pages\{zoom:1\.35/.test(html), 'page: TV settings is a large overlay with bigger content');
 {
-  const eq = html.slice(html.indexOf('id="eqp"'));
-  check(eq.indexOf('id="eqon"') < eq.indexOf('id="gain"') && eq.indexOf('id="pr0"') < eq.indexOf('id="gain"') && eq.indexOf('id="hs"') < eq.indexOf('id="night"') &&
-    eq.indexOf('id="mute"') < eq.indexOf('id="eqon"'), 'page: Sound panel: EQ first, then volume, then night mode; mute in the header');
+  const mainEq = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+  const advEq = html.slice(html.indexOf('id="advbox"'));
+  check(mainEq.indexOf('id="mute"') < mainEq.indexOf('id="gain"') && mainEq.indexOf('id="gain"') < mainEq.indexOf('id="hs"') &&
+    mainEq.indexOf('id="hs"') < mainEq.indexOf('id="lat"') &&
+    advEq.indexOf('id="eqon"') > 0 && advEq.indexOf('id="pr0"') > 0 && advEq.indexOf('id="night"') > 0 &&
+    advEq.indexOf('id="eqon"') < advEq.indexOf('id="pr0"') && advEq.indexOf('id="pr0"') < advEq.indexOf('id="night"'),
+    'page: main Sound: mute, volume, latency; Details: EQ then night mode');
 }
 check(/@font-face\{font-family:"HB Inter";src:url\(\/font\.woff2\)/.test(html) && /font:1rem\/1\.35 "HB Inter","Bahnschrift"/.test(html) &&
   /\.brand h1\{font-family:"Bahnschrift"/.test(html) && !/https?:\/\/[^"']*\.(woff2?|ttf)/.test(html), 'page: local Inter font with system fallback, title keeps its font');
