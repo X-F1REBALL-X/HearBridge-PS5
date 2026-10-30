@@ -15,11 +15,11 @@
 HearBridge PS5 هو ملف (ELF) يشغّل صوت اللعبة والنظام على سماعات بلوتوث عادية، عبر شريحة الكونسول أو محول USB. التحكم من صفحة ويب على الكونسول.
 
 <p align="center">
-<img src="docs/img/ui-tv.png" alt="واجهة HearBridge" width="440">
-<img src="docs/img/ui-details.png" alt="تفاصيل HearBridge" width="440">
+<img src="docs/img/ui-1.4.0-main.png" alt="واجهة HearBridge" width="440">
+<img src="docs/img/ui-1.4.0-details.png" alt="تفاصيل HearBridge" width="440">
 </p>
 <p align="center">
-<img src="docs/img/ui-adapter.png" alt="اختيار محول البلوتوث" width="640">
+<img src="docs/img/ui-1.4.0-adapter.png" alt="اختيار محول البلوتوث" width="640">
 </p>
 
 ## أبرز المزايا
