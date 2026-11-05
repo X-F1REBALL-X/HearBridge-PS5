@@ -3586,6 +3586,7 @@ static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, hea
     CTL_LOCK(&g_ctl);
     g_ctl.chip_vid = -1;
     g_ctl.chip_pid = -1;
+    g_ctl.chip_family = 0;
     g_ctl.bt_node[0] = 0;
     hb_adapter_pref_word(g_ctl.bt_pref, (int)sizeof g_ctl.bt_pref);
     CTL_UNLOCK(&g_ctl);
@@ -3635,11 +3636,17 @@ static int reopen_bt(hci_t *hci, a2dp_session **asess, a2dp_open_opts *opts, hea
             continue;
         }
         note_adapter();
-        if (!bt_adapter_bringup(*hci, hci_usb_is_external(), why, (int)sizeof why)) {
-            log_line("reopen: adapter setup failed: %s", why[0] ? why : "unknown");
-            if (hci->ops && hci->ops->close) hci->ops->close(hci->ctx);
-            memset(hci, 0, sizeof *hci);
-            continue;
+        {
+            int fam = 0;
+            if (!bt_adapter_bringup(*hci, hci_usb_is_external(), &fam, why, (int)sizeof why)) {
+                log_line("reopen: adapter setup failed: %s", why[0] ? why : "unknown");
+                if (hci->ops && hci->ops->close) hci->ops->close(hci->ctx);
+                memset(hci, 0, sizeof *hci);
+                continue;
+            }
+            CTL_LOCK(&g_ctl);
+            g_ctl.chip_family = fam;
+            CTL_UNLOCK(&g_ctl);
         }
         if (ini->have_addr) memcpy(opts->prefer_addr, ini->addr, 6);
         *asess = a2dp_open(*hci, opts);
@@ -3863,13 +3870,19 @@ int main(void)
         goto out;
     }
     note_adapter();
-    if (!bt_adapter_bringup(hci, hci_usb_is_external(), why, (int)sizeof why)) {
-        log_line("hearbridge: Bluetooth adapter setup failed: %s", why[0] ? why : "unknown");
-        diag_set("bt adapter", "%s", why[0] ? why : "setup failed");
-        (void)diag_save();
-        notify("HearBridge: adapter setup failed\n%s", why[0] ? why : "see /api/diag");
-        bt_failed_wait("error adapter-setup-failed");
-        goto close_hci;
+    {
+        int fam = 0;
+        if (!bt_adapter_bringup(hci, hci_usb_is_external(), &fam, why, (int)sizeof why)) {
+            log_line("hearbridge: Bluetooth adapter setup failed: %s", why[0] ? why : "unknown");
+            diag_set("bt adapter", "%s", why[0] ? why : "setup failed");
+            (void)diag_save();
+            notify("HearBridge: adapter setup failed\n%s", why[0] ? why : "see /api/diag");
+            bt_failed_wait("error adapter-setup-failed");
+            goto close_hci;
+        }
+        CTL_LOCK(&g_ctl);
+        g_ctl.chip_family = fam;
+        CTL_UNLOCK(&g_ctl);
     }
     {
         int vid, pid;

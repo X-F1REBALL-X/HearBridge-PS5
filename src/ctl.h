@@ -59,6 +59,7 @@ typedef struct {
     long dropped;          /* media packets dropped (radio too slow) */
     int xq_low;            /* SBC-XQ held under HB_XQ_LOW_BP: tell the page */
     int chip_vid, chip_pid; /* Bluetooth controller USB IDs, -1 until known */
+    int chip_family;       /* HB_BT_FAMILY_* from btchip.h (HCI identity) */
     int bt_external;       /* 1: a USB adapter (ours alone), 0: console chip */
     char bt_node[20];      /* its ugen node, "" until known */
     char bt_pref[20];      /* auto|internal|usb|ugenX.Y from the adapter file */

@@ -104,7 +104,8 @@ test-realtek:
 	@mkdir -p $(BUILD)/host
 	python3 scripts/gen_rtl_fw.py $(BUILD)/host/rtl_fw_blobs.h
 	cmp -s $(BUILD)/host/rtl_fw_blobs.h src/rtl_fw_blobs.h || (echo "src/rtl_fw_blobs.h is stale: make rtl-fw"; false)
-	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt tests/test_realtek_fw.c src/bt/realtek_fw.c src/bt/hci_cmd.c src/util.c src/log.c -o $(BUILD)/host/test_realtek_fw
+	cc -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE -Isrc -Isrc/bt tests/test_realtek_fw.c src/bt/realtek_fw.c src/bt/host_bdaddr.c src/bt/hci_cmd.c src/bt/btchip.c src/util.c src/log.c -o $(BUILD)/host/test_realtek_fw
+	rm -rf $(BUILD)/host/rtl_fw_out
 	$(BUILD)/host/test_realtek_fw $(BUILD)/host/rtl_fw_out
 
 test-txpath:

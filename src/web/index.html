@@ -967,7 +967,9 @@ setHtml('xqnote',S.xq_low?esc(t('xqLow')):'');
 /* Bluetooth adapter: USB or console chip, its node, then the chip vendor/IDs */
 var ch=S.chip||{},ad=S.adapter||{};
 var ct=(ad.node||ch.vid)?((ad.external?t('adapterUsb'):t('adapterInternal'))+(ad.node?' ('+ad.node.replace('/dev/','')+')':'')):'';
-var ci=ch.vid?(ch.vendor?ch.vendor+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'';
+/* chip family comes from the HCI identity; the USB vendor is only a fallback */
+var cname=ch.family||ch.vendor||'';
+var ci=ch.vid?(cname?cname+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'';
 $('chipv').textContent=(ct?(ci?ct+' · '+ci:ct):ci)||'-';
 drawAd();
 var ev=S.events||[],eh='';
