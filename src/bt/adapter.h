@@ -14,6 +14,8 @@
 
 /* 1 = ready (internal path always), 0 = stop. `why` (may be NULL) receives
  * the user-facing reason on failure, e.g. a missing Realtek firmware file. */
-int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap);
+/* *family gets HB_BT_FAMILY_* from btchip.h (HCI identity) so callers can
+ * display the real chip, not the USB product vendor. */
+int bt_adapter_bringup(hci_t hci, int external, int *family, char *why, int why_cap);
 
 #endif

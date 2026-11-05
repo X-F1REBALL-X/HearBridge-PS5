@@ -7,13 +7,34 @@
 const char *btchip_vendor(int vid)
 {
     switch (vid) {
-    case BTCHIP_VID_MARVELL:  return "Marvell/NXP";
-    case BTCHIP_VID_MEDIATEK: return "MediaTek";
-    case BTCHIP_VID_REALTEK:  return "Realtek";
-    case BTCHIP_VID_CSR:      return "CSR";
-    case BTCHIP_VID_BROADCOM: return "Broadcom";
-    case BTCHIP_VID_INTEL:    return "Intel";
-    default:                  return NULL;
+    /* silicon vendors */
+    case BTCHIP_VID_MARVELL:   return "Marvell/NXP";
+    case BTCHIP_VID_NXP:       return "Marvell/NXP";
+    case BTCHIP_VID_MEDIATEK:  return "MediaTek";
+    case BTCHIP_VID_REALTEK:   return "Realtek";
+    case BTCHIP_VID_CSR:       return "CSR";
+    case BTCHIP_VID_BROADCOM:  return "Broadcom";
+    case BTCHIP_VID_INTEL:     return "Intel";
+    case BTCHIP_VID_QUALCOMM:  return "Qualcomm/Atheros";
+    case BTCHIP_VID_TI:        return "Texas Instruments";
+    case BTCHIP_VID_SILABS:    return "Silicon Labs";
+    case BTCHIP_VID_BLUEGIGA:  return "Bluegiga";
+    case BTCHIP_VID_NORDIC:    return "Nordic";
+    /* product brands / OEMs */
+    case BTCHIP_VID_TPLINK:    return "TP-Link";
+    case BTCHIP_VID_TPLINK2:   return "TP-Link";
+    case BTCHIP_VID_ASUS:      return "ASUS";
+    case BTCHIP_VID_APPLE:     return "Apple";
+    case BTCHIP_VID_MICROSOFT: return "Microsoft";
+    case BTCHIP_VID_SONY:      return "Sony";
+    case BTCHIP_VID_DELL:      return "Dell";
+    case BTCHIP_VID_HP:        return "HP";
+    case BTCHIP_VID_LENOVO:    return "Lenovo";
+    case BTCHIP_VID_FOXCONN:   return "Foxconn";
+    case BTCHIP_VID_LITEON:    return "Lite-On";
+    case BTCHIP_VID_BELKIN:    return "Belkin";
+    case BTCHIP_VID_UGREEN:    return "UGREEN";
+    default:                   return NULL;
     }
 }
 
@@ -22,14 +43,33 @@ int btchip_is_mediatek(int vid)
     return vid == BTCHIP_VID_MEDIATEK;
 }
 
-int btchip_is_realtek(int vid)
+
+
+int btchip_family(unsigned manufacturer, int realtek_lmp)
 {
-    return vid == BTCHIP_VID_REALTEK;
+    switch (manufacturer) {
+    case BTCHIP_MFR_REALTEK:  return HB_BT_FAMILY_REALTEK;
+    case BTCHIP_MFR_CSR:      return HB_BT_FAMILY_CSR;
+    case BTCHIP_MFR_MEDIATEK: return HB_BT_FAMILY_MEDIATEK;
+    case BTCHIP_MFR_BROADCOM: return HB_BT_FAMILY_BROADCOM;
+    case BTCHIP_MFR_INTEL:    return HB_BT_FAMILY_INTEL;
+    case BTCHIP_MFR_QUALCOMM: return HB_BT_FAMILY_QUALCOMM;
+    default:                  return realtek_lmp ? HB_BT_FAMILY_REALTEK
+                                                 : HB_BT_FAMILY_OTHER;
+    }
 }
 
-int btchip_is_csr(int vid)
+const char *btchip_family_name(int family)
 {
-    return vid == BTCHIP_VID_CSR;
+    switch (family) {
+    case HB_BT_FAMILY_REALTEK:  return "Realtek";
+    case HB_BT_FAMILY_CSR:      return "CSR";
+    case HB_BT_FAMILY_MEDIATEK: return "MediaTek";
+    case HB_BT_FAMILY_BROADCOM: return "Broadcom";
+    case HB_BT_FAMILY_INTEL:    return "Intel";
+    case HB_BT_FAMILY_QUALCOMM: return "Qualcomm";
+    default:                    return "";
+    }
 }
 
 void btchip_describe(int vid, int pid, char *out, int cap)

@@ -36,12 +36,14 @@ static void fail(char *why, int cap, const char *text)
     if (why && cap > 0) snprintf(why, (size_t)cap, "%s", text);
 }
 
-int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
+int bt_adapter_bringup(hci_t hci, int external, int *family_out, char *why, int why_cap)
 {
     unsigned char cc[64], name[248], one, scan, filt;
     int cc_len = 0;
-    int vid = -1, pid = -1, is_csr = 0;
+    int vid = -1, pid = -1, is_csr = 0, is_rtl = 0;
+    int family = HB_BT_FAMILY_OTHER;
 
+    if (family_out) *family_out = HB_BT_FAMILY_OTHER;
     if (why && why_cap > 0) why[0] = 0;
     if (!external) return 1;             /* the console's chip is never reset */
 
@@ -52,22 +54,27 @@ int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
     }
     log_line("adapter: HCI Reset done, controller is ours");
 
-    {
-        int known = hci_usb_chip(&vid, &pid);
-        is_csr = known && btchip_is_csr(vid);
+    hci_usb_chip(&vid, &pid);
+
+    /* Give a ROM-mode Realtek time to be ready. Harmless on anything else. */
+    usleep(250 * 1000);
+
+    /* The USB VID is only a label: hb_rtl_prepare() classifies the family
+     * from Read Local Version, so reseller ids (TP-Link UB600 37ad:0600,
+     * ASUS BT600, ...) work too. It uploads the patch for Realtek ROM-mode
+     * sticks and is a no-op for CSR and other plain HCI dongles. */
+    if (!hb_rtl_prepare(hci, &family, why, why_cap)) {
+        if (family_out) *family_out = family;
+        return 0;
     }
-
-    /* PS4 CSR path goes straight to Read_BD_ADDR after Reset (no settle).
-     * Non-CSR sticks keep a short pause so ROM-mode Realtek is ready. */
-    if (!is_csr)
-        usleep(250 * 1000);
-
-    /* Shared host BD_ADDR: tell Realtek prepare to bake it into the config
-     * blob. CSR cloning happens after prepare (plain HCI, no firmware step). */
-    {
-        unsigned char want[6];
-        if (!is_csr && btchip_is_realtek(vid) && hb_host_bdaddr_load(want))
-            hb_rtl_bdaddr_override(want);
+    if (family_out) *family_out = family;
+    is_rtl = family == HB_BT_FAMILY_REALTEK;
+    is_csr = family == HB_BT_FAMILY_CSR;
+    if (!is_rtl && !is_csr) {
+        char chip[64];
+        btchip_describe(vid, pid, chip, (int)sizeof chip);
+        log_line("adapter: %s plain HCI, no firmware download",
+                 chip[0] ? chip : "USB stick");
     }
 
     /* Event mask BEFORE inquiry mode. CSR uses the PS4-proven mask; others
@@ -90,26 +97,9 @@ int bt_adapter_bringup(hci_t hci, int external, char *why, int why_cap)
             log_line("adapter: SET_EVENT_FILTER clear failed");
     }
 
-    /* Realtek ROM-mode sticks need a patch upload. CSR8510 (0a12:0001) and
-     * other plain HCI / class e0:01:01 dongles do not. */
-    {
-        int known = (vid >= 0);
-        if (known && !btchip_is_realtek(vid)) {
-            char chip[64];
-            btchip_describe(vid, pid, chip, (int)sizeof chip);
-            log_line("adapter: %s plain HCI, no firmware download",
-                     chip[0] ? chip : "USB stick");
-        } else if (!hb_rtl_prepare(hci, why, why_cap)) {
-            hb_rtl_bdaddr_override(NULL);
-            return 0;
-        }
-        hb_rtl_bdaddr_override(NULL);
-    }
-
     /* Clone the shared host BD_ADDR onto this stick (CSR BCCMD / Realtek
      * config). First stick with no saved address becomes the shared one. */
     {
-        int is_rtl = (vid >= 0) && btchip_is_realtek(vid);
         hb_host_bdaddr_sync_usb(hci, is_csr, is_rtl);
         /* Probe transport: a dead USB pipe after BD_ADDR work must fail
          * bring-up cleanly so main can reopen, not limp into a2dp_open. */

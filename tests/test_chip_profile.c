@@ -65,9 +65,13 @@ int main(void)
     /* profile by VID */
     CHECK(btchip_profile(0x1286, -1) == BTCHIP_PROFILE_DEFAULT, "profile: Marvell/NXP 1286 gets the default profile");
     CHECK(btchip_profile(0x0a12, -1) == BTCHIP_PROFILE_DEFAULT, "profile: CSR 0a12 gets the default profile");
-    CHECK(btchip_is_csr(0x0a12) && btchip_is_realtek(0x0bda) && !btchip_is_realtek(0x0a12),
-          "profile: CSR / Realtek helpers");
     CHECK(btchip_profile(0x0e8d, -1) == BTCHIP_PROFILE_MEDIATEK, "profile: MediaTek 0e8d gets the mediatek profile");
+    /* HCI manufacturer id -> family (never the VID) */
+    CHECK(btchip_family(0x0046, 0) == HB_BT_FAMILY_MEDIATEK, "family: MediaTek manufacturer");
+    CHECK(btchip_family(0x005d, 0) == HB_BT_FAMILY_REALTEK, "family: Realtek manufacturer");
+    CHECK(btchip_family(0x000a, 0) == HB_BT_FAMILY_CSR, "family: CSR manufacturer");
+    CHECK(btchip_family(0x08e7, 1) == HB_BT_FAMILY_REALTEK, "family: reseller manufacturer with a Realtek LMP");
+    CHECK(btchip_family(0x08e7, 0) == HB_BT_FAMILY_OTHER, "family: unknown manufacturer without a Realtek LMP");
     CHECK(btchip_profile(0xabcd, -1) == BTCHIP_PROFILE_DEFAULT && btchip_profile(-1, -1) == BTCHIP_PROFILE_DEFAULT,
           "profile: unknown or missing VID keeps the default profile");
     CHECK(btchip_profile(0x1286, BTCHIP_PROFILE_MEDIATEK) == BTCHIP_PROFILE_MEDIATEK &&

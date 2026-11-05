@@ -14,6 +14,7 @@
 
 #include <stddef.h>
 
+#include "btchip.h"
 #include "hci.h"
 
 #define HB_RTL_FW_DIR "/data/hearbridge/firmware"
@@ -81,11 +82,20 @@ int hb_rtl_ensure_firmware_dir(const char *dir);
  * state directory exists so USB adapters find their patch without a manual copy. */
 int hb_rtl_ensure_firmware(void);
 
+/* 1 when Read Local Version looks like a Realtek part: manufacturer id
+ * 0x005d, or an LMP subversion in the chip table. Use this instead of the
+ * USB VID: rebadged sticks (TP-Link UB600, 37ad:0600) are Realtek parts
+ * under another vendor id and may report a reseller manufacturer too. */
+int hb_rtl_is_realtek(hci_t hci);
+
 /* Read Local Version; when this is a Realtek USB part still in ROM mode,
  * read its firmware files from HB_RTL_FW_DIR and upload the patch.
+ * *family (HB_BT_FAMILY_* from btchip.h) is set from the HCI identity
+ * before any upload work, so the caller can use it for the BD_ADDR and
+ * event-mask steps that follow.
  * 1 = carry on (no step needed or the upload succeeded), 0 = stop and set
  * why (for example: the firmware file is missing). */
-int hb_rtl_prepare(hci_t hci, char *why, int why_cap);
+int hb_rtl_prepare(hci_t hci, int *family, char *why, int why_cap);
 
 
 /* Shared host BD_ADDR for the next firmware+config upload. addr NULL clears.
