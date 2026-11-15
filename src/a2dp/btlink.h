@@ -142,6 +142,10 @@ void btlink_link_quality(const btlink *l, int *rssi, int *lq);
 void btlink_set_rx(btlink *l, unsigned scid, btlink_rx_fn fn, void *ud);
 /* Config-stuck limit for non-media channels (0 = default 8 s). */
 void btlink_set_cfg_timeout(btlink *l, long ms);
+/* 1 once a channel stalled with the peer never configuring on this ACL. */
+int btlink_peer_cfg_dead(btlink *l);
+/* 1 once the peer sent its own L2CAP INFO_REQ on this ACL. */
+int btlink_peer_sig_seen(btlink *l);
 
 /* Wait for next data PDU on scid (not signaling). Returns length or 0. */
 int btlink_wait_rx(btlink *l, unsigned scid, unsigned char *out, int max,

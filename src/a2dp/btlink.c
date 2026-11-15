@@ -125,6 +125,9 @@ struct btlink {
     struct { unsigned scid; int len; unsigned char d[160]; } early[6];
     int n_early;
     long cfg_timeout_ms;      /* 0 = default; non-media channel config limit */
+    int peer_cfg_seen;        /* the peer sent a CFG_REQ on this ACL */
+    int peer_sig_seen;        /* the peer sent its own INFO_REQ on this ACL */
+    int peer_cfg_dead;        /* a channel stalled: ours accepted, theirs never came */
     int connected;
     unsigned handle;
     unsigned char addr[6];
@@ -549,6 +552,7 @@ static void chan_flush_pending_cfg(btlink *l, chan *ch)
     ch->pending_cfg = 0;
     ch->pending_cfg_optlen = 0;
     ch->cfg_theirs_ok = 1;
+    l->peer_cfg_seen = 1;
 }
 
 /* P3: send DISC_REQ before marking CLOSED so remote drops zombie half-config. */
@@ -842,6 +846,7 @@ static void on_signaling(btlink *l, const unsigned char *d, int len)
                     chan_send_cfg(l, cc);
                 }
                 cc->cfg_theirs_ok = 1;
+                l->peer_cfg_seen = 1;
                 chan_check_open(l, cc);
             }
             break;
@@ -913,6 +918,7 @@ static void on_signaling(btlink *l, const unsigned char *d, int len)
              * Type 3: fixed channels = signalling (bit 1) only. */
             if (blen < 2) break;
             log_line("l2cap: INFO_REQ type %u id=%u — answering", le16(pl), ident);
+            l->peer_sig_seen = 1;
             memset(out, 0, sizeof out);
             put16(out, le16(pl));
             if (le16(pl) == 2) {
@@ -1614,6 +1620,14 @@ static void chan_tick(btlink *l, chan *c, long now)
                  "media=%d scid %#x dcid %#x peer_mtu=%u)",
                  c->psm, c->cfg_ours_ok, c->cfg_theirs_ok, c->cfg_tries,
                  chan_is_avdtp_media(l, c), c->scid, c->dcid, c->peer_mtu);
+        /* Seen after a switch from the console chip: the headset accepts
+         * our config but never sends its own on this ACL, on every channel,
+         * until the link is dropped. A fresh link configures at once. */
+        if (c->cfg_ours_ok && !c->cfg_theirs_ok && !l->peer_cfg_seen && !mtk &&
+            !chan_is_avdtp_media(l, c)) {
+            l->peer_cfg_dead = 1;
+            log_line("l2cap: peer never sent a CFG_REQ on this link - needs a fresh reconnect");
+        }
         chan_close_disc(l, c); /* P3: DISC before CLOSED — no zombie half-config */
     } else if (c->st == CH_OPEN && c->reconf_wait &&
                now - c->t_cfg >= T_CFG_ASSUME_MTK) {
@@ -2437,6 +2451,16 @@ static void replay_early(btlink *l, unsigned scid, btlink_rx_fn fn, void *ud)
 void btlink_set_cfg_timeout(btlink *l, long ms)
 {
     if (l) l->cfg_timeout_ms = ms;
+}
+
+int btlink_peer_cfg_dead(btlink *l)
+{
+    return l ? l->peer_cfg_dead : 0;
+}
+
+int btlink_peer_sig_seen(btlink *l)
+{
+    return l ? l->peer_sig_seen : 0;
 }
 
 void btlink_set_rx(btlink *l, unsigned scid, btlink_rx_fn fn, void *ud)

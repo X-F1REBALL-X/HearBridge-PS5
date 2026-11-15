@@ -90,6 +90,7 @@ static unsigned sdp_open_fresh(btlink *link)
             return scid;
         }
         log_line("sdp: outbound open failed (attempt %d)", attempt + 1);
+        if (btlink_peer_cfg_dead(link)) return 0;   /* same stall again: drop the link */
     }
     return 0;
 }
@@ -224,7 +225,7 @@ unsigned sdp_find_avdtp_psm(btlink *link, int timeout_ms)
     g_sdp_fallback = 0;
     if (sdp_one_round && timeout_ms > 0) per_round = timeout_ms;
     for (round = 0; round < (sdp_one_round ? 1 : 2) && !psm && !g_sdp_no_sink &&
-                    btlink_is_up(link); round++) {
+                    btlink_is_up(link) && !btlink_peer_cfg_dead(link); round++) {
         if (round)
             log_line("sdp: fresh L2CAP retry after search timeout");
         scid = sdp_open_fresh(link);
@@ -241,6 +242,7 @@ unsigned sdp_find_avdtp_psm(btlink *link, int timeout_ms)
         }
     }
 
+    if (!psm && btlink_peer_cfg_dead(link)) return 0;   /* caller reconnects */
     if (!psm && g_sdp_no_sink) return 0;
     if (!psm && !btlink_is_up(link)) return 0;     /* link gone: not a fallback case */
     if (!psm) {
