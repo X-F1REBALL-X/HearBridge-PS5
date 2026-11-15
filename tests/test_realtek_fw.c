@@ -4,7 +4,9 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "btchip.h"
 #include "hci.h"
+#include "hci_cmd.h"
 #include "realtek_fw.h"
 
 static int failures;
@@ -72,6 +74,16 @@ static void test_identity(void)
     id.hci_revision = 0xd922;
     CHECK(hb_rtl_chip_for(&id) == NULL && !hb_rtl_in_rom_mode(&id),
           "a patched identity is not a ROM row");
+
+    /* family display names live next to the enum */
+    CHECK(!strcmp(btchip_family_name(HB_BT_FAMILY_REALTEK), "Realtek") &&
+          !strcmp(btchip_family_name(HB_BT_FAMILY_CSR), "CSR") &&
+          !strcmp(btchip_family_name(HB_BT_FAMILY_MEDIATEK), "MediaTek") &&
+          !strcmp(btchip_family_name(HB_BT_FAMILY_BROADCOM), "Broadcom") &&
+          !strcmp(btchip_family_name(HB_BT_FAMILY_INTEL), "Intel") &&
+          !strcmp(btchip_family_name(HB_BT_FAMILY_QUALCOMM), "Qualcomm") &&
+          !btchip_family_name(HB_BT_FAMILY_OTHER)[0],
+          "family names");
 }
 
 static void test_v1(void)
@@ -196,6 +208,80 @@ static void test_v2(void)
     free(out);
 }
 
+/* Read Local Version fake, for the manufacturer-based family check. */
+struct idfake {
+    unsigned char ev[16];
+    int has_ev;
+    unsigned manufacturer;
+    unsigned lmp_subversion;
+};
+
+static int idfake_cmd(void *self, unsigned op, const void *args, int nargs)
+{
+    struct idfake *f = self;
+    (void)args; (void)nargs;
+    memset(f->ev, 0, sizeof f->ev);
+    f->ev[0] = 0x0e; f->ev[1] = 12; f->ev[2] = 1;
+    f->ev[3] = (unsigned char)op; f->ev[4] = (unsigned char)(op >> 8); f->ev[5] = 0;
+    f->ev[6] = 0x0a; f->ev[7] = 0x0b; f->ev[8] = 0; f->ev[9] = 0x0a;
+    f->ev[10] = (unsigned char)f->manufacturer;
+    f->ev[11] = (unsigned char)(f->manufacturer >> 8);
+    f->ev[12] = (unsigned char)f->lmp_subversion;
+    f->ev[13] = (unsigned char)(f->lmp_subversion >> 8);
+    f->has_ev = 1;
+    return 1;
+}
+
+static int idfake_pump(void *self, int wait_ms)
+{
+    (void)wait_ms;
+    return ((struct idfake *)self)->has_ev;
+}
+
+static int idfake_next(void *self, unsigned char *dst, int cap)
+{
+    struct idfake *f = self;
+    int n = f->has_ev ? 14 : 0;
+    if (n > cap) n = cap;
+    if (n) memcpy(dst, f->ev, (size_t)n);
+    f->has_ev = 0;
+    return n;
+}
+
+static int idfake_acl(void *self, unsigned char *dst, int cap)
+{
+    (void)self; (void)dst; (void)cap;
+    return 0;
+}
+
+static void test_is_realtek(void)
+{
+    struct idfake f;
+    hci_t h;
+
+    memset(&f, 0, sizeof f);
+    h.ctx = &f;
+    h.ops = &(const hci_ops){
+        .next_acl = idfake_acl,
+        .next_event = idfake_next,
+        .pump = idfake_pump,
+        .cmd = idfake_cmd,
+    };
+
+    f.manufacturer = 0x005d;
+    f.lmp_subversion = 0x8761;
+    CHECK(hb_rtl_is_realtek(h), "Realtek manufacturer is detected");
+    /* rebadges can keep another manufacturer id: the Realtek ROM LMP wins */
+    memset(&f, 0, sizeof f);
+    f.manufacturer = 0x08e7;
+    f.lmp_subversion = 0x8761;
+    CHECK(hb_rtl_is_realtek(h), "a known Realtek ROM LMP is detected without the Realtek manufacturer");
+    memset(&f, 0, sizeof f);
+    f.manufacturer = 0x000a;
+    f.lmp_subversion = 0x1234;
+    CHECK(!hb_rtl_is_realtek(h), "an unrelated identity is not Realtek");
+}
+
 struct fake {
     unsigned char ev[8];
     unsigned op_seen[64];
@@ -302,6 +388,7 @@ static void test_ensure(const char *dir)
 int main(int argc, char **argv)
 {
     test_identity();
+    test_is_realtek();
     if (argc > 1) test_ensure(argv[1]);
     test_v1();
     test_v2();

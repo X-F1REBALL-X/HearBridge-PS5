@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include "hci_cmd.h"
+#include "host_bdaddr.h"
 #include "log.h"
 #include "rtl_fw_blobs.h"
 #include "util.h"
@@ -59,7 +60,6 @@ static void inject_bdaddr_config(unsigned char *cfg, size_t *cfg_len, size_t cap
 }
 
 
-#define REALTEK_MANUFACTURER 0x005d
 #define FRAGMENT_SIZE        252
 #define MAX_FIRMWARE_FILE    (512u * 1024u)
 
@@ -649,6 +649,22 @@ static int read_identity(hci_t hci, hb_chip_identity *id)
     return hb_chip_identity_from_cc(cc, cc_len, id);
 }
 
+/* Like btrtl: the chip identity decides, not the USB VID. The manufacturer
+ * id corroborates it, but some rebadges keep another one, so a known Realtek
+ * ROM LMP subversion is enough too. */
+static int identity_is_realtek(const hb_chip_identity *id)
+{
+    if (!id) return 0;
+    return id->manufacturer == BTCHIP_MFR_REALTEK || hb_rtl_in_rom_mode(id);
+}
+
+int hb_rtl_is_realtek(hci_t hci)
+{
+    hb_chip_identity id;
+    return read_identity(hci, &id) && identity_is_realtek(&id);
+}
+
+
 
 /* ---- bundled firmware install ------------------------------------------ */
 
@@ -711,12 +727,15 @@ int hb_rtl_ensure_firmware(void)
     return hb_rtl_ensure_firmware_dir(HB_RTL_FW_DIR);
 }
 
-int hb_rtl_prepare(hci_t hci, char *why, int why_cap)
+int hb_rtl_prepare(hci_t hci, int *family, char *why, int why_cap)
 {
     hb_chip_identity id;
     const hb_rtl_chip *chip;
     const char *file;
+    unsigned char want[6];
+    int have_addr = 0;
 
+    if (family) *family = HB_BT_FAMILY_OTHER;
     if (why && why_cap > 0) why[0] = 0;
     /* Make sure the bundled RTL8761BU files are on disk before we look them up. */
     hb_rtl_ensure_firmware();
@@ -727,7 +746,21 @@ int hb_rtl_prepare(hci_t hci, char *why, int why_cap)
     log_line("adapter: HCI %#04x, LMP %#04x, manufacturer %#06x, revision %#04x/%#04x",
              (unsigned)id.hci_version, (unsigned)id.lmp_version, (unsigned)id.manufacturer,
              (unsigned)id.hci_revision, (unsigned)id.lmp_subversion);
-    if (id.manufacturer != REALTEK_MANUFACTURER) return 1;
+    /* A Realtek manufacturer id is not required: rebadged parts may report
+     * the reseller. A known Realtek ROM identity still means patch it. */
+    {
+        int fam = btchip_family(id.manufacturer, identity_is_realtek(&id));
+        const char *fname = btchip_family_name(fam);
+        if (family) *family = fam;
+        if (fam != HB_BT_FAMILY_REALTEK) {
+            if (fname[0])
+                log_line("adapter: %s controller, no firmware step", fname);
+            else
+                log_line("adapter: manufacturer %#06x / LMP %#06x is not a known family, no firmware step",
+                         (unsigned)id.manufacturer, (unsigned)id.lmp_subversion);
+            return 1;
+        }
+    }
 
     chip = hb_rtl_chip_for(&id);
     if (!chip) {
@@ -750,10 +783,18 @@ int hb_rtl_prepare(hci_t hci, char *why, int why_cap)
     }
     file = chip->firmware_file_v2 ? chip->firmware_file_v2 : chip->firmware_file;
     log_line("adapter: %s in ROM mode, uploading %s", chip->name, file);
+    /* Bake the shared host address into the vendor config while patching, so
+     * one pairing works on every adapter. */
+    if (hb_host_bdaddr_load(want)) {
+        hb_rtl_bdaddr_override(want);
+        have_addr = 1;
+    }
     if (!install_chip(hci, chip, why, why_cap)) {
+        if (have_addr) hb_rtl_bdaddr_override(NULL);
         log_line("adapter: %s", why && why[0] ? why : "firmware upload failed");
         return 0;
     }
+    if (have_addr) hb_rtl_bdaddr_override(NULL);
     return 1;
 }
 
