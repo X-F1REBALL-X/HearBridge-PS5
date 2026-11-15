@@ -24,7 +24,7 @@ static int fails;
 #define CHECK(c, what) do { if (c) printf("ok   %s\n", what); \
     else { printf("FAIL %s\n", what); fails++; } } while (0)
 
-static char out[196608];
+static char out[393216];   /* the page is ~230 KB with all languages */
 
 static int get(hb_ctl *c, const char *path)
 {

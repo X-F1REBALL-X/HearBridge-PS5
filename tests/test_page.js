@@ -87,48 +87,42 @@ calls.length = 0; el('lat').value = 150; el('lat').oninput.call(el('lat'));
 check(calls[0] && calls[0].m === 'POST' && calls[0].p === '/api/latency?ms=150', 'page: moving the slider posts the buffer target');
 {
   const main0 = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
-  const adv0 = html.slice(html.indexOf('id="advbox"'));
-  check(main0.indexOf('class="panel logp"') < 0 && main0.indexOf('id="evlog"') < 0 && main0.indexOf('class="panel status"') < 0 &&
-    main0.slice(main0.indexOf('id="hspanel"')).indexOf('id="fmt"') > 0 &&
-    adv0.indexOf('class="panel logp"') > 0 && adv0.indexOf('id="evlog"') > 0 &&
-    html.indexOf('data-i18n="logEmpty"') > 0, 'page: status merged into the Headset panel, log in Details');
-  check(main0.indexOf('class="panel conn"') < 0 && adv0.indexOf('class="panel conn"') > 0 &&
-    adv0.indexOf('id="codecs"') > 0 && adv0.indexOf('id="stop"') > 0,
-    'page: connection (codec, chip, stop) is in Details');
-  const hdr = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
-  check(hdr.indexOf('id="setbtn"') >= 0 && hdr.indexOf('id="setbtn"') < hdr.indexOf('class="brand"') &&
-    /class="drawer" id="setm"/.test(html), 'page: settings button top left, opens a drawer');
+  const pg2 = html.slice(html.indexOf('id="pg2"'));
+  check(main0.indexOf('id="evlog"') < 0 && main0.slice(main0.indexOf('id="hspanel"')).indexOf('id="fmt"') > 0 &&
+    pg2.indexOf('class="card logp"') > 0 && pg2.indexOf('id="evlog"') > 0 && html.indexOf('data-i18n="logEmpty"') > 0,
+    'page: status merged into the Headset panel, log in Connection');
+  check(main0.indexOf('id="codecs"') < 0 && pg2.indexOf('class="card conn"') > 0 && pg2.indexOf('id="codecs"') > 0 && pg2.indexOf('id="stop"') > 0,
+    'page: connection (adapter, codec, chip, stop) is in Connection');
+  check(!/id="setbtn"|id="advbtn"|id="advbox"|id="scrim"/.test(html) && /<aside class="rail" id="setm"/.test(html) &&
+    html.indexOf('id="setm"') < html.indexOf('<main'), 'page: permanent left menu on every page, no drawer or Details overlay');
 }
 {
   const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
-  const adv = html.slice(html.indexOf('id="advbox"'));
+  const pg1s = html.slice(html.indexOf('id="pg1"'), html.indexOf('id="pg3"'));
+  const pg2s = html.slice(html.indexOf('id="pg2"'));
   check(main.indexOf('id="savedlist"') < 0 && main.indexOf('id="devlist"') < 0 &&
         main.indexOf('id="bkdo"') < 0 && main.indexOf('id="gsave"') < 0,
-        'page: device lists, game profiles and backup stay in Settings');
-  check(main.indexOf('id="eq0"') < 0 && adv.indexOf('id="eq0"') > 0 && adv.indexOf('id="eq4"') > 0 &&
-        adv.indexOf('id="eqline"') > 0,
-        'page: the full equalizer (5 bands + curve) is in Details');
-  check(adv.indexOf('class="panel conn"') > 0 && /id="stop" class="red sm"/.test(adv) &&
-        adv.indexOf('id="codecs"') > 0 && adv.indexOf('id="chipv"') > 0,
-        'page: connection is compact (codec, chip, small stop button)');
+        'page: device lists, game profiles and backup stay in their pages');
+  check(main.indexOf('id="eq0"') < 0 && pg1s.indexOf('id="eq0"') > 0 && pg1s.indexOf('id="eq4"') > 0 && pg1s.indexOf('id="eqline"') > 0,
+        'page: the full equalizer (5 bands + curve) is in Sound & games');
+  check(/id="stop" class="red sm"/.test(pg2s) && pg2s.indexOf('id="chipv"') > 0, 'page: connection has the chip and a small stop button');
   const c2 = main.slice(main.indexOf('class="col c2"'));
-  check(main.indexOf('id="hspanel"') > 0 && c2.indexOf('id="eqp"') >= 0 && c2.indexOf('id="gain"') > c2.indexOf('id="eqp"') &&
-        c2.indexOf('id="lat"') > c2.indexOf('id="gain"') && adv.indexOf('class="panel conn"') < adv.indexOf('class="panel logp"'),
-        'page: main: headset | sound (volume + latency); Details: EQ, connection, log');
+  check(main.indexOf('id="hspanel"') > 0 && c2.indexOf('id="sndp"') >= 0 && c2.indexOf('id="gain"') > c2.indexOf('id="sndp"') &&
+        c2.indexOf('id="lat"') > c2.indexOf('id="gain"') && c2.indexOf('class="quick"') > c2.indexOf('id="lat"'),
+        'page: home: headset | sound (volume, latency, quick settings)');
   check((main.match(/<section class="panel/g) || []).length === 1, 'page: main screen has 1 sound panel');
-  check(/class="side"><p class="navgrp"/.test(html) && /class="dmain"/.test(html) && /id="pgtitle"/.test(html),
-        'page: settings side menu (categories left, page right)');
+  check(/class="dmain" id="dmain"/.test(html) && /id="pgtitle"/.test(html), 'page: pages sit right of the menu with a title');
   check(main.indexOf('id="qs"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="gain"') > 0 && main.indexOf('id="hs"') > 0 &&
-        main.indexOf('id="lat"') > 0 && main.indexOf('id="latv"') > 0 && main.indexOf('id="pr0"') < 0 &&
-        adv.indexOf('id="pr0"') > 0 && adv.indexOf('id="night"') > 0,
-        'page: main has headset switch, battery, volume, latency; EQ presets and night mode in Details');
+        main.indexOf('id="lat"') > 0 && main.indexOf('id="latv"') > 0 && main.indexOf('id="pr0"') < 0 && main.indexOf('id="qp0"') > 0 &&
+        main.indexOf('id="qnight"') > 0 && main.indexOf('id="gline"') > 0 && pg1s.indexOf('id="pr0"') > 0 && pg1s.indexOf('id="night"') > 0,
+        'page: home has headset switch, battery, volume, latency and quick EQ presets, night mode, game profile');
   check(main.indexOf('id="pk"') < 0 && main.indexOf('id="av"') < 0 && main.indexOf('id="m1"') < 0 && main.indexOf('id="lbar"') < 0 &&
         main.indexOf('id="fmt"') > 0 && main.indexOf('id="batm"') > 0 && main.indexOf('id="lqv"') > 0,
         'page: headset shows format, battery, link; counters, AVRCP, peaks and latency breakdown are in Settings');
   {
     const pg4 = html.slice(html.indexOf('id="pg2"'));
-    check(/id="tb2"[^>]*><svg[\s\S]*?data-i18n="tabDetails"/.test(html) && !/id="tb4"/.test(html) && pg4.indexOf('id="pk"') > 0 && pg4.indexOf('id="av"') > 0 && pg4.indexOf('id="m2"') > 0 && pg4.indexOf('id="lkeys"') > 0,
-          'page: Settings > Details has the counters, AVRCP, peaks and latency breakdown');
+    check(/id="tb2"[^>]*><svg[\s\S]*?data-i18n="connection"/.test(html) && !/id="tb4"/.test(html) && pg4.indexOf('id="pk"') > 0 && pg4.indexOf('id="av"') > 0 && pg4.indexOf('id="m2"') > 0 && pg4.indexOf('id="lkeys"') > 0,
+          'page: Connection has the counters, AVRCP, peaks and latency breakdown');
     check(pg4.indexOf('id="chipv"') > 0 && pg4.indexOf('id="latnote"') > 0 && pg4.indexOf('id="fmtd"') > 0 && main.indexOf('id="chipv"') < 0,
           'page: chip, latency hint and full format details live in Settings > Details');
     check(pg4.indexOf('id="adseg"') > 0 && pg4.indexOf('id="adnodes"') > 0 && pg4.indexOf('data-i18n="adapterPick"') > 0 &&
@@ -164,8 +158,8 @@ el('mute').onclick();
 check(el('msg').textContent.indexOf('Reload') >= 0, 'page: 403 shows the reload hint');
 global.hbTest.draw && global.hbTest.draw();
 check(el('msg').textContent.indexOf('Reload') >= 0 || !global.hbTest.draw, 'page: the reload hint survives the next status draw');
-check(/\.msg\{position:fixed;z-index:(9[1-9]|[1-9]\d\d)/.test(html) && /\.drawer\{position:fixed;z-index:90/.test(html),
-  'page: the error hint shows above the Settings overlay');
+check(/\.msg\{position:fixed;z-index:(9[1-9]|[1-9]\d\d)/.test(html) && /\.toast\{[^}]*z-index:(9[1-9]|[1-9]\d\d)/.test(html),
+  'page: the error hint shows above everything');
 // Page left open over a restart: the old token gets 403, the status carries the
 // new one, the press is sent again with it and goes through.
 {
@@ -412,7 +406,7 @@ check(/act\('\/api\/game\?do=3&id='\+encodeURIComponent\(id\)\)/.test(html) && /
   const bc = (html.match(/class="band" style="--c:var\(--(\w+)\)"/g) || []).map(x => x.replace(/.*--(\w+)\).*/, '$1'));
   check(bc.length === 5 && new Set(bc).size === 5 && /EQCOL=\['#ff6a2b','#ffb23d','#c8ff3d','#3dd8ff','#ff7ad9'\]/.test(html),
     'page: each EQ band has its own color (slider, fill, value)');
-  check(/\.c3\{order:1\}\.c2\{order:2\}\.c1\{order:3\}/.test(html), 'page: TV columns: status/headset/log left, sound middle, volume/latency/connection right');
+  check(/\.v2 \.shell\{[^}]*grid-template-columns:16\.7rem minmax\(0,1fr\)/.test(html) && /\.v2 \.cols\{[^}]*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/.test(html), 'page: TV: menu column, pages in two columns');
 }
 {
   const pg1 = html.slice(html.indexOf('id="pg1"'), html.indexOf('id="pg3"'));
@@ -420,10 +414,10 @@ check(/act\('\/api\/game\?do=3&id='\+encodeURIComponent\(id\)\)/.test(html) && /
     'page: settings has 4 categories, games live in Sound & games');
 }
 // settings button: inset from the corner, big hit area, closed drawer never takes clicks
-check(/#setbtn\{min-height:3\.6rem;min-width:13rem;[^}]*margin-inline-start:2\.6rem/.test(html) && /\.bar\{padding-top:1\.6rem\}/.test(html),
-    'page: TV settings button inset from the screen edge and bigger');
-check(/visibility:hidden;pointer-events:none/.test(html) && /\.drawer\.show\{[^}]*pointer-events:auto/.test(html) && /\.scrim\{[^}]*pointer-events:none/.test(html),
-    'page: closed drawer and scrim do not catch clicks');
+check(/\.v2 \.rail \.tabs button\{[^}]*min-height:/.test(html) && /\.v2\.wrap\{height:100vh;max-height:100vh;overflow:hidden!important/.test(html) && /\.v2 \.pages\{[^}]*overflow:hidden/.test(html),
+    'page: TV menu buttons are big and pages never scroll');
+check(/html\{font-size:16px;font-size:clamp\(12px,1\.65vh,44px\)!important;font-size:clamp\(12px,min\(1\.65vh,\.95vw\),44px\)!important\}/.test(html),
+    'page: text scales with the screen (720p to 4K)');
 check(/getGamepads/.test(html) && /buttons\[9\]/.test(html) && /ContextMenu/.test(html), 'page: Options / menu key opens Settings');
 // just-left headset that will not answer pages: ask for a power cycle (state chip)
 STATUS.why = 'powercycle'; STATUS.state = 'disconnected';
@@ -433,17 +427,21 @@ STATUS.why = ''; STATUS.state = 'streaming';
 global.hbTest.req('/api/status');
 check(/\.by\{color:#fff;/.test(html), 'page: credit line under the name is white');
 // Home category replaces the Close button
-check(!/id="setclose"/.test(html) && /<nav class="tabs" id="tabs">\n<button type="button" id="tbhome"/.test(html) && /\$\('tbhome'\)\.onclick=setClose/.test(html),
-    'page: Home at the top of the settings menu closes it, no Close button');
-check(/\.drawer\{width:100vw;grid-template-columns:22rem/.test(html) && /\.pages\{zoom:1\.35/.test(html), 'page: TV settings is a large overlay with bigger content');
+check(!/id="setclose"/.test(html) && /<nav class="tabs" id="tabs">\n<button type="button" class="home on" id="tbhome"/.test(html) && /\$\('tbhome'\)\.onclick=setClose/.test(html),
+    'page: Home at the top of the settings menu goes back home, no Close button');
+el('tbhome').onclick(); global.hbTest.draw && global.hbTest.draw(); check(['tb0','tb1','tb2','tb3'].every(function (k) { return el(k).className === ''; }) && el('tbhome').className === 'home on', 'page: on Home only Home is highlighted, also after a redraw');
+el('tb1').onclick(); check(el('setm').className === 'rail show' && el('home').className === 'grid hid' && el('dmain').className === 'dmain show' && el('pg1').className === 'pg on' && el('tb1').className === 'on' && el('tb0').className === '' && el('tbhome').className === 'home', 'page: a menu item opens its page, only it is highlighted');
+el('tbhome').onclick(); check(el('home').className === 'grid' && el('dmain').className === 'dmain' && el('tbhome').className === 'home on' && el('tb1').className === '', 'page: Home goes back to the main page, only Home is highlighted');
+calls.length = 0; el('qp1').onclick(); check(calls[0] && /^\/api\/eq\?/.test(calls[0].p), 'page: quick Bass boost sets the EQ like the full preset');
+calls.length = 0; el('qnight').onclick(); check(calls[0] && /^\/api\/night\?on=[01]$/.test(calls[0].p), 'page: quick Night mode toggles night mode');
 {
   const mainEq = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
-  const advEq = html.slice(html.indexOf('id="advbox"'));
+  const advEq = html.slice(html.indexOf('id="pg1"'), html.indexOf('id="pg3"'));
   check(mainEq.indexOf('id="mute"') < mainEq.indexOf('id="gain"') && mainEq.indexOf('id="gain"') < mainEq.indexOf('id="hs"') &&
     mainEq.indexOf('id="hs"') < mainEq.indexOf('id="lat"') &&
     advEq.indexOf('id="eqon"') > 0 && advEq.indexOf('id="pr0"') > 0 && advEq.indexOf('id="night"') > 0 &&
     advEq.indexOf('id="eqon"') < advEq.indexOf('id="pr0"') && advEq.indexOf('id="pr0"') < advEq.indexOf('id="night"'),
-    'page: main Sound: mute, volume, latency; Details: EQ then night mode');
+    'page: main Sound: mute, volume, latency; Sound & games: EQ then night mode');
 }
 check(/@font-face\{font-family:"HB Inter";src:url\(\/font\.woff2\)/.test(html) && /font:1rem\/1\.35 "HB Inter","Bahnschrift"/.test(html) &&
   /\.brand h1\{font-family:"Bahnschrift"/.test(html) && !/https?:\/\/[^"']*\.(woff2?|ttf)/.test(html), 'page: local Inter font with system fallback, title keeps its font');

@@ -6,6 +6,7 @@
 #include "start_html.h"
 #include "tile.h"
 #include "font_woff2.h"
+#include "app_icon.h"
 #include "diag.h"
 #include "log.h"
 #include "rate.h"
@@ -525,6 +526,25 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         return n + (int)sizeof hb_font_woff2;
     }
 
+    if (!strcmp(path, "/manifest.webmanifest")) {
+        /* Add to home screen: name, icon and full screen. */
+        static const char mf[] =
+            "{\"name\":\"HearBridge\",\"short_name\":\"HearBridge\",\"start_url\":\"/\",\"scope\":\"/\","
+            "\"display\":\"standalone\",\"background_color\":\"#121117\",\"theme_color\":\"#121117\","
+            "\"icons\":[{\"src\":\"/app-icon.png\",\"sizes\":\"512x512\",\"type\":\"image/png\",\"purpose\":\"any\"},"
+            "{\"src\":\"/app-icon-180.png\",\"sizes\":\"180x180\",\"type\":\"image/png\"}]}";
+        return respond(out, max, 200, "application/manifest+json", mf, (int)sizeof mf - 1);
+    }
+    if (!strcmp(path, "/app-icon.png") || !strcmp(path, "/app-icon-180.png")) {
+        const unsigned char *ic = path[9] == '-' ? hb_icon_180 : hb_icon_512;
+        int il = path[9] == '-' ? (int)sizeof hb_icon_180 : (int)sizeof hb_icon_512;
+        int n = snprintf(out, (size_t)max, "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: %d\r\n"
+                         "Cache-Control: public, max-age=604800\r\nConnection: close\r\n\r\n", il);
+        if (n < 0 || n + il > max) return 0;
+        memcpy(out + n, ic, (size_t)il);
+        return n + il;
+    }
+
     is_api = !strncmp(path, "/api/", 5);
     if (!is_api) return respond(out, max, 404, "text/plain", "not found\n", 10);
 
@@ -960,7 +980,7 @@ static int send_gameicon(int fd, const char *id)
 
 static void serve_one(int fd)
 {
-    static char req[HB_BACKUP_MAX + 4096], out[196608];   /* the page (~75 KB with all languages) */
+    static char req[HB_BACKUP_MAX + 4096], out[393216];   /* the page (~230 KB with all languages) */
     int got = 0, n, need = -1;
     struct timeval tv = { 2, 0 };
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);

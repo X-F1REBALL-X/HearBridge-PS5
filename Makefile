@@ -67,6 +67,7 @@ test-control:
 webpage:
 	python3 scripts/gen_webpage.py
 	python3 scripts/gen_font.py assets/fonts/inter-latin.woff2 src/font_woff2.h
+	python3 scripts/gen_appicon.py assets/icon0.png src/app_icon.h
 
 test-tile:
 	@mkdir -p $(BUILD)/host
