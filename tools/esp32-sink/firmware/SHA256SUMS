@@ -1,0 +1,5 @@
+ac9a46603ca93a6227c7f4bc26cc63788a18576f4475f4034b56a5e41f69ec9d  esp32-ps5-uac-sink-merged.bin
+ab79b587f4f4e00437df250f1f27eb7be11e560ba91d3d926a66558670b30c77  bootloader.bin
+73c0b5c3e5fcba3a151cc70c453c93dd5f4798899e7f2f8cca76da1f32ffc501  partition-table.bin
+bdf3fdaaff767b93a776b76b4d9e6ab90c9e3d102c64ffddfb263f435c371c59  esp32-ps5-uac-sink.bin
+0dc009d7b1fde9d08295fd66f5e70e3569749f81d978973b4f329bac8d0a199b  uac2-fallback/esp32-ps5-uac-sink-UAC2-merged.bin
