@@ -44,7 +44,7 @@ Plug in a USB stick and HearBridge can use it instead of the console chip. The s
 
 Supported sticks today:
 
-- **Realtek RTL8761BU** (UB500 / UB600, USB id `0BDA:B00C` / `0BDA:8771`) — firmware is **bundled in the ELF** and written to `/data/hearbridge/firmware/` on start.
+- **Realtek RTL8761BU** (`0BDA:8771`, and the TP-Link UB600 as `37AD:0600`) — firmware is **bundled in the ELF** and written to `/data/hearbridge/firmware/` on start. Rebadged sticks are found by the controller's HCI identity (manufacturer / LMP), not by the USB vendor id.
 - **CSR8510** — works as a plain USB HCI adapter, no extra firmware.
 
 Under **Settings → Details → Bluetooth adapter** pick **Auto**, **Console chip**, or a listed stick (for example Realtek / CSR). The change is saved to `/data/hearbridge/adapter` and Bluetooth restarts right away. Pairing is shared across adapters, so you do not have to pair the same headset again after switching.

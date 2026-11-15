@@ -246,15 +246,17 @@ int main(int argc, char **argv)
         CHECK(btchip_vendor(0x1286) && !strcmp(btchip_vendor(0x1286), "Marvell/NXP"), "chip: 1286 is Marvell/NXP");
         CHECK(btchip_vendor(0x0e8d) && !strcmp(btchip_vendor(0x0e8d), "MediaTek"), "chip: 0e8d is MediaTek");
         CHECK(btchip_vendor(0x0bda) && !strcmp(btchip_vendor(0x0bda), "Realtek"), "chip: 0bda is Realtek");
+        CHECK(btchip_vendor(0x37ad) && !strcmp(btchip_vendor(0x37ad), "TP-Link"), "chip: 37ad is TP-Link");
+        CHECK(btchip_vendor(0x2357) && !strcmp(btchip_vendor(0x2357), "TP-Link"), "chip: 2357 is TP-Link too");
+        CHECK(btchip_vendor(0x0b05) && !strcmp(btchip_vendor(0x0b05), "ASUS"), "chip: 0b05 is ASUS");
+        CHECK(btchip_vendor(0x2550) && !strcmp(btchip_vendor(0x2550), "UGREEN"), "chip: 2550 is UGREEN");
+        CHECK(btchip_vendor(0x0cf3) && !strcmp(btchip_vendor(0x0cf3), "Qualcomm/Atheros"), "chip: 0cf3 is Qualcomm/Atheros");
         CHECK(btchip_vendor(0x0a12) && !strcmp(btchip_vendor(0x0a12), "CSR"), "chip: 0a12 is CSR");
         CHECK(btchip_vendor(0x8087) && !strcmp(btchip_vendor(0x8087), "Intel"), "chip: 8087 is Intel");
         CHECK(!btchip_vendor(0xabcd) && !btchip_vendor(-1), "chip: other VIDs unknown");
         CHECK(btchip_is_mediatek(0x0e8d) && !btchip_is_mediatek(0x1286) && !btchip_is_mediatek(-1),
               "chip: only 0e8d counts as MediaTek");
-        CHECK(btchip_is_realtek(0x0bda) && !btchip_is_realtek(0x0a12) && !btchip_is_realtek(-1),
-              "chip: only 0bda counts as Realtek");
-        CHECK(btchip_is_csr(0x0a12) && !btchip_is_csr(0x0bda) && !btchip_is_csr(-1),
-              "chip: only 0a12 counts as CSR");
+
         btchip_describe(0x1286, 0x2059, d, (int)sizeof d);
         CHECK(!strcmp(d, "Marvell/NXP (1286:2059)"), "chip: Marvell description");
         btchip_describe(0x0e8d, 0x0608, d, (int)sizeof d);
@@ -269,7 +271,7 @@ int main(int argc, char **argv)
         CHECK(d[0] == 0, "chip: nothing before the controller is open");
     }
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"chip\":{\"vid\":\"\",\"pid\":\"\",\"vendor\":\"\",\"mediatek\":0,") != NULL,
+    CHECK(strstr(out, "\"chip\":{\"vid\":\"\",\"pid\":\"\",\"vendor\":\"\",\"family\":\"\",\"mediatek\":0,") != NULL,
           "status: empty chip until the controller is open");
     CHECK(strstr(out, "\"adapter\":{\"external\":0,\"node\":\"\",\"pref\":\"auto\",\"nodes\":[],\"adapters\":[]}") != NULL,
           "status: no adapter before the controller is open");
@@ -282,20 +284,26 @@ int main(int argc, char **argv)
     c.bt_node[0] = 0;
     c.chip_vid = 0x1286; c.chip_pid = 0x2059;
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
+    CHECK(strstr(out, "\"chip\":{\"vid\":\"1286\",\"pid\":\"2059\",\"vendor\":\"Marvell/NXP\",\"family\":\"\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
           "status: Marvell chip, default profile");
     c.chip_vid = 0x0a12; c.chip_pid = 0x0001;
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"chip\":{\"vid\":\"0a12\",\"pid\":\"0001\",\"vendor\":\"CSR\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
+    CHECK(strstr(out, "\"chip\":{\"vid\":\"0a12\",\"pid\":\"0001\",\"vendor\":\"CSR\",\"family\":\"\",\"mediatek\":0,\"profile\":\"default\"}") != NULL,
           "status: CSR8510 chip line shows CSR");
     c.chip_vid = 0x0e8d; c.chip_pid = 0x0608;
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"vid\":\"0e8d\",\"pid\":\"0608\",\"vendor\":\"MediaTek\",\"mediatek\":1,\"profile\":\"mediatek\"") != NULL,
+    CHECK(strstr(out, "\"vid\":\"0e8d\",\"pid\":\"0608\",\"vendor\":\"MediaTek\",\"family\":\"\",\"mediatek\":1,\"profile\":\"mediatek\"") != NULL,
           "status: MediaTek chip, mediatek profile");
     c.chip_vid = 0xabcd; c.chip_pid = 0x0012;
     get(&c, "/api/status");
-    CHECK(strstr(out, "\"vid\":\"abcd\",\"pid\":\"0012\",\"vendor\":\"\",\"mediatek\":0") != NULL,
+    CHECK(strstr(out, "\"vid\":\"abcd\",\"pid\":\"0012\",\"vendor\":\"\",\"family\":\"\",\"mediatek\":0") != NULL,
           "status: unknown vendor, IDs only");
+    /* a reseller VID can still show the real HCI family */
+    c.chip_vid = 0x37ad; c.chip_pid = 0x0600; c.chip_family = 1;
+    get(&c, "/api/status");
+    CHECK(strstr(out, "\"vid\":\"37ad\",\"pid\":\"0600\",\"vendor\":\"TP-Link\",\"family\":\"Realtek\"") != NULL,
+          "status: TP-Link product shows the Realtek HCI family");
+    c.chip_family = 0;
     c.chip_vid = c.chip_pid = -1;
     diag_init(NULL);
     get(&c, "/api/diag");

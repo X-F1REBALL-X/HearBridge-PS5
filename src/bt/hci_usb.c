@@ -810,12 +810,11 @@ static int try_node(struct usb_hci *u, const char *path, int external)
     g_chip_pid = pid;
     btchip_describe(vid, pid, chip, (int)sizeof chip);
     diag_set("bt chip", "%s", chip[0] ? chip : "unknown (no device descriptor)");
-    log_line("hci_usb: chip %s", chip[0] ? chip : "unknown");
+    log_line("hci_usb: usb device %s", chip[0] ? chip : "unknown");
     if (external) {
-        if (btchip_is_csr(vid))
-            log_line("hci_usb: CSR USB stick, plain HCI (no firmware download)");
-        else if (btchip_is_realtek(vid))
-            log_line("hci_usb: Realtek USB stick (firmware path runs on bring-up if needed)");
+        if (btchip_vendor(vid))
+            log_line("hci_usb: %s USB stick, chip family decided from the HCI identity",
+                     btchip_vendor(vid));
         else if (nbt > 0)
             log_line("hci_usb: generic BT HCI interface (e0/01/01 or ff/01/01), plain HCI");
     }

@@ -126,6 +126,7 @@ static int status_json(hb_ctl *c, char *o, int max)
     static char adapters[HB_BT_NODES_MAX * 120];
     int ai, an;
     const char *cven = btchip_vendor(c->chip_vid);
+    const char *cfam = btchip_family_name(c->chip_family);
     int ei, en, chip_ok = c->chip_vid >= 0 && c->chip_vid <= 0xffff &&
                           c->chip_pid >= 0 && c->chip_pid <= 0xffff;
     json_esc(dev, sizeof dev, c->device);
@@ -215,7 +216,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"backlog\":%d,\"bitpool_min\":%d,\"bitpool_max\":%d,\"per_packet\":%d,"
         "\"dropped\":%ld,\"uptime_s\":%ld,\"stream_s\":%ld,\"stable\":%d,\"queue_ms\":%d,\"latency\":{\"target_ms\":%d,\"estimate_ms\":%d,\"capture_ms\":%d,\"packet_ms\":%d,\"queue_ms\":%d,\"radio_ms\":%d,\"sink_ms\":%d,\"sink_reported\":%d},\"codec\":\"%s\",\"codec_pref\":%d,\"codec_avail\":%d,"
         "\"eq\":{\"on\":%d,\"db\":[%d,%d,%d,%d,%d]},\"xq_low\":%d,"
-        "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},"
+        "\"chip\":{\"vid\":\"%s\",\"pid\":\"%s\",\"vendor\":\"%s\",\"family\":\"%s\",\"mediatek\":%d,\"profile\":\"%s\"},"
         "\"adapter\":{\"external\":%d,\"node\":\"%s\",\"pref\":\"%s\",\"nodes\":%s,\"adapters\":%s},"
         "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d,\"auto\":%d,\"auto_ms\":%d},"
         "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"src\":\"%s\",\"none\":%d},\"hs_moves\":%d,"
@@ -233,7 +234,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         c->lat_sink, c->lat_sink_reported, c->codec,
         c->codec_pref, c->codec_avail,
         c->eq_on, c->eq_db[0], c->eq_db[1], c->eq_db[2], c->eq_db[3], c->eq_db[4],
-        c->xq_low, cid[0], cid[1], chip_ok && cven ? cven : "",
+        c->xq_low, cid[0], cid[1], chip_ok && cven ? cven : "", cfam,
         chip_ok && btchip_is_mediatek(c->chip_vid),
         chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "",
         c->bt_external, c->bt_node, adpref, nodes, adapters,
