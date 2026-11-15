@@ -1119,16 +1119,34 @@ static void *srv_main(void *arg)
     return NULL;
 }
 
+int http_base_port(void)
+{
+    char b[16] = "";
+    int p = 0;
+    FILE *f = fopen(HB_PORT_PATH, "r");
+    if (f) {
+        if (fgets(b, (int)sizeof b, f)) p = atoi(b);
+        fclose(f);
+    }
+    return (p >= 1024 && p <= 65535 - HB_HTTP_PORTS) ? p : HB_HTTP_PORT;
+}
+
+int http_port(void)
+{
+    return g_started ? g_port : http_base_port();
+}
+
 int http_start(hb_ctl *c, char *url, int url_max)
 {
     int port;
     char ip[48];
     g_c = c;
-    for (port = HB_HTTP_PORT; port < HB_HTTP_PORT + 6; port++) {
+    int base = http_base_port();
+    for (port = base; port < base + HB_HTTP_PORTS; port++) {
         int e = 0;
         /* The usual port: a copy that is closing may hold it a moment
          * longer (#25), so wait for it before moving to the next one. */
-        g_srv = listen_on(port, port == HB_HTTP_PORT ? 3000 : 0, &e);
+        g_srv = listen_on(port, port == base ? 3000 : 0, &e);
         if (g_srv >= 0) break;
         log_line("http: port %d unavailable (errno %d)", port, e);
     }

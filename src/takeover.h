@@ -29,7 +29,7 @@ long hb_stop_named(const char *name, const char *stop_path, int graceful_ms);
 int hb_port_takeover(int port, const char *stop_path, int ms);
 
 /* Force any other HearBridge off the machine: stop file, every known
- * process name, every page port 8090..8095. Call before taking the lock
+ * process name, every page port (http_base_port() .. +5). Call before taking the lock
  * again so a freshly sent ELF always replaces the running copy. */
 void hb_force_replace(const char *stop_path);
 

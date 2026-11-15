@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 
     /* ---- HTTP ---- */
     ctl_init(&c, "1.0.9");
-    strcpy(c.url, "http://10.0.0.5:8090");
+    strcpy(c.url, "http://10.0.0.5:6767");
     strcpy(c.device, "WF-\"1000\"XM6");
     n = get(&c, "/");
     CHECK(n > 0 && !strncmp(out, "HTTP/1.1 200", 12) && strstr(out, "text/html") &&

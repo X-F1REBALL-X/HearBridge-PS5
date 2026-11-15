@@ -1,5 +1,6 @@
 /* takeover.c - see takeover.h. Developed by X-F1REBALL-X. */
 #include "takeover.h"
+#include "http.h"
 #include "log.h"
 #include "util.h"
 
@@ -137,6 +138,8 @@ void hb_force_replace(const char *stop_path)
     int p;
     (void)hb_stop_named(HB_PROC_NAME, stop_path, 4000);
     (void)hb_stop_named("payload.elf", stop_path, 2000);
-    for (p = 8090; p <= 8095; p++)
-        (void)hb_port_takeover(p, stop_path, p == 8090 ? 8000 : 1500);
+    /* Our own page ports only. 1.4.0 and older used 8090..8095; those copies
+     * are stopped by name above, and 8090 may belong to ps5-tailscale (#41). */
+    for (p = http_base_port(); p < http_base_port() + HB_HTTP_PORTS; p++)
+        (void)hb_port_takeover(p, stop_path, p == http_base_port() ? 8000 : 1500);
 }
