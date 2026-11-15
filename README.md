@@ -2,11 +2,9 @@
 
 <img src="docs/img/banner.png" alt="HearBridge PS5">
 
-**Bluetooth headphones for a jailbroken PS5: game and system audio, no dongle.**
+**Bluetooth headphones for a jailbroken PS5: game and system audio, on the console chip or a USB dongle.**
 
 Developed by **X-F1REBALL-X**
-
-🇺🇸 **English** · 🇸🇦 [العربية](README.ar.md)
 
 </div>
 
@@ -32,11 +30,19 @@ HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on
 
 ## Install
 
-1. Download **HearBridge-1.4.0.elf** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+1. Download **HearBridge-1.4.1.elf** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
 2. Send it to your ELF loader on port 9021.
-3. Open **http://&lt;console-ip&gt;:8090** or the **HearBridge** tile, then pair your headphones in **Settings**.
+3. Open **http://&lt;console-ip&gt;:6767** or the **HearBridge** tile, then pair your headphones in **Settings**.
 
 Everything else, from features to troubleshooting, is in the **[guide](https://x-f1reball-x.github.io/HearBridge-PS5/)**.
+
+## Internal chip vs USB dongle
+
+The DualSense always uses the console's internal Bluetooth chip. If HearBridge streams audio over that same chip, the controller and the headphones share one radio. This can cause audio stutter, controller disconnects, and controllers that can't reconnect until a reboot.
+
+**For gaming, use a USB Bluetooth dongle.** The controller stays on the internal chip and the headphones run on the dongle, so both stay stable.
+
+The internal chip works fine without a controller, for example for media or Remote Play.
 
 ## USB Bluetooth adapter
 
@@ -44,7 +50,7 @@ Plug in a USB stick and HearBridge can use it instead of the console chip. The s
 
 Supported sticks today:
 
-- **Realtek RTL8761BU** (`0BDA:8771`, and the TP-Link UB600 as `37AD:0600`) — firmware is **bundled in the ELF** and written to `/data/hearbridge/firmware/` on start. Rebadged sticks are found by the controller's HCI identity (manufacturer / LMP), not by the USB vendor id.
+- **Realtek RTL8761BU** (UB500 / UB600, USB id `0BDA:B00C` / `0BDA:8771`) — firmware is **bundled in the ELF** and written to `/data/hearbridge/firmware/` on start.
 - **CSR8510** — works as a plain USB HCI adapter, no extra firmware.
 
 Under **Settings → Details → Bluetooth adapter** pick **Auto**, **Console chip**, or a listed stick (for example Realtek / CSR). The change is saved to `/data/hearbridge/adapter` and Bluetooth restarts right away. Pairing is shared across adapters, so you do not have to pair the same headset again after switching.
