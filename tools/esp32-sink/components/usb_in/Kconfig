@@ -1,0 +1,53 @@
+menu "USB In"
+
+config USB_IN_SAMPLE_RATE
+    int "USB input sample rate (Hz)"
+    default 48000
+    help
+        Sample rate for audio frames received from the host.
+
+config USB_IN_CHANNEL_COUNT
+    int "USB input channel count"
+    default 2
+    range 1 8
+    help
+        Number of PCM channels delivered over USB audio.
+
+config USB_IN_BIT_DEPTH
+    int "USB input bit depth"
+    default 16
+    range 8 32
+    help
+        Bits per PCM sample; must be divisible by 8.
+
+config USB_IN_PCM_BUFFER_SIZE
+    int "PCM ring buffer size (bytes)"
+    default 8192
+    help
+        Capacity of the FreeRTOS ring buffer storing PCM audio.
+
+endmenu
+
+menu "PS5 UAC1 sink USB identity"
+
+config UAC_SINK_VID
+    hex "USB VID"
+    default 0x303A
+
+config UAC_SINK_PID
+    hex "USB PID"
+    default 0x4011
+
+config UAC_SINK_MANUFACTURER
+    string "USB manufacturer string"
+    default "ESP32"
+
+config UAC_SINK_PRODUCT
+    string "USB product string"
+    default "PS5 Audio Sink"
+
+config UAC_SINK_SERIAL
+    string "USB serial string"
+    default "000001"
+
+endmenu

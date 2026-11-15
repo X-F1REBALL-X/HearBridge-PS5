@@ -1,0 +1,12 @@
+description: USB UAC 1.0 Device Input Driver (speaker sink), adapted from netham45/esp32-usb-in onto TinyUSB 0.21 native UAC1
+dependencies:
+  idf:
+    version: '>=5.4'
+  # TinyUSB >= 0.20 is required for USB Audio Class 1.0 (bcdADC 0x0100) device support.
+  espressif/tinyusb:
+    version: "~0.21.0"
+targets:
+- esp32s2
+- esp32s3
+- esp32p4
+version: 2.0.0-uac1
