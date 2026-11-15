@@ -188,7 +188,10 @@ static void fetch_names(a2dp_session *s, a2dp_inq_dev *devs, int n)
     /* Audio devices first. */
     for (i = 0; i < n; i++) {
         for (j = i + 1; j < n; j++) {
-            if (devs[order[j]].audio_likely && !devs[order[i]].audio_likely) {
+            const a2dp_inq_dev *a = &devs[order[i]], *b = &devs[order[j]];
+            /* Audio first, then the strongest signal (nearest device). */
+            if ((b->audio_likely && !a->audio_likely) ||
+                (b->audio_likely == a->audio_likely && b->have_rssi && (!a->have_rssi || b->rssi > a->rssi))) {
                 int t = order[i];
                 order[i] = order[j];
                 order[j] = t;
