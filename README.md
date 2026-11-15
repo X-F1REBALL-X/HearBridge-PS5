@@ -12,20 +12,23 @@ Developed by **X-F1REBALL-X**
 
 HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on regular Bluetooth headphones, using the console's own Bluetooth or a USB stick. You control it from a web page served by the console.
 
-<p align="center">
-<img src="docs/img/ui-1.4.0-main.png" alt="HearBridge home" width="440">
-<img src="docs/img/ui-1.4.0-details.png" alt="HearBridge Details" width="440">
-</p>
-<p align="center">
-<img src="docs/img/ui-1.4.0-adapter.png" alt="Bluetooth adapter picker" width="640">
-</p>
+<table align="center">
+<tr>
+<td><img src="docs/img/ui-1.4.2-home.png" alt="Home" width="440"></td>
+<td><img src="docs/img/ui-1.4.2-headsets.png" alt="Headsets" width="440"></td>
+</tr>
+<tr>
+<td><img src="docs/img/ui-1.4.2-sound.png" alt="Sound &amp; games" width="440"></td>
+<td><img src="docs/img/ui-1.4.2-connection.png" alt="Connection" width="440"></td>
+</tr>
+</table>
 
 ## Highlights
 
 - One file for every PS5 (Marvell/NXP or MediaTek Bluetooth).
 - **USB Bluetooth adapters:** Realtek RTL8761BU (bundled firmware) and CSR8510, plus the console chip.
 - **Adapter picker** in Settings with instant switching; one pairing shared across adapters.
-- Single-screen UI for a 1080p TV: larger controls, Details panel for EQ, codecs and the log.
+- New interface with a side menu (Home, Headsets, Sound & games, Connection, Backup) that fits the TV with no scrolling, plus a phone layout with a bottom menu.
 - Game profiles, battery percent, night mode and one-tap headset switching.
 
 ## Install
