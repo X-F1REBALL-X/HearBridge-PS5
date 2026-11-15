@@ -50,8 +50,8 @@ Plug in a USB stick and HearBridge can use it instead of the console chip. The s
 
 Supported sticks today:
 
-- **Realtek RTL8761BU** (UB500 / UB600, USB id `0BDA:B00C` / `0BDA:8771`) — firmware is **bundled in the ELF** and written to `/data/hearbridge/firmware/` on start.
-- **CSR8510** — works as a plain USB HCI adapter, no extra firmware.
+- **Realtek RTL8761BU**, including rebadged sticks like TP-Link UB500 / UB600 and ASUS BT600. The chip is detected from the stick itself, not the USB id. Firmware is **bundled in the ELF** and written to `/data/hearbridge/firmware/` on start.
+- **CSR8510**, works as a plain USB HCI adapter with no extra firmware.
 
 Under **Settings → Details → Bluetooth adapter** pick **Auto**, **Console chip**, or a listed stick (for example Realtek / CSR). The change is saved to `/data/hearbridge/adapter` and Bluetooth restarts right away. Pairing is shared across adapters, so you do not have to pair the same headset again after switching.
 
@@ -90,6 +90,10 @@ make test
 MediaTek scan-pause and USB pipe fix, plus HCI debug tool, by [ZiZc3](https://github.com/ZiZc3) ([#6](https://github.com/X-F1REBALL-X/HearBridge-PS5/pull/6))
 
 USB Bluetooth adapter path and Realtek ROM uploader by [jamesst20](https://github.com/jamesst20) ([#45](https://github.com/X-F1REBALL-X/HearBridge-PS5/pull/45))
+
+Realtek detection by chip identity by [jamesst20](https://github.com/jamesst20) ([#51](https://github.com/X-F1REBALL-X/HearBridge-PS5/pull/51))
+
+SBC build fix for newer compilers by [keravyn-ops](https://github.com/keravyn-ops) ([#47](https://github.com/X-F1REBALL-X/HearBridge-PS5/pull/47))
 
 Bundled RTL8761BU firmware blobs are from the
 [linux-firmware](https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/rtl_bt)
