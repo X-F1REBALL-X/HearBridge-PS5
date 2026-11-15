@@ -4,7 +4,10 @@
 
 #include "ctl.h"
 
-#define HB_HTTP_PORT 8090
+#define HB_HTTP_PORT 6767   /* 1.4.1: was 8090, which ps5-tailscale also uses (#41) */
+#define HB_HTTP_PORTS 6     /* HB_HTTP_PORT .. +5 */
+/* Optional: a number (1024-65535) in this file replaces HB_HTTP_PORT. */
+#define HB_PORT_PATH "/data/hearbridge/port"
 
 /* Placeholder in the page (index.html) replaced by hb_ctl.token when the
  * page is served; same length as the token. */
@@ -25,5 +28,8 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max);
  * taken). Fills url ("http://ip:port") on success; returns port or 0. */
 int  http_start(hb_ctl *c, char *url, int url_max);
 void http_stop(void);
+/* Base port in use (HB_PORT_PATH or HB_HTTP_PORT) and the port actually bound. */
+int  http_base_port(void);
+int  http_port(void);
 
 #endif

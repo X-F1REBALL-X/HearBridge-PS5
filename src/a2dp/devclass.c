@@ -48,7 +48,9 @@ static int has(const char *h, const char *n)
 int hb_dev_name_hints_headphones(const char *name)
 {
     static const char *hint[] = { "buds", "wf-", "wh-", "airpods", "pods", "ear", "head",
-                                  "freeclip", "freebuds" };  /* #32 Huawei FreeClip / FreeBuds */
+                                  "freeclip", "freebuds",    /* #32 Huawei FreeClip / FreeBuds */
+                                  "speaker", "soundbar", "soundcore", "home mini", "nest mini",
+                                  "google home", "momentum" };  /* #31 speakers / odd CoD */
     unsigned i;
     for (i = 0; i < sizeof hint / sizeof *hint; i++)
         if (has(name, hint[i])) return 1;
@@ -67,7 +69,11 @@ int hb_dev_rank_class(uint32_t cod)
 int hb_dev_rank(uint32_t cod, const char *name)
 {
     int r = dev_rank(cod, name);
-    if (r > 0 && (!name || !name[0])) return -1;
+    /* Unnamed: headphones / headset (0) and, since 1.4.1, a loudspeaker or
+     * portable audio class (1) are listed by address until the name comes in
+     * (#35: AirPods were skipped as "no name yet"). Hands-free and name-only
+     * matches still need a name. */
+    if ((!name || !name[0]) && r > 1) return -1;
     return r;
 }
 
@@ -85,6 +91,11 @@ static int dev_rank(uint32_t cod, const char *name)
         default: break;
         }
         /* Car kits, set-top boxes, TVs and other A/V gear stay hidden. */
+        /* #35: AirPods 4 reported CoD 08243c (display + loudspeaker). A strong
+         * earbud name wins over that class; anything that says TV stays hidden. */
+        if (minor == 0x0F && !says_tv(name) &&
+            (has(name, "airpods") || has(name, "buds") || has(name, "pods") || has(name, "freeclip")))
+            return 3;
         if (minor == 0x08 || minor == 0x09 || minor == 0x0B || minor == 0x0C ||
             minor == 0x0D || minor == 0x0E || minor == 0x0F || minor == 0x10)
             return -1;

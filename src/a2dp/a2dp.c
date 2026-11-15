@@ -1144,11 +1144,21 @@ int a2dp_pair(a2dp_session *s, const a2dp_inq_dev *target, a2dp_pair_result *out
     return r;
 }
 
+static unsigned g_inq_turn;
+
 int a2dp_inquiry(a2dp_session *s, a2dp_inq_dev *out, int max, int *nfound)
 {
     int r;
     if (!s) return 0;
-    hci_scan_pause(s->hci, "scan");
+    /* MediaTek: with page scan left on (#34) the controller gives an inquiry
+     * almost no radio time, so 1.3.2+ found nothing (#25, #35, #31). During a
+     * Scan press (a2dp_scan_deadline_ms set) every second inquiry also pauses
+     * page scan; the ones in between keep it on so a pad can still page in.
+     * hci_scan_resume / hci_scan_release / hci_scan_check always restore it. */
+    if (a2dp_scan_deadline_ms && hci_is_mediatek() && (g_inq_turn++ & 1))
+        hci_scan_pause_page(s->hci, "scan");
+    else
+        hci_scan_pause(s->hci, "scan");
     r = inquiry_scan_off(s, out, max, nfound);
     hci_scan_resume(s->hci);
     return r;

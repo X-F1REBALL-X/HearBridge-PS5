@@ -369,7 +369,7 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
 /* A scan (button or page refresh) runs inquiries back to back for
  * SCAN_WINDOW_S. Each result is written to devices.json as it arrives.
  * The list stays until the next scan. */
-#define SCAN_WINDOW_S 12   /* short: the radio is shared with the DualSense */
+#define SCAN_WINDOW_S 15   /* short: the radio is shared with the DualSense (12 -> 15: MediaTek, #35) */
 
 static void write_status(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void write_status(const char *fmt, ...)
@@ -2177,6 +2177,9 @@ typedef struct {
     unsigned char buf[HCI_PKT_MAX];
     int nbytes, nframes;
     long pkts, frames;
+    long last_ok_ms;     /* last media packet the radio took (silence watchdog, #40) */
+    int fails;           /* media sends failed in a row */
+    int wd_rebinds;      /* watchdog SUSPEND+START tries since the last good packet */
 } packer;
 
 /* As many whole frames as the media MTU holds (RTP 12 + SBC header 1;
@@ -2210,6 +2213,11 @@ static void packer_flush(packer *p)
                          p->nframes)) {
         p->pkts++;
         p->frames += p->nframes;
+        p->last_ok_ms = now_ms();
+        p->fails = 0;
+        p->wd_rebinds = 0;
+    } else {
+        p->fails++;
     }
     p->nbytes = p->nframes = 0;
     p->bl_sum += btlink_tx_backlog(p->link);
@@ -2550,6 +2558,7 @@ stream_setup:
     pk.av = &av;
     pk.enc = enc;
     pk.link = link;
+    pk.last_ok_ms = now_ms();
     pk.samples_per = sbc_encoder_frame_samples(enc);
     if (pk.samples_per <= 0) pk.samples_per = 128;
     mtu = btlink_chan_peer_mtu(link, av.media_scid);
@@ -2688,6 +2697,22 @@ stream_setup:
         }
         if (btlink_media_rebind_due(link, av.media_scid))
             (void)avdtp_rebind(&av);
+        /* #40: credits still come back but no media packet has gone out for
+         * 3 s (page said Streaming, headset silent). Restart the stream once
+         * (SUSPEND+START); if it is still silent 3 s later, rejoin. */
+        if (pk.fails > 0 && now_ms() - pk.last_ok_ms > 3000) {
+            if (pk.wd_rebinds++ == 0) {
+                log_line("stream: no media sent for 3 s (%d failed sends), restarting the stream", pk.fails);
+                (void)avdtp_rebind(&av);
+                pk.last_ok_ms = now_ms();
+            } else {
+                log_line("stream: still no media after a restart, rejoining");
+                note_event("Audio stalled");
+                set_why("quiet");
+                rc = RUN_DROPPED;
+                break;
+            }
+        }
         if (btlink_ms_since_credit(link) > 4000) {
             log_line("stream: no packet acknowledged for 4 s, link lost");
             note_event("Connection lost");
@@ -3336,8 +3361,10 @@ static void home_tile(int second)
             if (!fgets(u, sizeof u, f)) u[0] = 0;
             fclose(f);
             u[strcspn(u, "\r\n ")] = 0;
-            if (!strcmp(u, "start")) snprintf(u, sizeof u, "%s", HB_TILE_START_URL);
+            if (!strcmp(u, "start")) u[0] = 0;
         }
+        /* #41: the tile opens the port the page really got (6767 or the next free one). */
+        if (!u[0]) snprintf(u, sizeof u, "http://127.0.0.1:%d/start", http_port());
         if (tile_install(u, &tr) != 0)
             notify("HearBridge: home-screen icon not added (%s, code %#x). Details: %s",
                    tr.failed ? tr.failed : "?", (unsigned)tr.code, second ? LOG_PATH : DIAG_PATH);
@@ -3733,7 +3760,7 @@ int main(void)
                 log_line("takeover: pid %ld still listed 5 s after it let go of the lock", old_pid);
         }
         /* Always clear any leftover copy by name and page port — a stale
-         * lock file or a copy blocked in USB must not leave :8090 on an
+         * lock file or a copy blocked in USB must not leave the page port on an
          * older version after a fresh send. */
         hb_force_replace(HB_STOP_PATH);
         if (lock_rc == LOCK_BUSY || lock_rc == LOCK_OK) {
@@ -3820,7 +3847,7 @@ int main(void)
             notify("HearBridge %s: %s", HEARBRIDGE_VERSION, url);
         } else {
             log_line("http: control page could not start");
-            diag_set("web page", "FAILED to start (ports %d-%d)", HB_HTTP_PORT, HB_HTTP_PORT + 5);
+            diag_set("web page", "FAILED to start (ports %d-%d)", http_base_port(), http_base_port() + HB_HTTP_PORTS - 1);
             notify("hearbridge: started\n%s", HEARBRIDGE_VERSION);
         }
     }

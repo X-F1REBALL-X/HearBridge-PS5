@@ -15,7 +15,7 @@
  * and the tile still shows "load the payload first" when the payload is not
  * running and when system Wi-Fi is down. file:// did not open at all on
  * hardware (1.3.3 local test), so it is not used. */
-#define HB_TILE_URL   "http://127.0.0.1:8090/start"
+#define HB_TILE_URL   "http://127.0.0.1:6767/start"   /* default; main.c builds it from the live port */
 
 /* Bump when param.json changes in a way an installed tile only picks up by
  * being installed again (2: Media->Games; 3: file:// deeplink; 4: Games->Media
@@ -24,7 +24,7 @@
  * in HB_TILE_VER_PATH; a mismatched version triggers uninstall + re-register.
  * Media->Games once left a leftover Media icon when uninstall was skipped or
  * the Shell kept a stale tab entry — version 4 hardens that path. */
-#define HB_TILE_VERSION  "10"  /* 10: explanation page stays, silent retries; 9: Checking state shows only title + Checking...; 8: clear offline page; 7: no PS5 on the page; 6: probes; 5: Media + AppCache (#22, #33) */
+#define HB_TILE_VERSION  "11"  /* 11: port 6767 (#41), link follows the live port;  10: explanation page stays, silent retries; 9: Checking state shows only title + Checking...; 8: clear offline page; 7: no PS5 on the page; 6: probes; 5: Media + AppCache (#22, #33) */
 #define HB_TILE_VER_PATH "/data/hearbridge/tile.ver"
 
 /* 1 when stored tile version (text of HB_TILE_VER_PATH, NULL if missing)

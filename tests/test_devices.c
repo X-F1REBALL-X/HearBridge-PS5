@@ -67,8 +67,13 @@ int main(void)
     CHECK(hb_dev_rank(0x5a020c, "Phone") == -1, "phone hidden");
     CHECK(hb_dev_rank(0x280424, "") == -1 && hb_dev_rank(0x280424, "TV - \xd7\x97\xd7\x93\xd7\xa8 \xd7\xa9\xd7\x99\xd7\xa0\xd7\x94") == -1 &&
           hb_dev_rank(0x280424, "\xd7\x97\xd7\x93\xd7\xa8 \xd7\x99\xd7\x9c\xd7\x93\xd7\x99\xd7\x9d") == -1, "console TVs (CoD 280424) hidden");
-    CHECK(hb_dev_rank(0x240414, "") == -1 && hb_dev_rank(0x000000, "") == -1 && hb_dev_rank(0x240404, "") == 0,
-          "unnamed: only a headphone / headset class is listed");
+    CHECK(hb_dev_rank(0x240414, "") == 1 && hb_dev_rank(0x000000, "") == -1 && hb_dev_rank(0x240404, "") == 0 &&
+          hb_dev_rank(0x240408, "") == -1 && hb_dev_rank(0x280424, "") == -1,
+          "unnamed: headphone / headset / speaker class listed, hands-free and TV not");
+    CHECK(hb_dev_rank(0x08243c, "AirPods 4") == 3 && hb_dev_rank(0x08243c, "") == -1 &&
+          hb_dev_rank(0x24043c, "Buds TV") == -1, "#35: AirPods with a display CoD listed by name");
+    CHECK(hb_dev_rank(0x000000, "Google Home Mini") == 3 && hb_dev_rank(0x0, "Soundcore Motion") == 3,
+          "#31: speakers with an odd CoD listed by name");
     CHECK(hb_dev_rank(0x5a020c, "My Buds phone") == -1 && hb_dev_rank(0x10010c, "Headquarters laptop") == -1,
           "phones and computers hidden even with a headphone-like name");
     CHECK(hb_dev_rank(0x240420, "Car Earphone kit") == -1 && hb_dev_rank(0x240424, "Head TV box") == -1 &&

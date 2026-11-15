@@ -31,12 +31,12 @@ a.q:focus{background:#f4efe6;color:#0c0b0f;border-color:#c8ff3d;outline:none}
 <ol><li id="s1"></li><li id="s2"></li></ol>
 <p class="a" id="a"></p>
 </div>
-<div id="x"><a class="o" id="b" href="/start" tabindex="1"></a><a class="o q w" id="o" href="http://127.0.0.1:8090/" tabindex="2"></a></div>
+<div id="x"><a class="o" id="b" href="/start" tabindex="1"></a><a class="o q w" id="o" href="/" tabindex="2"></a></div>
 <p class="d" id="d"></p>
 <p class="f w" id="f">Developed by X-F1REBALL-X</p>
 </main>
 <script>
-var B='http://127.0.0.1:8090/',T={
+var B=location.protocol+'//'+location.host+'/',T={
 en:['HearBridge is not running.','Load HearBridge with your ELF loader first, then open this tile again.','Try again','Open control page','Checking...','Load HearBridge with your ELF loader.','Open this tile again.','This page opens the control page automatically once HearBridge is running.'],
 ar:['HearBridge لا يعمل.','حمّل HearBridge بمحمِّل ELF أولًا، ثم افتح هذه الأيقونة مرة أخرى.','إعادة المحاولة','فتح صفحة التحكم','جارٍ التحقق...','حمّل HearBridge بمحمِّل ELF.','افتح هذه الأيقونة مرة أخرى.','تفتح هذه الصفحة صفحة التحكم تلقائيًا عند تشغيل HearBridge.'],
 es:['HearBridge no se está ejecutando.','Carga primero HearBridge con tu cargador de ELF y vuelve a abrir este icono.','Reintentar','Abrir la página de control','Comprobando...','Carga HearBridge con tu cargador de ELF.','Abre este icono de nuevo.','Esta página abre la página de control automáticamente cuando HearBridge está en marcha.'],
@@ -82,7 +82,7 @@ function probe(q0){var g,q='&t='+(new Date().getTime()),x,i,s,f,l;
  reg('fetch');if(window.fetch){try{fetch(B+'ping?m=fetch'+q,{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
   if(t.indexOf('hb-ok')>=0)go();else bad(g,'fetch','odd')},function(){bad(g,'fetch','error')})}catch(e){bad(g,'fetch','throw')}}else bad(g,'fetch','n/a');
  reg('img');i=node(new Image());i.onload=go;i.onerror=function(){bad(g,'img','error')};i.src=B+'ping.gif?m=img'+q;
- reg('img-localhost');l=node(new Image());l.onload=go;l.onerror=function(){bad(g,'img-localhost','error')};l.src='http://localhost:8090/ping.gif?m=img&h=l'+q;
+ reg('img-localhost');l=node(new Image());l.onload=go;l.onerror=function(){bad(g,'img-localhost','error')};l.src='http://localhost:'+(location.port||'80')+'/ping.gif?m=img&h=l'+q;
  reg('script');s=node(document.createElement('script'));s.onload=function(){if(window.hbUp)go();else bad(g,'script','odd')};
   s.onerror=function(){bad(g,'script','error')};s.src=B+'ping.js?m=js'+q;document.getElementsByTagName('head')[0].appendChild(s);
  reg('frame');f=node(document.createElement('iframe'));f.style.display='none';

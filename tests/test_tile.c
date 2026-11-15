@@ -44,11 +44,11 @@ int main(void)
     {
         char j2[2048];
         CHECK(tile_manifest(j2, sizeof j2, HB_TILE_START_URL) > 0 &&
-              strstr(j2, "\"deeplinkUri\": \"http://127.0.0.1:8090/start\""),
+              strstr(j2, "\"deeplinkUri\": \"http://127.0.0.1:6767/start\""),
               "manifest takes the /start link");
         CHECK(!strstr(j2, "file://") && atoi(HB_TILE_VERSION) > 8, "no file:// link, tile version bumped past 8");
     }
-    CHECK(strstr((const char *)hb_start_html, "127.0.0.1:8090") &&
+    CHECK(strstr((const char *)hb_start_html, "location.host") && !strstr((const char *)hb_start_html, "8090") &&
           strstr((const char *)hb_start_html, "HearBridge is not running") &&
           strstr((const char *)hb_start_html, "ar:[") && !strstr((const char *)hb_start_html, "he:["),
           "fallback page probes the server, has languages, no Hebrew");
@@ -67,7 +67,7 @@ int main(void)
           "start page: no jailbreak step, Checking state, debug line only with #debug");
     CHECK(strstr((const char *)hb_start_html, "class=\"f w\" id=\"f\"") && strstr((const char *)hb_start_html, "E('f').style.display='block'"),
           "start page: footer only after the probes conclude");
-    CHECK(strstr((const char *)hb_start_html, "id=\"o\" href=\"http://127.0.0.1:8090/\""),
+    CHECK(strstr((const char *)hb_start_html, "id=\"o\" href=\"/\""),
           "start page has an Open button that goes straight to the control page");
 
     if (!mkdtemp(root)) return 1;
