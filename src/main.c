@@ -297,6 +297,25 @@ static int connect_and_probe(hci_t hci, headset_ini *ini, btlink **linkp,
 static int probe_after(hci_t hci, btlink *link, headset_ini *ini, btlink **linkp, unsigned *psm)
 {
     int pr = probe_link(link, ini, linkp, psm);
+    if (pr == -3 && ini->ok && !connect_abort(ini->addr)) {
+        /* Stalled config on that ACL: a new link works right away (same as
+         * pressing Reconnect), so page again now instead of retrying the
+         * dead one for ~50 s. */
+        btlink *re;
+        long w = now_ms() + 200;
+        log_line("select: fresh reconnect to %s", ini->name[0] ? ini->name : "the headset");
+        while (now_ms() < w && !connect_abort(ini->addr)) idle_pump(hci, 50);
+        re = btlink_create(hci, 1021, 7);
+        if (!re) return -2;
+        if (!btlink_connect(re, ini->addr, 0x01, 0, ini->link_key, ini->key_type,
+                            ini->name, (int)sizeof ini->name, 10000)) {
+            log_line("select: fresh reconnect failed");
+            btlink_destroy(re);
+            return -2;
+        }
+        pr = probe_link(re, ini, linkp, psm);
+        return pr == -3 ? -2 : pr;
+    }
     if (pr == -2 && ini->ok && !connect_abort(ini->addr)) {
         btlink *in;
         log_line("select: waiting %d ms for %s to call back", HB_CALLBACK_MS,
@@ -346,7 +365,19 @@ static int probe_link(btlink *link, headset_ini *ini, btlink **linkp, unsigned *
         *linkp = link;
         return 1;
     }
+    /* Config normally completes in ~50 ms; a stalled one (peer never sends
+     * its CFG_REQ) is caught after 1.5 s and the link is redone fresh.
+     * A peer that stayed silent since ACL up (healthy ones send their own
+     * INFO_REQ within ~25 ms; stalled ones never did) gets 0.6 s. */
+    btlink_set_cfg_timeout(link, btlink_peer_sig_seen(link) ? 1500 : 600);
     sdp = sdp_probe_a2dp_sink(link, 6000, psm);
+    btlink_set_cfg_timeout(link, 0);
+    if (btlink_peer_cfg_dead(link)) {
+        log_line("select: headset never configures a channel on this link - dropping it for a fresh one");
+        btlink_disconnect(link);
+        btlink_destroy(link);
+        return -3;
+    }
     if (sdp == 0) {
         log_choice("no A2DP Sink in SDP — rejecting", ini);
         btlink_disconnect(link);

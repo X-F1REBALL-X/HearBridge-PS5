@@ -41,7 +41,7 @@ int hb_resume_gap(long mp, long mn, long rp, long rn, long gap)
 
 int hb_reopen_delay_ms(int attempt)
 {
-    static const int ms[4] = { 1500, 2500, 4000, 5000 };
+    static const int ms[4] = { 500, 2500, 4000, 5000 };   /* first: an adapter switch, the new one is already there */
     if (attempt < 0) attempt = 0;
     return attempt < 4 ? ms[attempt] : 5000;
 }

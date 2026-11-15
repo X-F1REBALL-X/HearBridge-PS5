@@ -262,6 +262,7 @@ struct avcap2_session {
     int fmt_s16;          /* 1 = int16 samples, 0 = float32 */
     int nch;              /* interleaved channels in the buffer */
     int fmt_checked;
+    int fmt_logs;         /* first-data lines logged (silence keeps fmt_checked 0) */
     long rate_t0;         /* channel-count check: bytes over ~2 s */
     uint64_t rate_bytes;
     int rate_done;
@@ -422,8 +423,9 @@ int avcap2_session_read_s16(avcap2_session *s, int16_t *out, int max_frames,
                 nz++;
                 if (e == 0xFF || e > 0x7F || e < 0x50) bad++;
             }
-            {
+            if (s->fmt_logs < 4) {
                 const unsigned char *b8 = (const unsigned char *)s->buf;
+                s->fmt_logs++;
                 log_line("avcap2: first data %02x %02x %02x %02x %02x %02x %02x %02x "
                          "%02x %02x %02x %02x %02x %02x %02x %02x (bytes=%d)",
                          b8[0], b8[1], b8[2], b8[3], b8[4], b8[5], b8[6], b8[7],
