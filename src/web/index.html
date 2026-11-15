@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>HearBridge</title>
+<meta name="theme-color" content="#121117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" sizes="180x180" href="/app-icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <style>
 :root{--ink:#f4efe6;--ink2:#cfc9be;--mute:#9a948a;--void:#0c0b0f;--deck:#15131a;--card:#1f1b26;--edge:#2c2833;--edge2:#3a3543;
 --lime:#c8ff3d;--ember:#ff6a2b;--cyan:#3dd8ff;--violet:#b18cff;--blue:#5aa2ff;--teal:#8fc2bb;--rose:#ff7ad9;--warn:#ffb23d;--bad:#ff3d5a;--sk:-12deg;
@@ -591,7 +596,6 @@ grid-template-columns:repeat(auto-fill,minmax(12rem,1fr))}
 .mainctl .advfoot{margin-top:auto;flex:0 0 auto;display:grid;grid-template-columns:1fr;gap:var(--s2);padding-top:var(--s3)}
 .mainctl .advfoot button{min-height:3.4rem;font-size:1.15rem}
 /* hide EQ bits if left in main (safety) */
-.mainctl .eqhead,.mainctl .eqbox,.mainctl .presets,.mainctl .night,.mainctl .gline{display:none!important}
 /* Details overlay - EQ + connection + log */
 .advov{position:fixed;inset:0;z-index:85;display:none;align-items:center;justify-content:center;
 background:rgba(6,5,9,.78);padding:clamp(.6rem,2vh,1.2rem)}
@@ -627,50 +631,462 @@ html{font-size:clamp(14px,1.65vh,22px)!important}
 .advov .advpanel{grid-template-columns:1fr;grid-template-rows:auto auto auto;overflow-y:auto}
 }
 
+
+/* 1.4.2 layout: permanent left menu on every page, each page fills the TV screen with no scrolling */
+html{font-size:16px;font-size:clamp(12px,1.65vh,44px)!important;font-size:clamp(12px,min(1.65vh,.95vw),44px)!important}
+.v2{--void:#121117;--deck:#1a1820;--card:#24212c;--edge:#353240;--edge2:#45414f;--ink:#f4efe6;--ink2:#cfc9be;--mute:#9e998f;--lime:#9fd96a;--ember:#e8895a;--rose:#d4a0c0;--bad:#e07080;--violet:#a894d4;--cyan:#7fc8d8;--gold:#e5b46a;--warn:#e5b46a;--sk:0deg;--gap:1.55rem}
+html,body{background:#121117!important}
+.v2.wrap{height:100vh;max-height:100vh;overflow:hidden!important;display:flex;flex-direction:column;gap:0;padding:0;box-sizing:border-box;color:var(--ink)}
+.v2 *{letter-spacing:normal}
+/* buttons: flat rounded plates, like the mockups */
+.v2 button{position:relative;min-height:0;padding:.78rem 1.45rem;font:inherit;font-size:1.22rem;font-weight:700;line-height:1.25;color:var(--ink);background:var(--card);border:2px solid var(--edge2);border-radius:.67rem;transform:none!important;letter-spacing:normal;text-transform:none;box-shadow:none;transition:border-color .12s,box-shadow .12s}
+.v2 button:before{display:none!important}
+.v2 button:hover,.v2 button:focus{border-color:var(--ink);box-shadow:0 0 0 3px rgba(244,239,230,.28)}
+.v2 button.act{background:var(--lime);border-color:var(--lime);color:#121117}
+.v2 button.act:focus{border-color:#fff;box-shadow:0 0 0 3px #fff}
+.v2 button.red{color:var(--bad);border-color:rgba(224,112,128,.5);background:var(--card)}
+.v2 button.red:focus,.v2 button.red:hover{border-color:var(--bad);box-shadow:0 0 0 3px rgba(224,112,128,.3)}
+.v2 button.ember{background:var(--ember);border-color:var(--ember);color:#121117}
+.v2 button[disabled]{opacity:.45;cursor:default}
+.v2 button.sm{padding:.55rem 1.1rem;font-size:1.1rem}
+.v2 button.xl{width:auto;min-height:0;padding:1.22rem 1.9rem;font-size:1.45rem}
+.v2 .sp{flex:1 1 auto}
+/* header */
+.v2 .bar{flex:0 0 5.33rem;height:5.33rem;margin:0;padding:0 2.2rem;gap:1.33rem;border-bottom:1px solid var(--edge);display:flex;align-items:center}
+.v2 .brand{flex:0 1 auto;gap:1.33rem}
+.v2 .logo{width:3.1rem;height:3.1rem;margin:0;border-radius:.67rem;background:var(--lime);color:#121117;transform:none;box-shadow:none}
+.v2 .logo svg{width:1.9rem;height:1.9rem;transform:none}
+.v2 .brand h1{font-family:inherit;font-size:1.9rem;font-weight:700;letter-spacing:.28rem;line-height:1.1;text-transform:uppercase}
+.v2 .brand h1 b{color:inherit;font-weight:700}
+.v2 .meta{margin-top:.1rem}
+.v2 .ver{background:none;color:var(--mute);font-size:.95rem;font-weight:400;padding:0;margin:0;transform:none;letter-spacing:normal}
+.v2 .ver:after{content:"\00a0\00b7\00a0"}
+.v2 .by{color:var(--mute);font-size:.95rem;font-weight:400;letter-spacing:normal;text-shadow:none}
+.v2 .live{transform:none;border-radius:999px;padding:.67rem 1.33rem;font-size:1.17rem;font-weight:700;text-transform:none;letter-spacing:normal;background:none;border:2px solid currentColor;color:var(--gold)}
+.v2 .live.ok{color:var(--lime)}.v2 .live.bad{color:var(--bad)}
+.v2 .live i{display:block;width:.78rem;height:.78rem;border-radius:50%;background:currentColor;margin:0 .67rem 0 0;box-shadow:none;animation:none;transform:none}
+[dir=rtl] .v2 .live i{margin:0 0 0 .67rem}
+.v2 .live span{transform:none}
+/* left menu */
+.v2 .shell{flex:1 1 0;min-height:0;display:grid;grid-template-columns:16.7rem minmax(0,1fr);grid-gap:0}
+.v2 .rail{display:flex;flex-direction:column;gap:.55rem;min-height:0;padding:1.33rem 1rem;background:var(--deck);border:0;border-inline-end:1px solid var(--edge);border-radius:0;box-sizing:border-box;position:static;transform:none;opacity:1;visibility:visible;width:auto}
+.v2 .rail .tabs{display:flex;flex-direction:column;gap:.55rem;margin:0;padding:0;border:0}
+.v2 .rail .tabs button{display:flex;align-items:center;gap:1rem;width:100%;min-height:0;padding:1.1rem 1.22rem;font-size:1.33rem;font-weight:700;line-height:1.25;text-align:start;white-space:normal;color:var(--ink2);background:none;border:2px solid transparent;border-radius:.78rem}
+.v2 .rail .tabs button svg{width:1.45rem;height:1.45rem;margin:0;flex:0 0 auto;color:var(--ink2)}
+.v2 .rail .tabs button.on{background:var(--card);color:var(--ink);border-color:var(--c)}
+.v2 .rail .tabs button.on svg{color:var(--c)}
+.v2 .rail .tabs button:focus{box-shadow:0 0 0 3px rgba(244,239,230,.28);border-color:var(--ink)}
+.v2 .rail .hdr{margin-top:auto;padding:0;border:0;display:block}
+.v2 #langbox{width:100%;position:relative}
+.v2 #langbtn{text-transform:none;letter-spacing:normal;display:flex;align-items:center;gap:1rem;width:100%;padding:1.1rem 1.22rem;font-size:1.33rem;border-radius:.78rem;background:none;border:2px solid var(--edge2);text-align:start}
+.v2 #langbtn svg{width:1.45rem;height:1.45rem;flex:0 0 auto;color:var(--cyan)}
+.v2 #langlist{top:auto;bottom:calc(100% + .55rem);left:0;right:auto;width:min(28rem,80vw);background:var(--deck);border:1px solid var(--edge2);border-radius:.78rem;padding:.55rem;transform:none}
+[dir=rtl] .v2 #langlist{left:auto;right:0}
+.v2 #langlist button{border-radius:.55rem}
+.v2 .rail .menufoot{margin:.55rem 0 0;padding:0 .55rem;font-size:.95rem;color:var(--mute);border:0}
+/* page area */
+.v2 .view{position:relative;min-width:0;min-height:0;display:flex;flex-direction:column;padding:1.55rem 2.2rem;overflow:hidden}
+.v2 #home{flex:1 1 0;min-height:0;height:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-gap:var(--gap);margin:0;padding:0}
+.v2 #home.hid{display:none!important}
+.v2 #home>.col{display:flex;flex-direction:column;min-height:0;min-width:0;gap:var(--gap);margin:0}
+.v2 .dmain{display:none;flex:1 1 0;min-height:0;padding:0;flex-direction:column;position:static;background:none;border:0}
+.v2 .dmain.show{display:flex}
+.v2 .dhead{display:none}
+.v2 .pages{flex:1 1 0;min-height:0;overflow:hidden;padding:0;zoom:1}
+.v2 .pg{display:none;height:100%}
+.v2 .pg.on{display:flex;flex-direction:column;gap:0}
+.v2 .ph{flex:0 0 auto;display:flex;align-items:center;gap:1.1rem;margin:0 0 1.33rem;min-height:3.4rem}
+.v2 .ph h2{margin:0;font-size:2.1rem;font-weight:700;line-height:1.2;color:var(--ink);white-space:nowrap}
+.v2 .ph .note{margin:0;font-size:1.1rem;color:var(--mute);line-height:1.3;flex:0 1 auto;min-width:0}
+.v2 .phint{flex:0 0 auto;margin:-.33rem 0 1rem;font-size:1.05rem;color:var(--mute);line-height:1.3;width:auto;max-width:none}
+.v2 .cols{flex:1 1 0;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-gap:var(--gap);align-items:start;grid-template-rows:minmax(0,max-content)}
+.v2 .cols>*{max-height:100%}
+.v2 .stack{display:flex;flex-direction:column;gap:var(--gap);min-height:0;max-height:100%}
+.v2 .stack:empty{display:none}
+/* panels */
+.v2 .card{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;padding:1.78rem;box-sizing:border-box;background:var(--deck);border:1px solid var(--edge);border-radius:1rem;clip-path:none!important;box-shadow:none;margin:0;transform:none}
+.v2 .card[style*="--acc:var(--lime)"],.v2 .card[style*="--acc:var(--ember)"],.v2 .card[style*="--acc:var(--violet)"],.v2 .card[style*="--acc:var(--rose)"],.v2 .card[style*="--acc:var(--gold)"],.v2 .card.status{border-inline-start:4px solid var(--acc)}
+.v2 .card.status{--acc:var(--cyan)}
+.v2 .card:before,.v2 .card:after{display:none}
+.v2 .card .label,.v2 .card .sub,.v2 .shead .label{order:0;margin:0 0 1rem;font-size:1rem;font-weight:800;letter-spacing:.17rem;text-transform:uppercase;color:var(--acc,var(--ink2));line-height:1.3;padding:0;border:0;background:none}
+.v2 .card .label:before,.v2 .card .label:after,.v2 .card .sub:before,.v2 .card .sub:after{display:none}
+.v2 .card .note,.v2 .k.note{font-size:1.05rem;line-height:1.35;margin:0 0 .9rem;color:var(--mute);font-weight:400}
+.v2 .card .btns{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);grid-gap:.78rem;margin:0}
+.v2 .list{max-height:none;overflow-y:auto;overflow-x:hidden;margin:0;padding:0;flex:0 1 auto;min-height:0}
+.v2 .list>p,.v2 .qs p,.v2 .glist .empty,.v2 .bklist>p{margin:0;padding:1.22rem;font-size:1.1rem;text-align:center;color:var(--mute);border:2px dashed var(--edge2);border-radius:.78rem;background:none}
+/* device rows */
+.v2 .dl{display:flex;align-items:center;gap:1.1rem;min-height:0;padding:1.1rem 1.33rem;margin:0 0 .78rem;background:var(--card);border:2px solid var(--edge);border-radius:.78rem}
+.v2 .dl:last-child{margin-bottom:0}
+.v2 .dl.on{border-color:var(--lime);background:var(--card)}
+.v2 .dl:focus-within{border-color:var(--ink2);background:var(--card)}
+.v2 .dl .ico{flex:0 0 auto;width:2.9rem;height:2.9rem;border-radius:.67rem;background:var(--edge);border:0;color:var(--ink2)}
+.v2 .dl.on .ico{background:var(--edge);color:var(--ink2)}
+.v2 .dl .ico svg{width:1.6rem;height:1.6rem}
+.v2 .dl .nm{flex:1 1 auto;min-width:0}
+.v2 .dl .nm b{font-size:1.45rem;font-weight:700;line-height:1.25}
+.v2 .dl .meta{display:block;margin-top:.15rem;font-size:1.05rem;color:var(--mute);white-space:normal;line-height:1.35}
+.v2 .dl .meta .addr{overflow:visible}
+.v2 .badge{display:inline;margin:0;padding:0;background:none!important;color:var(--mute)!important;font-size:inherit;font-weight:400;line-height:inherit;box-shadow:none!important;animation:none}
+.v2 .badge:before{content:"\25cf\00a0"}
+.v2 .badge+*:before{content:"\00a0\00b7\00a0"}
+.v2 .dl .sig{flex:0 0 auto}
+.v2 .dl .sig:empty{display:none}
+.v2 .dl .acts{flex:0 0 auto;display:flex;gap:.55rem}
+.v2 .dl button{min-width:0;padding:.78rem 1.45rem;font-size:1.22rem}
+.v2 #devlist button.act{background:var(--lime);color:#121117;border-color:var(--lime)}
+.v2 #blkaddr{flex:1 1 auto;min-width:0;min-height:0;padding:.9rem 1.1rem;font:inherit;font-size:1.22rem;color:var(--ink);background:var(--card);border:2px solid var(--edge2);border-radius:.67rem;transform:none}
+.v2 #pg0 .btns{display:flex;gap:.78rem;margin:0 0 .9rem}
+.v2 #pg0 .btns button{flex:0 0 auto}
+.v2 #pg0 .stack>.card{flex:0 1 auto}
+/* sliders: smooth rounded bars */
+.v2 input[type=range]{display:block;width:100%;height:1.67rem;margin:0;border-radius:.45rem;overflow:hidden;background:none;accent-color:var(--sl);-webkit-appearance:none;appearance:none}
+.v2 input[type=range]::-webkit-slider-runnable-track{height:1.67rem;background:#0e0d12;border-radius:.45rem;box-shadow:none}
+.v2 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:.35rem;height:1.67rem;border-radius:.45rem;background:var(--sl,var(--ember));box-shadow:-100vw 0 0 100vw var(--sl,var(--ember))}
+[dir=rtl] .v2 input[type=range]::-webkit-slider-thumb{box-shadow:100vw 0 0 100vw var(--sl,var(--ember))}
+.v2 input[type=range]::-moz-range-track{height:1.67rem;background:#0e0d12;border-radius:.45rem}
+.v2 input[type=range]::-moz-range-progress{height:1.67rem;background:var(--sl,var(--ember));border-radius:.45rem}
+.v2 input[type=range]::-moz-range-thumb{width:.35rem;height:1.67rem;border:0;border-radius:.45rem;background:var(--sl,var(--ember))}
+.v2 input[type=range]:focus{box-shadow:0 0 0 3px rgba(244,239,230,.35)}
+.v2 #gain,.v2 #hs{--sl:var(--ember)}
+.v2 #lat{--sl:var(--rose)}
+/* toggles */
+.v2 .sw{width:3.33rem;height:1.78rem;margin-inline-start:1.1rem;border-radius:1rem;background:var(--edge2);border:0;flex:0 0 auto;position:relative}
+.v2 .sw:after{top:.28rem;left:.28rem;width:1.22rem;height:1.22rem;border-radius:50%;background:var(--mute);box-shadow:none}
+[dir=rtl] .v2 .sw:after{left:auto;right:.28rem}
+.v2 .night.on .sw{background:var(--rose);border:0}
+.v2 .night.on .sw:after{left:1.83rem;background:#121117;box-shadow:none}
+[dir=rtl] .v2 .night.on .sw:after{left:auto;right:1.83rem}
+.v2 button.night{display:flex;align-items:center;justify-content:space-between;width:100%;margin:0;padding:1.1rem 1.33rem;min-height:0;text-align:start;background:var(--card);border:2px solid var(--edge);border-radius:.78rem;white-space:normal}
+.v2 button.night.on{background:var(--card);border-color:var(--edge)}
+.v2 button.night:focus{border-color:var(--ink2)}
+.v2 .night b{font-size:1.45rem;font-weight:700;line-height:1.25}
+.v2 .night small{display:block;font-size:1.05rem;font-weight:400;color:var(--mute)}
+/* home: headset panel */
+.v2 #hspanel{position:relative;display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;overflow:hidden;padding:1.78rem;box-sizing:border-box;background:var(--deck);border:1px solid var(--edge);border-inline-start:4px solid var(--lime);border-radius:1rem;clip-path:none!important;box-shadow:none;margin:0;transform:none;--acc:var(--lime)}
+.v2 #hspanel:before,.v2 #hspanel:after{display:none}
+.v2 #hspanel>*{order:0}
+.v2 #hspanel .label,.v2 #hspanel .sub{margin:0 0 1rem;font-size:1rem;font-weight:800;letter-spacing:.17rem;text-transform:uppercase;line-height:1.3;padding:0;border:0;background:none}
+.v2 #hspanel .label{color:var(--lime)}
+.v2 #hspanel .label:before,.v2 #hspanel .sub:before{display:none}
+.v2 #hspanel .hhead{margin:0;padding:0;border:0;display:block}
+.v2 #hspanel .now{display:flex;align-items:center;gap:1.33rem;margin:0 0 1.33rem;padding:0;background:none;border:0;min-width:0}
+.v2 #hspanel .nowico{flex:0 0 auto;width:4.9rem;height:4.9rem;display:flex;align-items:center;justify-content:center;border-radius:.67rem;background:rgba(159,217,106,.15);border:2px solid var(--lime);color:var(--ink);transform:none;box-shadow:none}
+.v2 #hspanel .nowico svg{width:2.5rem;height:2.5rem;transform:none}
+.v2 #hspanel .nowt{flex:1 1 auto;min-width:0}
+.v2 #hspanel .dev{margin:0;font-size:2.2rem;font-weight:700;line-height:1.2;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none;letter-spacing:normal}
+.v2 #hspanel .nows{margin:.1rem 0 0;font-size:1.33rem;font-weight:700;color:var(--gold)}
+.v2 #hspanel .nows.ok{color:var(--lime)}
+.v2 #hspanel .nows:before{content:"\25cf\00a0"}
+.v2 #hspanel .nows:empty{display:none}
+.v2 #hspanel.off .nowico{background:var(--card);border-color:var(--edge2);color:var(--mute)}
+.v2 #hsconn{flex:0 0 auto;padding:1.22rem 1.9rem;font-size:1.45rem}
+.v2 #hsconn.act{background:var(--lime);color:#121117}
+.v2 #hspanel .hsinfo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-gap:.78rem;margin:0 0 1.55rem;padding:0;border:0}
+.v2 #hspanel .hsi{display:block;padding:1.1rem 1.33rem;background:var(--card);border:2px solid var(--edge);border-radius:.78rem;min-width:0}
+.v2 #hspanel .hsi .k{display:block;font-size:1.05rem;color:var(--mute);font-weight:400;letter-spacing:normal;text-transform:none;margin:0}
+.v2 #hspanel .hsi .v{display:block;font-size:1.45rem;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
+.v2 #lqm{color:var(--lime)}
+.v2 #hspanel .hsi .bars,.v2 #hspanel .hsi .bat{display:none}
+.v2 #hspanel .hsi .batt,.v2 #hspanel .hsi .lq{display:inline;font-size:inherit;padding:0;margin:0}
+.v2 #hspanel.off .hsinfo{display:none}
+.v2 #hspanel #stats{display:none!important}
+.v2 #hspanel .idle2{flex:0 0 auto;margin:0 0 1.55rem;font-size:1.33rem;font-weight:700;text-align:center;padding:1.8rem 1rem;border:2px dashed var(--edge2);border-radius:.78rem;color:var(--mute);text-transform:none;letter-spacing:normal}
+.v2 #hspanel .sub{color:var(--mute)}
+.v2 #hspanel .qs{display:flex;flex-direction:column;gap:.78rem;flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;margin:0;padding:0}
+.v2 #hspanel .qs button{display:flex;flex-direction:row;align-items:center;gap:1.1rem;flex:0 0 auto;width:100%;min-height:0;padding:1.1rem 1.33rem;text-align:start;background:var(--card);border:2px solid var(--edge);border-radius:.78rem;color:var(--ink);white-space:normal}
+.v2 #hspanel .qs button.act,.v2 #hspanel .qs button.cur{background:var(--card);border-color:var(--lime);color:var(--ink)}
+.v2 #hspanel .qs button:focus{border-color:var(--ink);box-shadow:0 0 0 3px rgba(244,239,230,.28)}
+.v2 .qs .qi{flex:0 0 auto;width:2.9rem;height:2.9rem;display:flex;align-items:center;justify-content:center;border-radius:.67rem;background:var(--edge);color:var(--ink2)}
+.v2 .qs .qi svg{width:1.6rem;height:1.6rem}
+.v2 .qs .qt{flex:1 1 auto;min-width:0;display:block}
+.v2 #hspanel .qs button b{display:block;font-size:1.45rem;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2 #hspanel .qs button small,.v2 #hspanel .qs button.act small{display:block;font-size:1.05rem;font-weight:400;color:var(--mute)}
+.v2 .qs .qsw{flex:0 0 auto;padding:.78rem 1.45rem;font-size:1.22rem;font-weight:700;border-radius:.67rem;background:var(--lime);color:#121117}
+.v2 #hspanel .hsb{display:flex;margin:.78rem 0 0;grid-template-columns:none}
+.v2 #addhs{flex:0 0 auto;padding:1.22rem 1.9rem;font-size:1.45rem}
+.v2 #addhs:before{display:inline!important;content:"+\00a0";position:static;background:none;border:0;transform:none}
+/* home: sound panel */
+.v2 .mainctl{height:100%;display:flex;flex-direction:column;overflow:hidden;--acc:var(--ember);border-inline-start:4px solid var(--ember)}
+.v2 .mainctl .phead{display:flex;align-items:center;margin:0;padding:0;border:0}
+.v2 .mainctl .phead .label{margin:0;color:var(--ember)}
+.v2 .mainctl .phead button,.v2 #mute{margin-inline-start:auto;padding:1.22rem 1.9rem;font-size:1.45rem}
+.v2 #mute.ember{background:var(--ember);color:#121117}
+.v2 .mainctl .vol{margin:0;padding:0;border:0;background:none}
+.v2 .mainctl .vrow{margin:0;padding:0;border:0;background:none}
+.v2 .mainctl .row,.v2 .latp .row{display:flex;justify-content:space-between;align-items:baseline;margin:1.1rem 0 .5rem;font-size:1.22rem;color:var(--ink2);padding:0;border:0;gap:1rem}
+.v2 .mainctl .row .cl{font-size:1.22rem;font-weight:400;color:var(--ink2);text-transform:none;letter-spacing:normal}
+.v2 .mainctl .big{font-size:1.67rem;font-weight:700;color:var(--ember);line-height:1.1}
+.v2 .sync{font-size:.85rem;margin-inline-start:.55rem}
+.v2 .vnote{display:block;font-size:.95rem;color:var(--mute);margin-top:.33rem}
+.v2 .vnote:empty{display:none}
+.v2 .latp{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;margin:1.55rem 0 0;padding:1.1rem 0 0;border:0;border-top:1px solid var(--edge);background:none}
+.v2 .latp>.sub{grid-column:1;grid-row:1;margin:0;color:var(--rose)}
+.v2 .latp .lbuf{grid-column:1/3;grid-row:2;margin:1.22rem 0 .55rem}
+.v2 .latp .latm{display:contents}
+.v2 .latp .lt{display:contents}
+.v2 #latauto{grid-column:2;grid-row:1;padding:.78rem 1.45rem;font-size:1.22rem}
+.v2 #latauto.act{background:var(--rose);border-color:var(--rose);color:#121117}
+.v2 #lat{grid-column:1/3;grid-row:3}
+.v2 #latt{grid-column:2;grid-row:2;font-size:1.67rem;font-weight:700;color:var(--rose);line-height:1.1;align-self:center;margin:.66rem 0 0}
+.v2 .latp .latm>.row{grid-column:1/3;grid-row:4}
+.v2 .latp .big{color:var(--rose)}
+.v2 .est{display:inline-block;margin-inline-start:.55rem;font-size:.83rem;background:var(--edge);border-radius:.33rem;padding:.17rem .45rem;color:var(--ink2);letter-spacing:.06rem;text-transform:uppercase;vertical-align:middle;border:0}
+.v2 .llsave{font-size:1rem;margin-inline-start:.45rem}
+.v2 .mainctl .quick{margin:1.55rem 0 0;padding:1.33rem 0 0;border-top:1px solid var(--edge);flex:0 0 auto}
+.v2 .qhead{display:flex;align-items:center;gap:1rem}
+.v2 .mainctl .quick .sub{margin:0;color:var(--violet)}
+.v2 .qhint{margin-inline-start:auto;font-size:1rem;color:var(--mute);text-transform:none;letter-spacing:normal;font-weight:400}
+.v2 .qpre,.v2 .presets{display:flex;flex-wrap:wrap;gap:.55rem;margin:.9rem 0}
+.v2 .qpre button,.v2 .presets button{min-height:0;margin:0;padding:.67rem 1rem;font-size:1.05rem;line-height:1.2;white-space:nowrap}
+.v2 .qpre button.act,.v2 .presets button.act,.v2 .eqp.off .presets button.act{background:rgba(255,255,255,.04);border-color:var(--violet);color:var(--violet)}
+.v2 .qpre button.act:after,.v2 .presets button.act:after{content:none}
+.v2 .qpre button.act,.v2 .presets button.act{padding-inline-start:1rem}
+.v2 .qpre button.act>*,.v2 .presets button.act>*{display:none}
+.v2 .qrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-gap:.67rem;margin:0;align-items:stretch}
+.v2 .qrow.one{grid-template-columns:minmax(0,1fr)}
+.v2 .qrow .night{padding:.78rem 1.33rem}
+.v2 .qrow .night b{font-size:1.22rem}
+.v2 .qrow .sw{width:3.33rem;height:1.78rem}
+.v2 .qrow .gline{display:flex;align-items:center;gap:.67rem;margin:0;min-width:0;padding:.45rem .45rem .45rem 1rem;background:var(--card);border:2px solid var(--rose);border-radius:.67rem;color:var(--rose);font-size:1.1rem;font-weight:700}
+.v2 .qrow .gline #gltxt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2 .gline .gic{flex:0 0 auto}
+.v2 button.gup{margin:0;padding:.55rem .9rem;font-size:1rem;background:var(--rose);border-color:var(--rose);color:#121117;min-height:0}
+.v2 button.gup[disabled]{background:none;border-color:var(--edge2);color:var(--mute);opacity:1}
+/* sound & games */
+.v2 #pg1 .eqp{flex:0 1 auto;--acc:var(--violet)}
+.v2 #pg1 .eqhead{display:flex;align-items:center;margin:0;padding:0;border:0}
+.v2 #pg1 .eqhead .cl{font-size:1rem;font-weight:800;letter-spacing:.17rem;text-transform:uppercase;color:var(--violet)}
+.v2 #eqon{margin-inline-start:auto;padding:.78rem 1.45rem;font-size:1.22rem}
+.v2 #eqon.act{background:var(--violet);border-color:var(--violet);color:#121117}
+.v2 #pg1 .eqbox{display:block;margin:0;padding:0;border:0;background:none}
+.v2 #pg1 .eqp .curve{height:6.1rem;margin:1rem 0 .45rem;background:#0e0d12;border-radius:.55rem;overflow:hidden;border:0}
+.v2 #pg1 .eqp .curve svg{width:100%;height:100%;display:block}
+.v2 #pg1 .eqp .bands{display:block;margin:0;padding:0}
+.v2 #pg1 .eqp .band{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n v" "s s";grid-gap:.33rem 1rem;align-items:baseline;min-height:0;margin:.67rem 0 0;padding:0;border:0;background:none}
+.v2 #pg1 .band .bn{grid-area:n;display:flex;align-items:center;gap:.45rem;font-size:1.22rem;font-weight:400;color:var(--c);text-transform:none;letter-spacing:normal}
+.v2 #pg1 .band .bn i{display:block;width:.67rem;height:.67rem;border-radius:50%;background:var(--c);transform:none;box-shadow:none}
+.v2 #pg1 .band .bv{grid-area:v;font-size:1.33rem;font-weight:700;color:var(--c);text-align:end;min-width:0}
+.v2 #pg1 .band input[type=range]{grid-area:s;height:.9rem;border-radius:.45rem;margin:0}
+.v2 #pg1 .band input[type=range]::-webkit-slider-runnable-track{height:.9rem;border-radius:.45rem;background:var(--trk,#0e0d12);box-shadow:none}
+.v2 #pg1 .band input[type=range]::-webkit-slider-thumb{width:.9rem;height:.9rem;border-radius:50%;background:var(--c);box-shadow:none}
+.v2 #pg1 .band input[type=range]::-moz-range-track{height:.9rem;border-radius:.45rem;background:var(--trk,#0e0d12)}
+.v2 #pg1 .band input[type=range]::-moz-range-progress{background:none}
+.v2 #pg1 .band input[type=range]::-moz-range-thumb{width:.9rem;height:.9rem;border-radius:50%;background:var(--c)}
+.v2 #pg1 .eqp .presets{margin:1.1rem 0 0}
+.v2 #pg1 .games{flex:0 1 auto;--acc:var(--rose)}
+.v2 #pg1 .games .gsec{margin:0;padding:0;border:0;display:flex;flex-direction:column;min-height:0;background:none}
+.v2 #pg1 .gsec>.note{display:none}
+.v2 #pg1 .game{display:flex;align-items:center;gap:1.1rem;margin:0 0 .78rem;padding:1.1rem 1.33rem;background:var(--card);border:2px solid var(--rose);border-radius:.78rem}
+.v2 #pg1 .game.none{border-color:var(--edge)}
+.v2 #pg1 .game .gic{flex:0 0 auto;width:2.9rem;height:2.9rem;border-radius:.67rem;transform:none}
+.v2 #pg1 .gtx{flex:1 1 auto;min-width:0;display:block}
+.v2 #pg1 #gname{display:block;font-size:1.45rem;font-weight:700;line-height:1.25;color:var(--ink)}
+.v2 #pg1 .gchip{display:inline-block;margin:.15rem 0 0;font-size:1.05rem;font-weight:400;color:var(--mute);background:none;border:0;padding:0;text-transform:none;letter-spacing:normal}
+.v2 #pg1 #gbtns{flex:0 0 auto;display:flex;gap:.55rem;margin:0}
+.v2 #pg1 #gsave.act{background:var(--rose);border-color:var(--rose);color:#121117}
+.v2 #pg1 .gsec>.sub{margin:.45rem 0 .67rem;color:var(--mute)}
+.v2 #pg1 .glist{flex:0 1 auto;min-height:0;overflow-y:auto}
+.v2 #pg1 .glist .empty{padding:.78rem}
+.v2 .grow{background:var(--card);border:2px solid var(--edge);border-radius:.78rem;margin:0 0 .55rem;padding:.78rem 1rem}
+.v2 .grow.on{border-color:var(--rose)}
+.v2 .grow button,.v2 .hchip button{padding:.45rem .8rem;font-size:1rem}
+.v2 #pg1 .more{flex:0 0 auto;gap:.78rem}
+.v2 #pg1 .more .label{margin:0 0 .22rem;color:var(--ink2)}
+.v2 #pg1 .more .btns{grid-template-columns:1fr 1fr;grid-auto-flow:row;margin:0}
+.v2 #pg1 .more .btns button{padding:1rem 1.45rem}
+.v2 #tone.act{background:var(--lime);color:#121117}
+/* connection */
+.v2 #pg2 .conn{--acc:var(--ember)}
+.v2 #pg2 .seg{display:grid;grid-auto-flow:row;grid-template-columns:1fr 1fr;grid-gap:.67rem;margin:0 0 .67rem}
+.v2 #pg2 #codecs{grid-template-columns:repeat(4,minmax(0,1fr))}
+.v2 #pg2 .seg:empty{display:none}
+.v2 #pg2 .seg button{padding:1.1rem .6rem;font-size:1.28rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2 .seg button.act,.v2 #pg2 .seg button.act{background:rgba(255,255,255,.04);border-color:var(--acc);color:var(--acc)}
+.v2 .seg button.act:after{content:none}
+.v2 .seg button.cur{border-color:rgba(159,217,106,.6)}
+.v2 .seg button[disabled],.v2 .seg button.no{color:var(--mute);opacity:.4;border-style:solid}
+.v2 #pg2 #admsg:empty,.v2 .cno:empty{display:none}
+.v2 .chiprow{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:.45rem 0 0;padding:.9rem 0;border-bottom:1px solid var(--edge);font-size:1.22rem}
+.v2 .chiprow .k{font-size:1.22rem;color:var(--ink2);font-weight:400;text-transform:none;letter-spacing:normal}
+.v2 .chiprow .v{font-weight:700;color:var(--ink);text-align:end}
+.v2 #pg2 .conn .lbl2{margin-top:1.9rem}
+.v2 #pg2 #codecnote{margin-top:.33rem;font-size:.95rem}
+.v2 #pg2 .status{--acc:var(--cyan)}
+.v2 .shead{display:flex;align-items:baseline}
+.v2 .shead .label{color:var(--cyan)}
+.v2 .shead .diag{font-size:1.05rem;color:var(--mute);text-decoration:none;opacity:1;margin:0}
+.v2 .shead .diag:focus,.v2 .shead .diag:hover{color:var(--cyan);text-decoration:underline}
+.v2 #pg2 .kv{display:grid;grid-template-columns:auto minmax(0,1fr);margin:0;border:0}
+.v2 #pg2 .kv>*{min-height:0;padding:.75rem 0;margin:0;border:0;border-bottom:1px solid var(--edge);font-size:1.22rem;display:flex;align-items:center;flex-wrap:wrap}
+.v2 #pg2 .kv>.k{color:var(--ink2);font-weight:400;padding-inline-end:1.33rem;text-transform:none;letter-spacing:normal}
+.v2 #pg2 .kv>.v,.v2 #pg2 .kv>.chips{justify-content:flex-end;text-align:end;font-weight:700;color:var(--ink)}
+.v2 .chip{background:none!important;border:0!important;padding:0!important;margin:0!important;color:inherit!important;font-weight:700;font-size:inherit;transform:none;box-shadow:none!important}
+.v2 .chip+.chip:before{content:"\00a0\00b7\00a0"}
+.v2 .meters{display:grid;grid-template-columns:1fr 1fr;grid-gap:1.33rem;margin:.9rem 0 0}
+.v2 .mrow{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 .45rem;font-size:1.22rem}
+.v2 .mrow .k{color:var(--ink2);font-weight:400;font-size:1.22rem;text-transform:none;letter-spacing:normal}
+.v2 .mrow .v{font-size:1.45rem;font-weight:700}
+.v2 .meter{height:1rem;border-radius:.45rem;background:#0e0d12;margin:0}
+.v2 .meter:after{display:none}
+.v2 .meter div{border-radius:.45rem;background:var(--lime);box-shadow:none}
+.v2 #pg2 .status .lbl2{margin:1.1rem 0 .45rem;color:var(--ink2);font-size:1.22rem;font-weight:400;letter-spacing:normal;text-transform:none}
+.v2 #latnote{display:none}
+.v2 .latd .lbar,.v2 .lbar{height:1rem;border-radius:.45rem;margin:0 0 .45rem;background:#0e0d12}
+.v2 .lbar i+i{border:0}
+.v2 .lkeys{font-size:.95rem;color:var(--mute)}
+.v2 #pg2 .logp{padding:0;margin:1.1rem 0 0;background:none;border:0;border-radius:0;flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.v2 #pg2 .logp .label{color:var(--cyan);margin:0 0 .67rem}
+.v2 #pg2 .evlog{flex:1 1 auto;min-height:3.5rem;max-height:none;overflow-y:auto;background:#0e0d12;border-radius:.55rem;padding:.78rem 1rem;font-size:1rem;line-height:1.6}
+.v2 #pg2 .evlog div{border:0;padding:0}
+.v2 .evlog .good{color:var(--lime)}.v2 .evlog .bad{color:var(--bad)}.v2 .evlog .press{color:var(--cyan)}
+.v2 #pg2 .cols{grid-template-rows:minmax(0,1fr);align-items:stretch}
+.v2 #pg2 .cols>.card{max-height:none;height:100%}
+.v2 .pfoot{flex:0 0 auto;display:flex;margin:1.22rem 0 0}
+.v2 #pg2 #stop{padding:.78rem 1.45rem;font-size:1.22rem}
+/* backup */
+.v2 #pg3 .bkw{--acc:var(--gold)}
+.v2 #pg3 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);grid-gap:.67rem;margin:0}
+.v2 #pg3 .seg button{padding:1.22rem .6rem;font-size:1.28rem}
+.v2 #pg3 .seg button.act{background:rgba(255,255,255,.04);border-color:var(--gold);color:var(--gold)}
+.v2 #pg3 .bkgo{display:grid;grid-template-columns:1fr 1fr;grid-gap:.67rem;margin:1.55rem 0 0}
+.v2 #pg3 .bkgo button{padding:1.22rem 1.9rem;font-size:1.45rem;min-height:0}
+.v2 #pg3 .bkgo button.act{background:var(--gold);border-color:var(--gold);color:#121117}
+.v2 .bkmsg{margin:.67rem 0 0;font-size:1.05rem}
+.v2 .bkmsg:empty{display:none}
+.v2 #pg3 .bkr .label{color:var(--ink2)}
+.v2 .bklist{overflow-y:auto;min-height:0;flex:0 1 auto}
+.v2 .bklist button{display:flex;width:100%;justify-content:space-between;margin:0;padding:.9rem 0;background:none;border:0;border-bottom:1px solid var(--edge);border-radius:0;font-size:1.22rem;font-weight:400;color:var(--ink2);text-align:start}
+.v2 .bklist button:focus,.v2 .bklist button.act{color:var(--gold);box-shadow:none;background:none}
+.v2 .bkr .note{margin:1rem 0 0}
+/* messages */
+.v2 .msg{border-radius:.78rem;transform:none}
+.v2 .toast{border-radius:.78rem;transform:none}
+@media(max-width:1000px){.v2 .shell{grid-template-columns:4.6rem minmax(0,1fr)}.v2 .rail{padding:.8rem .5rem}.v2 .rail .tabs button span,.v2 .rail .menufoot,.v2 #langcur{display:none}.v2 .rail .tabs button,.v2 #langbtn{justify-content:center;padding:.9rem 0}.v2 .view{padding:1rem}.v2 .cols,.v2 #home{grid-template-columns:minmax(0,1fr);height:auto}.v2 .view,.v2 .pages,.v2 .card{overflow-y:auto}.v2 #hspanel .hsinfo{grid-template-columns:1fr 1fr 1fr}}
+.v2 #hvnote{display:none}
+.v2 .qrow{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr)}
+.v2 .qrow .gline{font-size:1rem}
+.v2 .qrow .gline .gic{width:1.8rem;height:1.8rem}
+.v2 .qpre button{padding:.6rem .85rem;font-size:1rem}
+.v2 #hspanel.off .now{flex-direction:column;justify-content:center;text-align:center;gap:.55rem;padding:2.2rem 1.5rem;margin:0 0 1.55rem;border:2px dashed var(--edge2);border-radius:.78rem;background:var(--card)}
+.v2 #hspanel.off .nowico{background:none;border:0;color:var(--ink2);width:auto;height:auto}
+.v2 #hspanel.off .nowico svg{width:3rem;height:3rem}
+.v2 #hspanel.off .nowt{flex:0 0 auto;max-width:100%}
+.v2 #hspanel.off .dev{font-size:1.9rem;white-space:normal}
+.v2 #hspanel.off .nows{color:var(--mute);font-weight:400;font-size:1.15rem}
+.v2 #hspanel.off .nows:before{content:none}
+.v2 #hspanel.off #hsconn{margin-top:.8rem;background:var(--lime);border-color:var(--lime);color:#121117;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.v2 #hspanel .idle2{display:none!important}
+.v2 #mute{padding:.9rem 1.45rem}
+.v2 .qrow .night b{white-space:nowrap}
+.v2 .qrow{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}
+.v2 .brand h1{white-space:nowrap}
+.v2 #hspanel .label:after,.v2 #hspanel .sub:after,.v2 #hspanel .hhead:after,.v2 #hspanel .hhead:before{display:none!important}
+.v2 #hspanel .hhead{margin:0}
+.v2 .chiprow{order:0;border-top:0;margin:.3rem 0 .4rem}
+.v2 .qhead{display:flex;align-items:baseline;gap:.8rem;min-width:0}
+.v2 .qhead .sub{flex:0 0 auto}
+.v2 .qhint{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:end}
+@media(max-width:1000px),(max-aspect-ratio:4/3){
+html{font-size:14px!important}
+.v2 .view,.v2 .rail{max-width:820px;margin-left:auto!important;margin-right:auto!important;width:100%;box-sizing:border-box}
+.v2 #hspanel .hsinfo .v{overflow-wrap:normal!important;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v2 header .live{display:flex!important;justify-content:center!important;gap:.35rem}
+.v2 header .live>*{flex:0 0 auto!important;width:auto!important}
+.v2 #home>.c2{order:2}
+.v2 #hspanel .now{flex-wrap:wrap}
+.v2 #hspanel .nowt{flex:1 1 10rem;min-width:0}
+.v2 #hspanel .dev{white-space:normal!important;overflow:visible;font-size:1.4rem}
+.v2 #hspanel:not(.off) #hsconn{flex:1 1 100%;margin:0}
+.v2 #hspanel .hsinfo .v{white-space:normal;overflow-wrap:anywhere}
+.v2 header{height:auto!important;display:flex!important;flex-wrap:wrap!important;overflow:visible!important}
+.v2 header .live,.v2 #state{position:static!important;flex:1 1 100%;text-align:center;justify-content:center}
+body{max-height:none!important;height:auto!important}
+.v2 #home>.col,.v2 #home>*{display:flex!important;flex-direction:column;height:auto!important;min-height:auto!important;flex:none!important}
+.v2 #home>.col>*{flex:none!important;height:auto!important}
+.v2.wrap,.v2 .view,.v2 .dmain,.v2 .pages{display:block!important;height:auto!important;min-height:0;flex:none!important}
+.v2 .pg.on{display:flex!important;flex-direction:column;height:auto!important;flex:none!important}
+.v2 .pg.on>*,.v2 .cols>*,.v2 .stack>*{flex:none!important;min-height:auto!important}
+.v2 .cols,.v2 #home{grid-template-rows:none!important;grid-auto-rows:auto!important}
+.v2 .stack{display:flex!important;flex-direction:column;gap:.8rem;height:auto!important}
+html,body{height:auto!important;overflow:auto!important}
+.v2.wrap{height:auto!important;max-height:none!important;min-height:100vh;overflow:visible!important}
+.v2 header{height:auto;min-height:3.6rem;padding:.6rem .9rem;flex-wrap:wrap;gap:.5rem}
+.v2 .brand p,.v2 .brand small{display:none}
+.v2 .live{font-size:.9rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2 .shell{display:block!important;height:auto!important}
+.v2 .rail{position:sticky;top:0;z-index:20;height:auto!important;display:flex!important;flex-direction:row!important;align-items:center;gap:.3rem;padding:.4rem!important;border-right:0;border-bottom:1px solid var(--edge);background:var(--deck)}
+.v2 .rail .tabs{display:flex!important;flex-direction:row!important;flex:1 1 auto;gap:.25rem;min-width:0}
+.v2 .rail .tabs button{flex:1 1 0;flex-direction:column;justify-content:center!important;gap:.2rem;min-height:3.4rem;padding:.4rem .1rem!important;font-size:.72rem;text-align:center;line-height:1.1}
+.v2 .rail .tabs button span{display:block!important}
+.v2 .rail .menufoot,.v2 #langcur{display:none!important}
+.v2 #langbtn{flex:0 0 auto;width:auto;padding:.6rem!important;margin:0}
+.v2 .view{padding:.8rem!important;height:auto!important;overflow:visible!important}
+.v2 .pages,.v2 .pg,.v2 #home{height:auto!important;max-height:none!important;overflow:visible!important}
+.v2 .cols,.v2 #home{display:grid!important;grid-template-columns:minmax(0,1fr)!important;height:auto!important;gap:.8rem}
+.v2 .card,.v2 .panel,.v2 #hspanel,.v2 .stack{height:auto!important;max-height:none!important;overflow:visible!important;padding:1rem!important}
+.v2 .ph{flex-wrap:wrap;gap:.5rem}
+.v2 .ph h2{font-size:1.6rem}
+.v2 #scan{width:100%}
+.v2 .dl,.v2 .row,.v2 #game{flex-wrap:wrap}
+.v2 .dl .btns,.v2 #gbtns{flex-wrap:wrap}
+.v2 #hspanel .hsinfo{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.v2 .qrow{grid-template-columns:minmax(0,1fr)!important}
+.v2 .qhint{display:none}
+.v2 .seg{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.v2 .pfoot{margin-top:.8rem}
+}
+@media(max-width:1000px),(max-aspect-ratio:4/3){
+.v2 .rail{position:fixed!important;top:auto!important;bottom:0!important;left:0;right:0;z-index:50;border-bottom:0!important;border-inline-end:0;border-top:1px solid var(--edge);padding:.4rem .4rem calc(.4rem + env(safe-area-inset-bottom))!important;box-shadow:0 -6px 18px rgba(0,0,0,.35);max-width:none!important;width:100%!important;margin:0!important;background:var(--deck)}
+.v2 .view{padding-bottom:calc(6.2rem + env(safe-area-inset-bottom))!important}
+.v2 #langlist{z-index:60;max-height:min(24rem,calc(100dvh - 7rem));overflow-y:auto}
+.v2 .seg,.v2 #pg2 .seg,.v2 #pg3 .seg{grid-auto-flow:row!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.v2 .seg button,.v2 #pg2 .seg button,.v2 #pg3 .seg button{white-space:normal;overflow:visible;text-overflow:unset;line-height:1.15}
+}
 </style>
 </head>
-<body><div class="wrap">
+<body><div class="wrap v2">
 <header class="bar">
-<button type="button" id="setbtn" aria-haspopup="true"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2.6" fill="none"/></svg><span data-i18n="settings">Settings</span></button>
 <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span>
 <div><h1>Hear<b>Bridge</b></h1><div class="meta"><span class="ver" id="ver">-</span><span class="by">Developed by X-F1REBALL-X</span></div></div></div>
-<button type="button" id="advbtn" data-i18n="tabDetails">Details</button>
-<div class="live" id="live"><i></i><span id="state">-</span></div>
-<div class="hdr"><div id="langbox"><button type="button" id="langbtn" aria-haspopup="true"><span data-i18n="language">Language</span></button><div id="langlist" role="menu"></div></div></div>
+<span class="sp"></span>
+<div class="live" id="live"><i></i><span id="state">-</span><span id="livedev"></span></div>
 </header>
 <div class="msg" id="msg"></div><div class="toast" id="toast"></div>
-<main class="grid">
-<section class="hero" id="hspanel"><p class="label" data-i18n="headsetPanel">Headset</p>
-<div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><p class="dev" id="dev">-</p></div>
-<div class="hsinfo"><span class="hsi"><span class="k" data-i18n="battery">Battery</span><span class="v" id="batm">-</span></span><span class="hsi"><span class="k" data-i18n="signal">Signal</span><span class="v" id="lqm">-</span></span></div>
+<div class="shell">
+<aside class="rail" id="setm" aria-label="Settings">
+<nav class="tabs" id="tabs">
+<button type="button" class="home on" id="tbhome" style="--c:var(--ink)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M6 10v10h4.5v-6h3v6H18V10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg><span data-i18n="home">Home</span></button>
+<button type="button" id="tb0" style="--c:var(--lime)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg><span data-i18n="tabHeadsets">Headsets</span></button>
+<button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="tabSound">Sound &amp; games</span></button>
+<button type="button" id="tb2" style="--c:var(--ember)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M6 16v-5M11 16V6M16 16v-8M21 16v-3" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="connection">Connection</span></button>
+<button type="button" id="tb3" style="--c:var(--gold)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 9l5 5 5-5M4 17v4h16v-4" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="bkBtn">Backup</span></button>
+</nav>
+<div class="hdr"><div id="langbox"><button type="button" id="langbtn" aria-haspopup="true" aria-label="Language"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="2"/></svg><span id="langcur">English</span></button><div id="langlist" role="menu"></div></div></div>
+<div class="menufoot"><span data-i18n="footer">Closing this page leaves HearBridge running.</span></div>
+</aside>
+<div class="view">
+<main class="grid" id="home"><section class="hero card" id="hspanel" style="--acc:var(--lime)"><div class="hhead"><p class="label" data-i18n="headsetPanel">Headset</p></div><div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><span class="nowt"><p class="dev" id="dev">-</p><p class="nows" id="nows"></p></span><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button></div>
+<div class="hsinfo"><span class="hsi"><span class="k" data-i18n="battery">Battery</span><span class="v" id="batm">-</span></span><span class="hsi"><span class="k" data-i18n="signal">Signal</span><span class="v" id="lqm">-</span></span><span class="hsi"><span class="k" data-i18n="adapterShort">Adapter</span><span class="v" id="adm">-</span></span></div>
 <div id="stats" style="display:none"><div class="kv hskv">
 <span class="k" data-i18n="format">Format</span><span class="chips" id="fmt">-</span>
 <span class="k" data-i18n="link">Link quality</span><span class="v" id="lqv">-</span>
 </div></div>
-<p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p>
-<p class="sub" data-i18n="switchHs">Switch headset</p>
-<div class="qs" id="qs"></div>
-<div class="btns hsb"><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button><button type="button" id="addhs" data-i18n="addHs">Add headset</button><button type="button" id="mainscan" class="act" data-i18n="scan">Scan for devices</button></div>
-</section>
-<div class="col c2">
-<section class="panel mainctl eqp" id="eqp"><div class="phead"><p class="label" data-i18n="sound">Sound</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div>
-<div class="vol volin"><div class="vrow"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
+<p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p><p class="sub" id="yourhs" data-i18n="yourHs">Your headsets</p><div class="qs" id="qs"></div><div class="btns hsb"><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div></section><div class="col c2"><section class="panel mainctl card" id="sndp" style="--acc:var(--ember)"><div class="phead"><p class="label" data-i18n="sound">Sound</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div><div class="vol volin"><div class="vrow"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
 <input type="range" id="gain" min="0" max="500" step="10"></div>
 <div class="vrow"><div class="row"><span class="cl"><span data-i18n="headset">Headset volume (AVRCP)</span><span class="sync" id="hsync" data-i18n="fromHeadset">from headset</span></span><span class="big" id="hv">-</span></div>
 <input type="range" id="hs" min="0" max="127" step="1"><small class="vnote" id="hvnote"></small></div>
 </div>
 
-<div class="latp latin"><p class="sub" data-i18n="latency">Latency</p>
+<div class="latp latin"><p class="sub" data-i18n="latency">Latency</p><div class="row lbuf"><span class="cl" data-i18n="latTarget">Buffer target</span></div>
 <div class="latm"><div class="lt lt1 la"><button type="button" id="latauto" class="sm" data-i18n="codecAuto">Auto</button><input type="range" id="lat" min="40" max="400" step="1"><span class="v" id="latt">-</span></div>
 <div class="row"><span class="cl"><span data-i18n="latEst">Delay to your ears</span><span class="est" data-i18n="estimate">estimate</span></span><span class="big"><span id="latv">-</span><span class="llsave" id="llsave"></span></span></div>
 </div>
-</div>
-<div class="advfoot"><button type="button" id="advbtn2" data-i18n="tabDetails">Details</button></div>
-</section>
-</div>
-</main>
-<div class="advov" id="advbox" role="dialog" aria-modal="true" aria-label="Details"><div class="advpanel"><div class="advhead"><p class="label" data-i18n="tabDetails">Details</p><button type="button" id="advclose" data-i18n="home">Home</button></div><section class="panel eqp" style="--acc:var(--violet)"><p class="label" data-i18n="equalizer">Equalizer</p><div class="gline" id="gline" style="display:none"><span class="gic sm" id="glic"></span><span id="gltxt">-</span><button type="button" id="gupd" class="gup" disabled data-i18n="gameUpdate">Update Game Profile</button></div>
-<div class="eqhead" id="eqhead"><span class="cl" data-i18n="equalizer">Equalizer</span><button id="eqon" data-i18n="eqOff">Off</button></div>
+</div><div class="quick"><div class="qhead"><p class="sub" data-i18n="quick">Quick settings</p><span class="k qhint" data-i18n="quickHint">Full equalizer in Sound &amp; games</span></div><div class="qpre" id="qpre"><button id="qp0" data-i18n="prFlat">Flat</button><button id="qp1" data-i18n="prBassBoost">Bass boost</button><button id="qp2" data-i18n="prBassCut">Bass cut</button><button id="qp3" data-i18n="prTreble">Treble boost</button><button id="qp4" data-i18n="prVoice">Voice / footsteps</button></div><div class="qrow" id="qrow"><button type="button" class="night" id="qnight"><span class="nt"><b data-i18n="night">Night mode</b></span><span class="sw"></span></button><div class="gline" id="gline" style="display:none"><span class="gic sm" id="glic"></span><span id="gltxt">-</span><button type="button" id="gupd" class="gup" disabled data-i18n="gameUpdate">Update Game Profile</button></div></div></div></section></div></main>
+<div class="dmain" id="dmain">
+<div class="dhead"><p class="label" id="pgtitle">-</p></div>
+<div class="pages">
+<div class="pg" id="pg0" style="--acc:var(--lime)"><div class="ph"><h2 data-i18n="tabHeadsets">Headsets</h2><span class="sp"></span><button id="scan" class="act xl" data-i18n="scan">Scan for devices</button></div><p class="k hint phint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p><div class="cols"><section class="card" style="--acc:var(--lime)"><p class="label" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div></section><div class="stack"><section class="card" style="--acc:var(--cyan)"><p class="label"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div></section><section class="card" style="--acc:var(--bad)"><p class="label">Blocked devices</p><p class="k note">HearBridge never touches these. Game controllers are blocked automatically.</p><div class="btns"><input id="blkaddr" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" autocomplete="off"><button id="blkadd" class="act">Block</button></div><div id="blklist" class="list"></div></section></div></div></div>
+<div class="pg" id="pg1" style="--acc:var(--violet)"><div class="ph"><h2 data-i18n="tabSound">Sound &amp; games</h2><p class="k note" id="eqhint" data-i18n="eqHint">Saved for this headset.</p></div><div class="cols"><section class="card eqp" id="eqp" style="--acc:var(--violet)"><div class="eqhead" id="eqhead"><span class="cl" data-i18n="equalizer">Equalizer</span><button id="eqon" data-i18n="eqOff">Off</button></div>
 <div class="eqbox"><div class="curve"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eqg" x1="0" x2="1" y1="0" y2="0">
 <stop offset="0" stop-color="#ff6a2b"/><stop offset=".3" stop-color="#ffb23d"/><stop offset=".5" stop-color="#c8ff3d"/><stop offset=".72" stop-color="#3dd8ff"/><stop offset="1" stop-color="#ff7ad9"/></linearGradient></defs>
 <path id="eqfill" fill="url(#eqg)" fill-opacity=".18" d=""/><path id="eqline" fill="none" stroke="url(#eqg)" stroke-width="2.5" vector-effect="non-scaling-stroke" d=""/></svg></div>
@@ -682,62 +1098,20 @@ html{font-size:clamp(14px,1.65vh,22px)!important}
 <div class="band" style="--c:var(--rose)"><span class="bn"><i></i><span data-i18n="eqTreble">Treble</span></span><input type="range" id="eq4" min="-12" max="12" step="1"><span class="bv" id="eqv4">0</span></div>
 </div>
 </div>
-<div class="presets"><button id="pr0" data-i18n="prFlat">Flat</button><button id="pr1" data-i18n="prBassBoost">Bass boost</button><button id="pr2" data-i18n="prBassCut">Bass cut</button><button id="pr3" data-i18n="prTreble">Treble boost</button><button id="pr4" data-i18n="prVoice">Voice / footsteps</button><button id="prc" data-i18n="eqCustom">Custom</button></div>
-<button type="button" class="night" id="night"><span class="nt"><b data-i18n="night">Night mode</b><small data-i18n="nightHint">Quieter explosions, clearer voices</small></span><span class="sw" id="nightsw"></span></button></section><div class="sidebox"><section class="panel conn"><div class="phead"><p class="label" data-i18n="connection">Connection</p><button id="stop" class="red sm" data-i18n="stop">Stop HearBridge</button></div>
-<div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div>
-<p class="k note cno" id="codecno"></p>
-<p class="k note cno" id="xqnote"></p>
-
-</section><section class="panel logp"><p class="label" data-i18n="log">Log</p>
-<div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></section></div></div></div>
-</div>
-<div class="scrim" id="scrim"></div>
-<aside class="drawer" id="setm" role="dialog" aria-modal="true" aria-label="Settings">
-<div class="side"><p class="navgrp" data-i18n="settings">Settings</p>
-<nav class="tabs" id="tabs">
-<button type="button" id="tbhome" class="home"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M6 10v10h4.5v-6h3v6H18V10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg><span data-i18n="home">Home</span></button>
-<button type="button" id="tb0" style="--c:var(--lime)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg><span data-i18n="tabHeadsets">Headsets</span></button>
-<button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="tabSound">Sound &amp; games</span></button>
-<button type="button" id="tb2" style="--c:var(--cyan)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M6 16v-5M11 16V6M16 16v-8M21 16v-3" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="tabDetails">Details</span></button>
-<button type="button" id="tb3" style="--c:var(--warn)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 9l5 5 5-5M4 17v4h16v-4" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="bkTitle">Backup &amp; restore</span></button>
-</nav>
-<div class="menufoot"><b>HearBridge</b><span data-i18n="footer">Closing this page leaves HearBridge running.</span></div>
-</div>
-<div class="dmain">
-<div class="dhead"><p class="label" id="pgtitle">-</p></div>
-<div class="pages">
-<div class="pg" id="pg0" style="--acc:var(--lime)">
-<button id="scan" class="act xl" data-i18n="scan">Scan for devices</button>
-<p class="k hint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p>
-<p class="sub" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div>
-<p class="sub"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div>
-<p class="sub">Blocked devices</p>
-<p class="k note">Never connected, paired or listed by HearBridge; left to the console. Game controllers are blocked automatically.</p>
-<div class="btns"><input id="blkaddr" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" autocomplete="off" style="flex:1;min-width:0;font:inherit;padding:8px"><button id="blkadd" class="act">Block</button></div>
-<div id="blklist" class="list"></div>
-</div>
-<div class="pg" id="pg1" style="--acc:var(--violet)">
-<p class="k note" id="eqhint" data-i18n="eqHint">Saved for this headset.</p>
-<div class="btns"><button id="tone" data-i18n="tone">Test tone</button><button id="clean" data-i18n="clean">Clean sound</button></div>
-<button type="button" class="night" id="keyvol"><span class="nt"><b data-i18n="keyVol">Earbud next/previous changes volume</b><small data-i18n="keyVolHint">For earbuds without volume keys</small></span><span class="sw"></span></button>
-<div class="gsec"><p class="sub" data-i18n="tabGames">Games</p>
+<div class="presets"><button id="pr0" data-i18n="prFlat">Flat</button><button id="pr1" data-i18n="prBassBoost">Bass boost</button><button id="pr2" data-i18n="prBassCut">Bass cut</button><button id="pr3" data-i18n="prTreble">Treble boost</button><button id="pr4" data-i18n="prVoice">Voice / footsteps</button><button id="prc" data-i18n="eqCustom">Custom</button></div></section><div class="stack"><section class="card games" style="--acc:var(--rose)"><p class="label" data-i18n="gameSnd">Game sound</p><div class="gsec">
 <p class="k note" data-i18n="gamesHint">Save the sound you like for a game. It turns on by itself when that game starts, and your usual sound comes back when it closes.</p>
-<div class="game" id="game"><span class="gic" id="gic"></span><b id="gname">-</b><span class="gchip" id="gon" data-i18n="gameOn">game profile</span></div>
-<div class="btns" id="gbtns"><button id="gsave" class="act" data-i18n="gameSave">Save for this game</button><button id="gdrop" class="red" data-i18n="gameRemove">Remove</button></div>
+<div class="game" id="game"><span class="gic" id="gic"></span><span class="gtx"><b id="gname">-</b><span class="gchip" id="gon" data-i18n="gameOn">game profile</span></span><div class="btns" id="gbtns"><button id="gsave" class="act" data-i18n="gameSave">Save for this game</button><button id="gdrop" class="red" data-i18n="gameRemove">Remove</button></div></div>
 <p class="sub" data-i18n="savedGames">Saved games</p><div class="glist" id="glist"></div>
 </div>
-</div>
-<div class="pg" id="pg3" style="--acc:var(--warn)">
-<p class="k note" data-i18n="bkHint">Saved headsets (with their pairing), their settings and game profiles in one file.</p>
-<p class="sub" data-i18n="bkWhere">Where</p>
+</section><section class="card more" style="--acc:var(--ink2)"><p class="label" data-i18n="more">More</p><button type="button" class="night" id="night"><span class="nt"><b data-i18n="night">Night mode</b><small data-i18n="nightHint">Quieter explosions, clearer voices</small></span><span class="sw" id="nightsw"></span></button><button type="button" class="night" id="keyvol"><span class="nt"><b data-i18n="keyVol">Earbud next/previous changes volume</b><small data-i18n="keyVolHint">For earbuds without volume keys</small></span><span class="sw"></span></button><div class="btns"><button id="tone" data-i18n="tone">Test tone</button><button id="clean" data-i18n="clean">Clean sound</button></div></section></div></div></div>
+<div class="pg" id="pg3" style="--acc:var(--gold)"><div class="ph"><h2 data-i18n="bkBtn">Backup</h2><p class="k note" data-i18n="bkHint">Saved headsets (with their pairing), their settings and game profiles in one file.</p></div><div class="cols"><section class="card bkw" style="--acc:var(--gold)">
+<p class="label" data-i18n="bkWhere">Where</p>
 <div class="seg" id="bkseg"><button id="bkusb" data-i18n="bkUsb">USB drive</button><button id="bkint" data-i18n="bkConsole">Console</button><button id="bkdev" data-i18n="bkDevice">This device</button></div>
 <div class="bkgo"><button id="bkdo" class="act" data-i18n="backup">Back up</button><button id="rsdo" data-i18n="restore">Restore</button></div>
-<p class="bkmsg" id="bkmsg"></p><div class="bklist" id="bklist"></div>
+<p class="bkmsg" id="bkmsg"></p>
 <input type="file" id="bkfile" accept=".json,application/json" style="display:none">
-</div>
-<div class="pg" id="pg2" style="--acc:var(--cyan)">
-<p class="sub" data-i18n="status">Status</p>
-<div class="kv">
+</section><section class="card bkr" style="--acc:var(--edge2)"><p class="label" data-i18n="bkHere">Backups</p><div class="bklist" id="bklist"></div><p class="k note" data-i18n="rsNote">Restore replaces the saved headsets and settings on this console.</p></section></div></div>
+<div class="pg" id="pg2" style="--acc:var(--ember)"><div class="ph"><h2 data-i18n="connection">Connection</h2><p class="k note" data-i18n="connSub">Adapter, codec and live numbers</p></div><div class="cols"><section class="card conn" style="--acc:var(--ember)"><p class="label" data-i18n="adapterPick">Bluetooth adapter</p><p class="k note" data-i18n="adapterHint">Auto prefers a USB stick when one is plugged in. Changing this restarts Bluetooth.</p><div class="seg" id="adseg"><button type="button" id="adauto" data-i18n="adapterAuto">Auto</button><button type="button" id="adint" data-i18n="adapterInternal">Console chip</button><button type="button" id="adusb" data-i18n="adapterUsb">USB adapter</button></div><div class="seg" id="adnodes"></div><p class="k note" id="admsg"></p><div class="chiprow"><span class="k" data-i18n="current">In use</span><span class="v" id="chipv">-</span></div><p class="label lbl2" data-i18n="codec">Codec</p><div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div><p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p><p class="k note cno" id="codecno"></p><p class="k note cno" id="xqnote"></p></section><section class="card status" style="--acc:var(--cyan)"><div class="shead"><p class="label" data-i18n="liveStatus">Live status</p><span class="sp"></span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div><div class="kv">
 <span class="k" data-i18n="format">Format</span><span class="chips" id="fmtd">-</span>
 <span class="k" data-i18n="battery">Battery</span><span class="v" id="batv">-</span>
 <span class="k" data-i18n="packets">Packets / SBC frames</span><span class="v" id="pk">-</span>
@@ -747,22 +1121,16 @@ html{font-size:clamp(14px,1.65vh,22px)!important}
 <div><div class="mrow"><span class="k" data-i18n="capPeak">Capture peak</span><span class="v" id="pkv">-</span></div><div class="meter"><div id="m1"></div></div></div>
 <div><div class="mrow"><span class="k" data-i18n="outPeak">Output peak</span><span class="v" id="opv">-</span></div><div class="meter"><div id="m2"></div></div></div>
 </div>
-<p class="sub" data-i18n="latency">Latency</p>
+<p class="label lbl2" data-i18n="latency">Latency</p>
 <p class="k note" id="latnote" data-i18n="latHint">Lower: less delay. Higher: fewer dropouts when the radio is busy. Saved for this headset.</p>
 <div class="latd"><div class="lbar" id="lbar"><i id="lb0" style="background:var(--b0)"></i><i id="lb1" style="background:var(--b1)"></i><i id="lb2" style="background:var(--b3)"></i><i id="lb3" style="background:var(--b4)"></i></div>
 <div class="lkeys" id="lkeys"></div></div>
-<p class="sub" data-i18n="connection">Connection</p>
-<p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p>
-<p class="sub" data-i18n="adapterPick">Bluetooth adapter</p>
-<p class="k note" data-i18n="adapterHint">Auto prefers a USB stick when one is plugged in. Changing this restarts Bluetooth.</p>
-<div class="seg" id="adseg"><button type="button" id="adauto" data-i18n="adapterAuto">Auto</button><button type="button" id="adint" data-i18n="adapterInternal">Console chip</button><button type="button" id="adusb" data-i18n="adapterUsb">USB adapter</button></div>
-<div class="seg" id="adnodes"></div>
-<p class="k note" id="admsg"></p>
-<div class="chiprow"><span class="k" data-i18n="chip">Chip</span><span class="v" id="chipv">-</span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div>
+<div class="card logp" style="--acc:var(--cyan)"><p class="label" data-i18n="log">Log</p><div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></div></section></div><div class="pfoot"><span class="sp"></span><button id="stop" class="red sm" data-i18n="stop">Stop HearBridge</button></div></div>
 </div>
 </div>
 </div>
-</aside>
+</div>
+</div>
 <script>
 var I18N=/*I18N*/;
 var S=null,busyG=0,busyH=0,LANG='en',TOKEN='HBTOKENxxxxxxxxxxxxxxxxxxxxxxxxx';
@@ -770,27 +1138,14 @@ function $(i){return document.getElementById(i)}
 function t(k){var d=I18N.strings[LANG]||I18N.strings.en;return d[k]||I18N.strings.en[k]||k}
 function info(c){for(var i=0;i<I18N.langs.length;i++)if(I18N.langs[i].code==c)return I18N.langs[i];return I18N.langs[0]}
 function setLang(c){var L=info(c);LANG=L.code;try{localStorage.setItem('hb_lang',LANG)}catch(e){}
-document.documentElement.lang=LANG;document.documentElement.dir=L.rtl?'rtl':'ltr';
+document.documentElement.lang=LANG;if($('langcur'))$('langcur').textContent=L.name;document.documentElement.dir=L.rtl?'rtl':'ltr';
 var n=document.querySelectorAll('[data-i18n]');for(var i=0;i<n.length;i++)n[i].textContent=t(n[i].getAttribute('data-i18n'));
-var o=$('langlist').getElementsByTagName('button');for(var i2=0;i2<o.length;i2++)o[i2].className='langopt'+(o[i2].getAttribute('data-code')==LANG?' on':'');$('langlist').className='';if(typeof TAB=='number')setTab(TAB);if(S)draw()}
+var o=$('langlist').getElementsByTagName('button');for(var i2=0;i2<o.length;i2++)o[i2].className='langopt'+(o[i2].getAttribute('data-code')==LANG?' on':'');$('langlist').className='';if(typeof TAB=='number'&&setIsOpen())setTab(TAB);if(S)draw()}
 function buildLangs(){var h='',i,L;for(i=0;i<I18N.langs.length;i++){L=I18N.langs[i];
 h+='<button type="button" class="langopt" role="menuitem" data-code="'+L.code+'"'+(L.rtl?' dir="rtl"':'')+'><span>'+L.name+'</span></button>'}
 $('langlist').innerHTML=h;var b=$('langlist').getElementsByTagName('button');
 for(i=0;i<b.length;i++)b[i].onclick=function(){setLang(this.getAttribute('data-code'))};
 $('langbtn').onclick=function(){$('langlist').className=$('langlist').className?'':'show'}}
-
-(function(){var b=$('advbtn'),x=$('advclose'),o=$('advbox');
-function openA(){if(o)o.className='advov show'}function closeA(){if(o)o.className='advov'}
-if(b)b.onclick=function(e){e.preventDefault();openA()};
-if(x)x.onclick=function(e){e.preventDefault();closeA()};
-if(o)o.addEventListener('click',function(e){if(e.target===o)closeA()});
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeA()});
-})();
-
-
-(function(){var b2=$('advbtn2');if(b2)b2.onclick=function(e){e.preventDefault();var o=$('advbox');if(o)o.className='advov show'};
-var ms=$('mainscan');if(ms)ms.onclick=function(){if(typeof setOpen==='function'){setOpen(0);}if(typeof scanPress==='function')scanPress();};
-})();
 
 /* POST token: the page carries it, /api/status repeats it. A page left open
  * over a restart of HearBridge holds the old one: a 403 takes the new token
@@ -888,15 +1243,15 @@ rows.push({k:d.addr,h:row(icon(d.kind),d.name||d.addr,badge(d.current)+'<span cl
 d.current&&on?'on':d.current&&busy?'busy':'')})}
 patchList('savedlist',rows,'<p class="k">'+esc(t('noSaved'))+'</p>');drawQs(on,busy)}
 /* main screen: one tap on a saved headset switches to it */
-function drawQs(on,busy){var h='',i,d,cur=null;
+var LASTNM='';function drawQs(on,busy){var h='',i,d,cur=null;
 for(i=0;i<SAVL.length;i++){d=SAVL[i];if(d.current)cur=d;
 var cls=d.current?(on?'act':'cur'):'',sub=d.current?(on?t('playing'):busy?t('connecting')+'…':t('notConnected')):t('tapSwitch');
-h+='<button type="button" class="'+cls+'" data-q="'+esc(d.addr)+'"'+(d.current&&on?' data-on="1"':'')+'><b>'+esc(d.name||d.addr)+'</b><small>'+esc(sub)+'</small></button>'}
+h+='<button type="button" class="'+cls+'" data-q="'+esc(d.addr)+'"'+(d.current&&on?' data-on="1"':'')+'><span class="qi">'+icon(kindOf(d.cod))+'</span><span class="qt"><b>'+esc(d.name||d.addr)+'</b><small>'+esc(sub)+'</small></span>'+(d.current&&on?'':'<span class="qsw">'+esc(t(on?'switchBtn':'connect'))+'</span>')+'</button>'}
 if(!SAVL.length)h='<p>'+esc(t('noSaved'))+'</p>';
 if($('qs').hbHtml!==h){$('qs').hbHtml=h;$('qs').innerHTML=h;var b=$('qs').getElementsByTagName('button');
 for(i=0;i<b.length;i++)b[i].onclick=function(){if(this.getAttribute('data-on'))return;
 act('/api/select?addr='+this.getAttribute('data-q'));this.getElementsByTagName('small')[0].textContent=t('connecting')+'…'}}
-var hc=$('hsconn');hc.style.visibility=cur&&!busy?'':'hidden';hc.textContent=t(on?'disconnect':'connect');hc.className=on?'':'act';hc.hbOn=on}
+var hc=$('hsconn');hc.style.visibility=cur&&!busy?'':'hidden';LASTNM=cur?(cur.name||cur.addr):'';if(!on&&!linked())$('nows').textContent=LASTNM?t('lastUsed').replace('%s',LASTNM):'';hc.textContent=on?t('disconnect'):t('connect')+(LASTNM?' '+LASTNM:'');hc.className=on?'':'act';hc.hbOn=on}
 $('hsconn').onclick=function(){act(this.hbOn?'/api/disconnect':'/api/connect')};
 function blocked(){getj('/api/blocked',function(j){var r=[],i,b,L=j.blocked||[];
 for(i=0;i<L.length;i++){b=L[i];r.push({k:b.addr,h:row(icon('audio'),b.addr,b.auto?'auto-blocked (controller)':'blocked by you','<button data-unblock="'+esc(b.addr)+'">Unblock</button>')})}
@@ -947,9 +1302,9 @@ var det=st=='error'&&S.detail?S.detail.replace(/^error\s*/,''):'';if(/^unsupport
 var whyTxt=S.why&&t('why_'+S.why)!=='why_'+S.why?t('why_'+S.why):'';
 if(whyTxt)det=whyTxt;
 $('state').textContent={reconnecting:1,disconnected:1,paused:1,error:1,idle:1,'waiting-selection':1}[st]?t('notConnected')+(det?' ('+det+')':''):(t(st)==st?st:t(st));
-$('live').className='live '+(st=='streaming'||st=='connected'?'ok':(st=='paused'||st=='disconnected'||st=='error'?'bad':'wait'));
+$('live').className='live '+(st=='streaming'||st=='connected'?'ok':(st=='paused'||st=='disconnected'||st=='error'||st=='idle'||st=='reconnecting'?'bad':'wait'));
 var on=!!S.connected&&fresh(),link=on||((st=='connecting'||st=='pairing')&&S.device);
-$('dev').textContent=link?(S.device||'-'):t('notConnected');$('stats').style.display=on?'':'none';$('stidle').style.display=on?'none':'';$('hspanel').className='panel hs'+(on?'':' off');
+$('dev').textContent=link?(S.device||'-'):t('noHs');$('nows').textContent=link?$('state').textContent:(LASTNM?t('lastUsed').replace('%s',LASTNM):'');$('nows').className='nows '+(on?'ok':'wait');$('livedev').textContent=on&&S.device?'\u00a0· '+S.device:'';$('stats').style.display=on?'':'none';$('stidle').style.display=on?'none':'';$('hspanel').className='panel hs'+(on?'':' off');
 if(!on){S.pkts=S.frames=S.backlog=S.sample_rate=0;S.peak=S.out_peak=0;S.avrcp={}}
 if(st=='scanning')scanLive=Date.now()+12000;
 if(scanLive&&(st=='waiting-selection'||st=='streaming'||st=='connected'||st=='connecting'||st=='error'||st=='paused'))scanLive=0;
@@ -970,7 +1325,7 @@ var ct=(ad.node||ch.vid)?((ad.external?t('adapterUsb'):t('adapterInternal'))+(ad
 /* chip family comes from the HCI identity; the USB vendor is only a fallback */
 var cname=ch.family||ch.vendor||'';
 var ci=ch.vid?(cname?cname+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'';
-$('chipv').textContent=(ct?(ci?ct+' · '+ci:ct):ci)||'-';
+$('chipv').textContent=(ct?(ci?ct+' · '+ci:ct):ci)||'-';$('adm').textContent=cname||ct||'-';
 drawAd();
 var ev=S.events||[],eh='';
 if(!ev.length)eh='<div class="k">'+esc(t('logEmpty'))+'</div>';
@@ -1017,13 +1372,13 @@ lh='<span class="lq">'+bb+l.score+'%<small>'+(l.lq>=0||l.rssi?'RSSI '+l.rssi+' �
 lm='<span class="lq">'+bb+t(['','sigWeak','sigFair','sigGood','sigGreat'][n])+'</span>'}
 setHtml('lqv',lh);setHtml('lqm',S.connected?lm:'-');
 /* games: main screen only says when a game's sound is on; saving lives in Settings */
-var gon=!!g.id,gnm=g.name||g.id;$('gline').style.display=gon?'':'none';
+var gon=!!g.id,gnm=g.name||g.id;$('gline').style.display=gon?'':'none';$('qrow').className='qrow'+(gon?'':' one');
 if(gon)$('gltxt').textContent=g.active?t('gameSoundOn').replace('%s',gnm)+(g.from?' ('+t('gameFrom').replace('%s',g.from)+')':''):t('gameNoProfile').replace('%s',gnm);
 $('gupd').disabled=!(gon&&g.dirty);$('gupd').className='gup'+(gon&&g.dirty?' on':'');
 $('game').className='game'+(gon?(g.active?' on':''):' none');gIcon($('gic'),gon?g.id:'',g.name);gIcon($('glic'),gon&&g.active?g.id:'',g.name);drawGames(g);$('gname').textContent=gon?(g.name||g.id):t(g.avail===0?'gameNoDetect':'noGame');$('gon').style.display=gon&&g.active?'':'none';
 var own=0,SL=g.saved||[];for(var si=0;si<SL.length;si++)if(SL[si].id==g.id)for(var hi=0;hi<(SL[si].hs||[]).length;hi++)if(SL[si].hs[hi].cur)own=1;
 var gsOn=gon&&(!own||!!g.dirty);$('gsave').textContent=t(own?'gameUpdate':'gameSave');$('gsave').disabled=!gsOn;$('gsave').className=gsOn?'act':'no';$('gdrop').style.display=gon&&own?'':'none';
-$('night').className='night'+(nm.on?' on':'');$('keyvol').className='night'+(S.key_vol!==0?' on':'');
+$('night').className='night'+(nm.on?' on':'');$('qnight').className=$('night').className;$('keyvol').className='night'+(S.key_vol!==0?' on':'');
 /* low headset battery: a toast once per heads-up (20 %, then 10 %) */
 var ba=S.batt_alert||{};if(ba.seq>0&&ba.level){var seen=-1;try{seen=parseInt(localStorage.getItem('hb_batt_seq'),10)}catch(e){}
 if(isNaN(seen)||ba.seq<seen)seen=0;if(ba.seq>seen){try{localStorage.setItem('hb_batt_seq',ba.seq)}catch(e){}toast(t('battToast').replace('%s',ba.level))}}
@@ -1036,15 +1391,15 @@ else{sv.className='llsave';sv.textContent=''}}
 var toastT=0;function toast(m){$('toast').textContent=m;clearTimeout(toastT);toastT=setTimeout(function(){$('toast').textContent=''},7000)}
 $('gsave').onclick=function(){if(!this.disabled)act('/api/game?do=1')};
 $('gupd').onclick=function(){if(this.disabled)return;this.disabled=true;this.className='gup';act('/api/game?do=1')};
-$('night').onclick=function(){act('/api/night?on='+(S&&S.night&&S.night.on?0:1))};
+$('night').onclick=function(){act('/api/night?on='+(S&&S.night&&S.night.on?0:1))};$('qnight').onclick=function(){$('night').onclick()};
+for(var qi=0;qi<5;qi++)$('qp'+qi).onclick=(function(n){return function(){$('pr'+n).onclick()}})(qi);
 $('keyvol').onclick=function(){act('/api/keyvol?on='+(S&&S.key_vol===0?1:0))};
 /* settings overlay */
-var TAB=0,NTAB=4;function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}var ts=$('tb'+n).getElementsByTagName?$('tb'+n).getElementsByTagName('span'):[];$('pgtitle').textContent=ts.length?ts[0].textContent:'';$('setm').style.setProperty&&$('setm').style.setProperty('--pgc',['var(--lime)','var(--violet)','var(--cyan)','var(--warn)'][n])}
-function setOpen(n){$('setm').className='drawer show';$('scrim').className='scrim show';setTab(n==null?TAB:n);$('tb'+TAB).focus();if(TAB==3)bkCheck()}
-function setClose(){$('setm').className='drawer';$('scrim').className='scrim';$('setbtn').focus()}
-$('scrim').onclick=setClose;
-for(var ti=0;ti<NTAB;ti++)$('tb'+ti).onclick=(function(n){return function(){setTab(n);if(n==3)bkCheck()}})(ti);
-$('setbtn').onclick=function(){setOpen()};$('tbhome').onclick=setClose;
+var TAB=0,NTAB=4,PGC=['var(--lime)','var(--violet)','var(--ember)','var(--gold)'];function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}$('tbhome').className='home';var ts=$('tb'+n).getElementsByTagName?$('tb'+n).getElementsByTagName('span'):[];$('pgtitle').textContent=ts.length?ts[0].textContent:'';$('setm').style.setProperty&&$('setm').style.setProperty('--pgc',PGC[n])}
+function setOpen(n){$('setm').className='rail show';$('home').className='grid hid';$('dmain').className='dmain show';setTab(n==null?TAB:n);$('tb'+TAB).focus();if(TAB==3)bkCheck()}
+function setClose(){$('setm').className='rail';$('home').className='grid';$('dmain').className='dmain';for(var i=0;i<NTAB;i++)$('tb'+i).className='';$('tbhome').className='home on';$('tbhome').focus()}
+for(var ti=0;ti<NTAB;ti++)$('tb'+ti).onclick=(function(n){return function(){setOpen(n)}})(ti);
+$('tbhome').onclick=setClose;
 function setIsOpen(){return $('setm').className.indexOf('show')>0}
 if(document.addEventListener)document.addEventListener('keydown',function(e){var k=e.keyCode;
 if((e.key=='Escape'||k==27)&&setIsOpen()){setClose();return}
@@ -1055,7 +1410,7 @@ var gpPrev={};if(navigator.getGamepads)setInterval(function(){if(document.hidden
 var o=p.buttons[9]&&p.buttons[9].pressed,c=p.buttons[1]&&p.buttons[1].pressed,q=gpPrev[i]||{};
 if(o&&!q.o){if(setIsOpen())setClose();else setOpen()}if(c&&!q.c&&setIsOpen())setClose();gpPrev[i]={o:o,c:c}}},150);
 /* D-pad focus starts on Settings */
-setTimeout(function(){if(!document.activeElement||document.activeElement==document.body)try{$('setbtn').focus()}catch(e){}},300);
+setTimeout(function(){if(!document.activeElement||document.activeElement==document.body)try{$('tbhome').focus()}catch(e){}},300);
 $('prc').onclick=function(){setOpen(1)};
 /* Scan / Add headset: never while a headset streams (the inquiry shares the
  * radio with the DualSense). Say what to do instead. */
@@ -1127,8 +1482,8 @@ $('eqline').setAttribute('d',d);$('eqfill').setAttribute('d',d+'L300 50L0 50Z');
 for(i=0;i<5;i++){var v=db[i],p=(v+12)/24*100,lo=Math.min(50,p),hi=Math.max(50,p);
 $('eqv'+i).textContent=(v>0?'+':'')+v+' dB';
 $('eq'+i).style.setProperty('--trk','linear-gradient(90deg,#0c0b0f '+lo+'%,'+EQCOL[i]+'aa '+lo+'%,'+EQCOL[i]+'aa '+hi+'%,#0c0b0f '+hi+'%)')}
-var anyp=0;for(i=0;i<PRESETS.length;i++){var m=PRESETS[i].join()==db.join();$('pr'+i).className=m?'act':'';if(m)anyp=1}$('prc').className=anyp?'':'act';
-$('eqp').className='panel eqp'+(on?'':' off');$('eqon').className=on?'act':'';$('eqon').textContent=t(on?'eqOn':'eqOff')}
+var anyp=0;for(i=0;i<PRESETS.length;i++){var m=PRESETS[i].join()==db.join();$('pr'+i).className=m?'act':'';if(m)anyp=1}$('prc').className=anyp?'':'act';for(i=0;i<5;i++)$('qp'+i).className=$('pr'+i).className;
+$('eqp').className='card eqp'+(on?'':' off');$('eqon').className=on?'act':'';$('eqon').textContent=t(on?'eqOn':'eqOff')}
 function drawEq(){if(!S.eq)return;if(!busyE&&Date.now()-eqT>1500){var i;for(i=0;i<5;i++)$('eq'+i).value=S.eq.db[i];EQ=S.eq}
 eqPaint(busyE?eqVals():S.eq.db,S.eq.on)}
 function eqSend(db,on){var q='/api/eq?on='+(on?1:0),i;for(i=0;i<5;i++)q+='&b'+i+'='+db[i];eqT=Date.now();act(q,function(){busyE=0})}
