@@ -86,6 +86,12 @@ int main(void)
           hb_dev_rank(0x001f00, "DualSense Wireless Controller") < 0 && hb_dev_rank(0x000000, "DUALSHOCK 4 Headset") < 0,
           "#34: controllers never listed, whatever the name");
     CHECK(!strcmp(hb_dev_kind(0x000000, "OnePlus Buds Ace 2"), "headphones"), "name hint gets the headphones icon");
+    CHECK(hb_dev_rank(0x2c0420, "Coral") == 3 && hb_dev_rank(0x3c0420, "Coral") == 3 &&
+          hb_dev_rank(0x2c0420, "") == -1 && hb_dev_rank_class(0x2c0420) >= 0 && hb_dev_rank_class(0x08243c) >= 0 &&
+          hb_dev_rank_class(0x280424) < 0 && hb_dev_rank(0x240420, "MY TOYOTA") == -1,
+          "speakers with a car-audio CoD listed by name; names fetched for car / display classes");
+    CHECK(!strcmp(hb_dev_kind(0x2c0420, "Coral"), "speaker") && !strcmp(hb_dev_kind(0x2c0420, "Car kit"), "car"),
+          "named car-audio speaker gets the speaker icon");
     /* Saved list */
     h = mk(0xA1, "WF-1000XM6", 0x240418); paired_put(L, &n, PAIRED_MAX, &h);
     h = mk(0xB2, "Speaker \xc3\xa9", 0x240414); paired_put(L, &n, PAIRED_MAX, &h);
