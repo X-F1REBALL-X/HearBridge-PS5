@@ -11,3 +11,9 @@ scripts/** linguist-detectable=false
 tests/decode_dump linguist-detectable=false
 tests/sbc_snr.py linguist-detectable=false
 tests/test_page.js linguist-detectable=false
+
+# Keep LF in the repo, also when working from Windows
+* text=auto eol=lf
+*.bin binary
+*.png binary
+*.woff2 binary
