@@ -28,16 +28,29 @@ HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on
 - One file for every PS5 (Marvell/NXP or MediaTek Bluetooth).
 - **USB Bluetooth adapters:** Realtek RTL8761BU (bundled firmware) and CSR8510, plus the console chip.
 - **Adapter picker** in Settings with instant switching; one pairing shared across adapters.
-- New interface with a side menu (Home, Headsets, Sound & games, Connection, Backup) that fits the TV with no scrolling, plus a phone layout with a bottom menu.
+- Headset connect and disconnect auto mode.
+- Interface layout updates for TV use.
+- Optional **ESP32-S3** board that shows up on the PS5 as USB headphones, so Tempest 3D Audio can turn on while HearBridge still sends the sound to your real Bluetooth headset.
+- Side menu (Home, Headsets, Sound & games, Connection, Backup) that fits the TV with no scrolling, plus a phone layout with a bottom menu.
 - Game profiles, battery percent, night mode and one-tap headset switching.
 
 ## Install
 
-1. Download **HearBridge-1.4.2.elf** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+1. Download **HearBridge-1.4.3.elf** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
 2. Send it to your ELF loader on port 9021.
 3. Open **http://&lt;console-ip&gt;:6767** or the **HearBridge** tile, then pair your headphones in **Settings**.
 
 Everything else, from features to troubleshooting, is in the **[guide](https://x-f1reball-x.github.io/HearBridge-PS5/)**.
+
+## Optional: ESP32-S3 for Tempest 3D Audio
+
+The PS5 only fills its USB audio path while a USB headset is selected. A small ESP32-S3 board can act as that headset: plug it into the PS5 over USB, pick **USB Headphones (PS5 Audio Sink)** in Sound settings, and Tempest 3D Audio can turn on. HearBridge still streams the mix to your real Bluetooth headphones.
+
+1. Download **esp32-ps5-uac-sink-merged.bin** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+2. Flash it to the ESP32-S3 UART port at offset `0x0` (esptool, or [esptool-js](https://espressif.github.io/esptool-js/) in a browser).
+3. Plug the board's USB-OTG port into the PS5, select **USB Headphones (PS5 Audio Sink)** as the output, and in HearBridge set capture to USB audio.
+
+Full build and flash notes are in `tools/esp32-sink`.
 
 ## Internal chip vs USB dongle
 
