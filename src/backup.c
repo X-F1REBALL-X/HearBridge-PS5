@@ -389,6 +389,33 @@ int hb_backup_list(const char *dd, char (*names)[HB_BACKUP_NAME], int max)
     return k;
 }
 
+
+int hb_backup_delete(const char *dd, const char *name)
+{
+    static char idx[2048], nidx[2048];
+    char path[200], names[HB_BACKUP_KEEP][HB_BACKUP_NAME];
+    int n, i, o = 0, kept = 0;
+    if (!dd || !hb_backup_name_ok(name)) return 0;
+    snprintf(path, sizeof path, "%s/%s", dd, name);
+    if (remove(path) != 0 && strcmp(name, HB_BACKUP_LATEST) != 0) {
+        /* still try to clean index even if file already gone */
+    }
+    if (!strcmp(name, HB_BACKUP_LATEST)) return 1;
+    snprintf(path, sizeof path, "%s/index.txt", dd);
+    if (read_all(path, idx, (int)sizeof idx) < 0) idx[0] = 0;
+    n = hb_backup_index_list(idx, names, HB_BACKUP_KEEP);
+    nidx[0] = 0;
+    for (i = 0; i < n; i++) {
+        if (!strcmp(names[i], name)) continue;
+        o += snprintf(nidx + o, sizeof nidx - (size_t)o, "%s\n", names[i]);
+        kept++;
+        if (o <= 0 || o >= (int)sizeof nidx) return 0;
+    }
+    if (!write_atomic(path, nidx, o > 0 ? o : 0)) return 0;
+    (void)kept;
+    return 1;
+}
+
 int hb_backup_restore(const char *sd, const char *dd, const char *name)
 {
     static char json[HB_BACKUP_MAX + 1];

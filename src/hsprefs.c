@@ -43,7 +43,7 @@ int hb_prefs_gain(const hb_prefs *p)
 
 int hb_prefs_hs_volume(const hb_prefs *p)
 {
-    return p && p->hs_vol >= 0 ? p->hs_vol : HB_PREFS_HS_VOL_DEFAULT;
+    return p && p->hs_vol >= 0 ? p->hs_vol : -1;
 }
 
 void hb_prefs_new_headset(hb_prefs *p)

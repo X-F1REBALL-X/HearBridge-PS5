@@ -12,6 +12,7 @@
 #include "rate.h"
 #include "btchip.h"
 #include "adapter_pref.h"
+#include "hci_usb.h"
 #include "backup.h"
 #include "avrcp.h"
 #include "version.h"
@@ -108,7 +109,7 @@ static int is_write_path(const char *path)
         "/api/select", "/api/forget", "/api/scan", "/api/reconnect", "/api/volume",
         "/api/headset", "/api/mute", "/api/tone", "/api/connect", "/api/disconnect",
         "/api/stop", "/api/reset", "/api/latency", "/api/codec", "/api/eq", "/api/clean", "/api/night",
-        "/api/hci", "/api/game", "/api/backup", "/api/restore", "/api/keyvol", "/api/block",
+        "/api/hci", "/api/game", "/api/backup", "/api/backup-delete", "/api/restore", "/api/keyvol", "/api/block",
         "/api/adapter",
     };
     size_t i;
@@ -121,6 +122,9 @@ static int status_json(hb_ctl *c, char *o, int max)
 {
     char dev[140], st[70], url[140], det[200], why[40], ev[2400], cid[2][8], gname[100], gfrom[70];
     char pref[20], adpref[48];
+    char ua_name[96];
+    char ua_sony[96];
+    char ua_esp[96];
     int ni, nn;
     static char gl[32 * 600];
     static char nodes[HB_BT_NODES_MAX * 28];
@@ -179,6 +183,9 @@ static int status_json(hb_ctl *c, char *o, int max)
     hb_adapter_pref_word(pref, (int)sizeof pref);
     snprintf(c->bt_pref, sizeof c->bt_pref, "%s", pref);
     json_esc(adpref, sizeof adpref, pref);
+    json_esc(ua_name, sizeof ua_name, c->usb_audio_name);
+    json_esc(ua_sony, sizeof ua_sony, c->usb_sony_name);
+    json_esc(ua_esp, sizeof ua_esp, c->usb_esp_name);
     nodes[0] = '[';
     nn = 1;
     for (ni = 0; ni < c->bt_nodes_n && ni < HB_BT_NODES_MAX; ni++) {
@@ -222,7 +229,7 @@ static int status_json(hb_ctl *c, char *o, int max)
         "\"lat_extra\":{\"backoff_ms\":%d,\"normal_ms\":%d,\"auto\":%d,\"auto_ms\":%d},"
         "\"battery\":{\"status\":\"%s\",\"level\":%d,\"pct\":%d,\"src\":\"%s\",\"none\":%d},\"hs_moves\":%d,"
         "\"link\":{\"score\":%d,\"rssi\":%d,\"lq\":%d,\"drops_min\":%d},"
-        "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,\"key_vol\":%d,"
+        "\"night\":{\"on\":%d,\"db10\":%d},\"batt_alert\":{\"level\":%d,\"seq\":%u},\"rest_watch\":%d,\"usb_audio\":%d,\"usb_audio_name\":\"%s\",\"usb_sony\":%d,\"usb_esp\":%d,\"usb_sony_name\":\"%s\",\"usb_esp_name\":\"%s\",\"key_vol\":%d,"
         "\"game\":{\"avail\":%d,\"id\":\"%s\",\"name\":\"%s\",\"profile\":%d,\"active\":%d,\"exact\":%d,\"from\":\"%s\",\"dirty\":%d,\"saved\":%s},\"events\":%s}",
         c->version, c->token, !strcmp(c->state, "streaming"), det, why, st, dev, url, c->gain_pct, c->muted, c->tone, c->paused,
         c->hs_volume, c->avrcp & 1, (c->avrcp >> 1) & 1, (c->avrcp >> 2) & 1, (c->avrcp >> 3) & 1,
@@ -240,10 +247,11 @@ static int status_json(hb_ctl *c, char *o, int max)
         chip_ok ? btchip_profile_name(btchip_profile(c->chip_vid, btchip_get_override())) : "",
         c->bt_external, c->bt_node, adpref, nodes, adapters,
         c->lat_backoff_ms, c->lat_normal_ms, c->latency_auto != 0, c->lat_auto_ms,
-        avrcp_battery_key(c->battery), avrcp_battery_level(c->battery), c->batt_pct,
+        (c->batt_chg > 0 || c->battery == AVRCP_BATT_EXTERNAL) ? "charging" : avrcp_battery_key(c->battery),
+        avrcp_battery_level(c->battery), c->batt_pct,
         c->batt_pct < 0 ? "" : c->batt_src == 1 ? "hf" : c->batt_src == 2 ? "apple" : "", c->batt_none, c->hs_moves,
         c->link_score, c->link_rssi == 127 ? 0 : c->link_rssi, c->link_lq, c->drops_min,
-        c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch, c->key_vol,
+        c->night, c->night_db10, c->batt_alert, c->batt_alert_seq, c->rest_watch, c->usb_audio, ua_name, c->usb_sony, c->usb_esp, ua_sony, ua_esp, c->key_vol,
         c->game_avail, c->game_id, gname, c->game_profile, c->game_active, c->game_exact, gfrom, c->game_dirty, gl, ev);
 }
 
@@ -423,7 +431,19 @@ static int backup_api(hb_ctl *c, const char *path, const char *q, const char *re
             l = snprintf(big, sizeof big, "{\"ok\":1,\"name\":\"%s\",\"dir\":\"%s\"}", name, dir);
             return respond(out, max, 200, "application/json", big, l);
         }
-        if (!query_word(q, "name", name, sizeof name) || !hb_backup_name_ok(name))
+                if (!strcmp(path, "/api/backup-delete")) {
+            int l;
+            if (!query_word(q, "name", name, sizeof name) || !hb_backup_name_ok(name))
+                return respond(out, max, 400, "application/json", "{\"error\":\"bad parameter\"}", 25);
+            if (!hb_backup_delete(dir, name))
+                return respond(out, max, 500, "application/json", "{\"error\":\"delete\"}", 18);
+            CTL_LOCK(c);
+            ctl_event_locked(c, "Backup deleted");
+            CTL_UNLOCK(c);
+            l = snprintf(big, sizeof big, "{\"ok\":1,\"name\":\"%s\"}", name);
+            return respond(out, max, 200, "application/json", big, l);
+        }
+if (!query_word(q, "name", name, sizeof name) || !hb_backup_name_ok(name))
             return respond(out, max, 400, "application/json", "{\"error\":\"bad parameter\"}", 25);
         n = hb_backup_restore(sd, dir, name);
     }
@@ -719,8 +739,25 @@ int http_handle(hb_ctl *c, const char *req, int reqlen, char *out, int max)
         return respond(out, max, 200, "application/json", "{\"ok\":1}", 8);
     }
 
-    if (!strcmp(path, "/api/backups") || !strcmp(path, "/api/backup") || !strcmp(path, "/api/restore"))
+    if (!strcmp(path, "/api/backups") || !strcmp(path, "/api/backup") || !strcmp(path, "/api/backup-delete") || !strcmp(path, "/api/restore"))
         return backup_api(c, path, q, req, reqlen, out, max);
+
+    /* USB Audio probe outside the ctl lock (ugen ioctls can block). */
+    if (!strcmp(path, "/api/status")) {
+        int sony = 0, esp = 0;
+        char sn[48], en[48];
+        sn[0] = en[0] = 0;
+        hci_usb_audio_scan(&sony, sn, (int)sizeof sn, &esp, en, (int)sizeof en);
+        CTL_LOCK(c);
+        c->usb_sony = sony;
+        c->usb_esp = esp;
+        c->usb_audio = sony || esp;
+        snprintf(c->usb_sony_name, sizeof c->usb_sony_name, "%s", sony ? sn : "");
+        snprintf(c->usb_esp_name, sizeof c->usb_esp_name, "%s", esp ? en : "");
+        snprintf(c->usb_audio_name, sizeof c->usb_audio_name, "%s",
+                 sony && sn[0] ? sn : esp && en[0] ? en : "");
+        CTL_UNLOCK(c);
+    }
 
     CTL_LOCK(c);
     if (!strcmp(path, "/api/status")) {

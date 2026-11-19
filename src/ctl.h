@@ -34,6 +34,12 @@ typedef struct {
     int batt_alert;        /* last low battery heads-up: 20 / 10, 0 none */
     unsigned batt_alert_seq; /* bumped with each one (the page toasts once) */
     int rest_watch;        /* 1 = rest mode requests can be seen */
+    int usb_audio;         /* 1 = any USB Headphones plugged (Sony or ESP) */
+    char usb_audio_name[48]; /* first product string (compat) */
+    int usb_sony;          /* 1 = Sony USB Audio dock/headset */
+    int usb_esp;           /* 1 = ESP32-S3 PS5 Audio Sink */
+    char usb_sony_name[48];
+    char usb_esp_name[48];
     /* status (stream loop → web) */
     char token[HB_TOKEN_LEN + 1];  /* hex, set once by ctl_init() */
     char version[16];
@@ -87,6 +93,7 @@ typedef struct {
     unsigned long status_polls; /* /api/status requests: the page is open while it moves */
     int batt_pct;          /* HFP battery percent 0..100, -1 unknown */
     int batt_src;          /* 0 none, 1 HF indicator (exact), 2 Apple (10 % steps) */
+    int batt_chg;          /* 1 charging (HFP dock), 0 not, -1 unknown */
     int batt_none;         /* connected a while, the headset reported nothing */
     int hs_moves;          /* volume changes made on the headset itself */
     int key_vol;           /* earbud next / previous keys change the volume (all headsets, default on) */

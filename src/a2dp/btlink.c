@@ -2683,6 +2683,11 @@ int btlink_hfp_battery(const btlink *l)
     return l ? l->hfp.battery : -1;
 }
 
+int btlink_hfp_battery_chg(const btlink *l)
+{
+    return l ? l->hfp.battery_chg : -1;
+}
+
 int btlink_avrcp_requery(btlink *l)
 {
     unsigned char r[32];

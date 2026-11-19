@@ -65,5 +65,6 @@ int hb_dropped_recent(const hb_dropped *d, const unsigned char addr[6], long now
 
 int hb_drop_is_away(int reason)
 {
-    return reason == 0x13;
+    /* 0x13 remote user ended; 0x15 remote device terminated connection (case). */
+    return reason == 0x13 || reason == 0x15;
 }

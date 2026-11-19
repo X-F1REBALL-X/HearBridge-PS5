@@ -43,7 +43,7 @@ int  hb_prefs_lat_auto(const hb_prefs *p);
 /* Gain to use: the user's own for this headset, else HB_PREFS_GAIN_DEFAULT.
  * Old files carry an automatically saved gain= with no gain_user=1: ignored. */
 int  hb_prefs_gain(const hb_prefs *p);
-/* Headset volume to send on connect: the user's, else 64 (50 %). */
+/* Headset volume to send on connect: the user's, else -1 (keep current). */
 int  hb_prefs_hs_volume(const hb_prefs *p);
 /* A headset with no saved file: keep whatever else was copied off the page,
  * but the buffer target is the default (200 ms), not an old 1 s mode. */
