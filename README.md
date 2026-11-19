@@ -14,12 +14,12 @@ HearBridge PS5 is a payload (ELF) that plays your PS5's game and system audio on
 
 <table align="center">
 <tr>
-<td><img src="docs/img/ui-1.4.2-home.png" alt="Home" width="440"></td>
-<td><img src="docs/img/ui-1.4.2-headsets.png" alt="Headsets" width="440"></td>
+<td><img src="docs/img/ui-1.4.3-home.png" alt="Home" width="440"></td>
+<td><img src="docs/img/ui-1.4.3-headsets.png" alt="Headsets" width="440"></td>
 </tr>
 <tr>
-<td><img src="docs/img/ui-1.4.2-sound.png" alt="Sound &amp; games" width="440"></td>
-<td><img src="docs/img/ui-1.4.2-connection.png" alt="Connection" width="440"></td>
+<td><img src="docs/img/ui-1.4.3-sound.png" alt="Sound &amp; games" width="440"></td>
+<td><img src="docs/img/ui-1.4.3-connection.png" alt="Connection" width="440"></td>
 </tr>
 </table>
 
