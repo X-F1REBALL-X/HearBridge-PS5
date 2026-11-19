@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/app-icon-180.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <style>
-:root{--ink:#f4efe6;--ink2:#cfc9be;--mute:#9a948a;--void:#0c0b0f;--deck:#15131a;--card:#1f1b26;--edge:#2c2833;--edge2:#3a3543;
+:root{--ink:#f4efe6;--ink2:#e8e2d6;--mute:#d2cbc0;--void:#0c0b0f;--deck:#15131a;--card:#1f1b26;--edge:#2c2833;--edge2:#3a3543;
 --lime:#c8ff3d;--ember:#ff6a2b;--cyan:#3dd8ff;--violet:#b18cff;--blue:#5aa2ff;--teal:#8fc2bb;--rose:#ff7ad9;--warn:#ffb23d;--bad:#ff3d5a;--sk:-12deg;
 --s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.25rem;--gap:var(--s4)}
 /* Inter (SIL OFL), Latin only, served by HearBridge itself (/font.woff2). Other scripts
@@ -253,6 +253,7 @@ background:linear-gradient(90deg,transparent calc(25% - 1px),var(--deck) calc(25
 .bat:after{content:"";position:absolute;right:-.3rem;top:.18rem;width:.18rem;height:.35rem;background:var(--ink2)}
 .bat i{position:absolute;left:1px;top:1px;bottom:1px;background:var(--lime)}
 .bat.low i{background:var(--warn)}.bat.crit i{background:var(--bad)}.bat.chg i{background:var(--cyan)}
+.bat.chg:before{content:"";position:absolute;left:50%;top:50%;width:.22rem;height:.55rem;margin:-.28rem 0 0 -.2rem;background:var(--void);clip-path:polygon(35% 0,100% 0,65% 45%,100% 45%,0 100%,40% 55%,0 55%);z-index:1}
 .bst.low{color:var(--warn)}.bst.critical{color:var(--bad)}.bnone{color:var(--ink2);font-size:.85em}
 .lq{display:inline-flex;align-items:center;gap:var(--s2)}.lq .bars{height:1.05rem}
 .lq small{font-size:.74rem;font-weight:700;color:var(--ink2)}
@@ -514,7 +515,7 @@ html{font-size:13px;font-size:clamp(12px,min(1.06vw,1.9vh),28px)}
 /* 1.3.18 big essentials, no-scroll 1080p - secondary in Details overlay */
 html,body{height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;overflow:hidden!important;margin:0}
 html{font-size:clamp(14px,1.65vh,22px)!important}
-:root{--ink:#f2f0eb;--ink2:#c8c4bb;--mute:#9e998f;--void:#121117;--deck:#1a1820;--card:#24212c;--edge:#353240;--edge2:#45414f;
+:root{--ink:#f2f0eb;--ink2:#e6e0d4;--mute:#d4cec3;--void:#121117;--deck:#1a1820;--card:#24212c;--edge:#353240;--edge2:#45414f;
 --lime:#9fd96a;--ember:#e8895a;--cyan:#6ebfd4;--violet:#a894d4;--blue:#7aa8e0;--teal:#8fb8b2;--rose:#d4a0c0;--warn:#e0b06a;--bad:#e07080;
 --gap:clamp(.55rem,1.4vh,1.1rem);--s1:.2rem;--s2:.45rem;--s3:.7rem;--s4:1rem;--s5:1.25rem}
 body{background:radial-gradient(70vw 55vh at 90% -10%,rgba(232,137,90,.08),transparent 55%),
@@ -634,7 +635,7 @@ html{font-size:clamp(14px,1.65vh,22px)!important}
 
 /* 1.4.2 layout: permanent left menu on every page, each page fills the TV screen with no scrolling */
 html{font-size:16px;font-size:clamp(12px,1.65vh,44px)!important;font-size:clamp(12px,min(1.65vh,.95vw),44px)!important}
-.v2{--void:#121117;--deck:#1a1820;--card:#24212c;--edge:#353240;--edge2:#45414f;--ink:#f4efe6;--ink2:#cfc9be;--mute:#9e998f;--lime:#9fd96a;--ember:#e8895a;--rose:#d4a0c0;--bad:#e07080;--violet:#a894d4;--cyan:#7fc8d8;--gold:#e5b46a;--warn:#e5b46a;--sk:0deg;--gap:1.55rem}
+.v2{--void:#121117;--deck:#1a1820;--card:#24212c;--edge:#353240;--edge2:#45414f;--ink:#f4efe6;--ink2:#ebe6dc;--mute:#d9d3c8;--lime:#9fd96a;--ember:#e8895a;--rose:#d4a0c0;--bad:#e07080;--violet:#a894d4;--cyan:#7fc8d8;--gold:#e5b46a;--warn:#e5b46a;--sk:0deg;--gap:1.55rem}
 html,body{background:#121117!important}
 .v2.wrap{height:100vh;max-height:100vh;overflow:hidden!important;display:flex;flex-direction:column;gap:0;padding:0;box-sizing:border-box;color:var(--ink)}
 .v2 *{letter-spacing:normal}
@@ -787,8 +788,10 @@ html,body{background:#121117!important}
 .v2 #hspanel .hsi .k{display:block;font-size:1.05rem;color:var(--mute);font-weight:400;letter-spacing:normal;text-transform:none;margin:0}
 .v2 #hspanel .hsi .v{display:block;font-size:1.45rem;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
 .v2 #lqm{color:var(--lime)}
-.v2 #hspanel .hsi .bars,.v2 #hspanel .hsi .bat{display:none}
-.v2 #hspanel .hsi .batt,.v2 #hspanel .hsi .lq{display:inline;font-size:inherit;padding:0;margin:0}
+.v2 #hspanel .hsi .bars,.v2 #hspanel .hsi .bat{display:inline-flex;vertical-align:-.12rem}
+.v2 #hspanel .hsi .bat{width:1.65rem;height:.82rem;margin-inline-end:.28rem}
+.v2 #hspanel .hsi .bars{height:.95rem;margin-inline-end:.28rem}
+.v2 #hspanel .hsi .batt,.v2 #hspanel .hsi .lq{display:inline-flex;align-items:center;gap:.28rem;font-size:inherit;padding:0;margin:0}
 .v2 #hspanel.off .hsinfo{display:none}
 .v2 #hspanel #stats{display:none!important}
 .v2 #hspanel .idle2{flex:0 0 auto;margin:0 0 1.55rem;font-size:1.33rem;font-weight:700;text-align:center;padding:1.8rem 1rem;border:2px dashed var(--edge2);border-radius:.78rem;color:var(--mute);text-transform:none;letter-spacing:normal}
@@ -803,9 +806,10 @@ html,body{background:#121117!important}
 .v2 #hspanel .qs button b{display:block;font-size:1.45rem;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .v2 #hspanel .qs button small,.v2 #hspanel .qs button.act small{display:block;font-size:1.05rem;font-weight:400;color:var(--mute)}
 .v2 .qs .qsw{flex:0 0 auto;padding:.78rem 1.45rem;font-size:1.22rem;font-weight:700;border-radius:.67rem;background:var(--lime);color:#121117}
-.v2 #hspanel .hsb{display:flex;margin:.78rem 0 0;grid-template-columns:none}
-.v2 #addhs{flex:0 0 auto;padding:1.22rem 1.9rem;font-size:1.45rem}
-.v2 #addhs:before{display:inline!important;content:"+\00a0";position:static;background:none;border:0;transform:none}
+.v2 #hspanel .hsb{display:flex;margin:auto 0 0;grid-template-columns:none;padding-top:.9rem}
+.v2 #addhs{flex:1 1 auto;width:100%;justify-content:center;padding:1.35rem 1.9rem;font-size:1.55rem;font-weight:800;background:var(--lime);border-color:var(--lime);color:#121117;border-radius:.9rem;min-height:3.6rem}
+.v2 #addhs:before{display:inline!important;content:"+ ";position:static;background:none;border:0;transform:none;font-weight:900}
+.v2 #addhs:focus{box-shadow:0 0 0 3px #fff,0 0 0 7px rgba(159,217,106,.55)!important}
 /* home: sound panel */
 .v2 .mainctl{height:100%;display:flex;flex-direction:column;overflow:hidden;--acc:var(--ember);border-inline-start:4px solid var(--ember)}
 .v2 .mainctl .phead{display:flex;align-items:center;margin:0;padding:0;border:0}
@@ -898,20 +902,22 @@ html,body{background:#121117!important}
 .v2 #tone.act{background:var(--lime);color:#121117}
 /* connection */
 .v2 #pg2 .conn{--acc:var(--ember)}
-.v2 #pg2 .seg{display:grid;grid-auto-flow:row;grid-template-columns:1fr 1fr;grid-gap:.67rem;margin:0 0 .67rem}
+.v2 #pg2 .conn>.note{margin:0 0 .35rem;font-size:.82rem;line-height:1.25}
+.v2 #pg2 .seg{display:grid;grid-auto-flow:row;grid-template-columns:1fr 1fr;grid-gap:.55rem;margin:0 0 .45rem}
 .v2 #pg2 #codecs{grid-template-columns:repeat(4,minmax(0,1fr))}
 .v2 #pg2 .seg:empty{display:none}
-.v2 #pg2 .seg button{padding:1.1rem .6rem;font-size:1.28rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2 #pg2 .seg button{padding:.72rem .5rem;font-size:1.12rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .v2 .seg button.act,.v2 #pg2 .seg button.act{background:rgba(255,255,255,.04);border-color:var(--acc);color:var(--acc)}
+.v2 #pg2 #adseg button.act,.v2 #pg2 #adnodes button.act,.v2 #pg2 #codecs button.act{background:#fff;border-color:rgba(255,255,255,.35);color:#0b1220}
 .v2 .seg button.act:after{content:none}
 .v2 .seg button.cur{border-color:rgba(159,217,106,.6)}
 .v2 .seg button[disabled],.v2 .seg button.no{color:var(--mute);opacity:.4;border-style:solid}
 .v2 #pg2 #admsg:empty,.v2 .cno:empty{display:none}
-.v2 .chiprow{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:.45rem 0 0;padding:.9rem 0;border-bottom:1px solid var(--edge);font-size:1.22rem}
+.v2 .chiprow{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:.2rem 0 0;padding:.45rem 0;border-bottom:1px solid var(--edge);font-size:1.1rem}
 .v2 .chiprow .k{font-size:1.22rem;color:var(--ink2);font-weight:400;text-transform:none;letter-spacing:normal}
 .v2 .chiprow .v{font-weight:700;color:var(--ink);text-align:end}
-.v2 #pg2 .conn .lbl2{margin-top:1.9rem}
-.v2 #pg2 #codecnote{margin-top:.33rem;font-size:.95rem}
+.v2 #pg2 .conn .lbl2{margin-top:.85rem}
+.v2 #pg2 #codecnote{margin-top:.2rem;font-size:.85rem}
 .v2 #pg2 .status{--acc:var(--cyan)}
 .v2 .shead{display:flex;align-items:baseline}
 .v2 .shead .label{color:var(--cyan)}
@@ -935,6 +941,16 @@ html,body{background:#121117!important}
 .v2 .latd .lbar,.v2 .lbar{height:1rem;border-radius:.45rem;margin:0 0 .45rem;background:#0e0d12}
 .v2 .lbar i+i{border:0}
 .v2 .lkeys{font-size:.95rem;color:var(--mute)}
+/* Connection latency legend: one row, readable, do not eat Log */
+.v2 #pg2 .latd{flex:0 0 auto!important;margin-top:.7rem!important}
+.v2 #pg2 .lkeys{
+  display:flex!important;flex-wrap:nowrap!important;align-items:center;
+  font-size:1.22rem!important;line-height:1.35;color:var(--ink2)!important;
+  gap:.55rem;overflow:visible;white-space:nowrap
+}
+.v2 #pg2 .lkeys span{margin:0!important;flex:0 0 auto;white-space:nowrap}
+.v2 #pg2 .lkeys b{width:.75rem;height:.75rem;margin-inline-end:.35rem;vertical-align:-.05em;flex:0 0 auto}
+.v2 #pg2 .lkeys em{font-size:1.22rem;font-weight:900;color:var(--ink)!important}
 .v2 #pg2 .logp{padding:0;margin:1.1rem 0 0;background:none;border:0;border-radius:0;flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column}
 .v2 #pg2 .logp .label{color:var(--cyan);margin:0 0 .67rem}
 .v2 #pg2 .evlog{flex:1 1 auto;min-height:3.5rem;max-height:none;overflow-y:auto;background:#0e0d12;border-radius:.55rem;padding:.78rem 1rem;font-size:1rem;line-height:1.6}
@@ -962,7 +978,7 @@ html,body{background:#121117!important}
 /* messages */
 .v2 .msg{border-radius:.78rem;transform:none}
 .v2 .toast{border-radius:.78rem;transform:none}
-@media(max-width:1000px){.v2 .shell{grid-template-columns:4.6rem minmax(0,1fr)}.v2 .rail{padding:.8rem .5rem}.v2 .rail .tabs button span,.v2 .rail .menufoot,.v2 #langcur{display:none}.v2 .rail .tabs button,.v2 #langbtn{justify-content:center;padding:.9rem 0}.v2 .view{padding:1rem}.v2 .cols,.v2 #home{grid-template-columns:minmax(0,1fr);height:auto}.v2 .view,.v2 .pages,.v2 .card{overflow-y:auto}.v2 #hspanel .hsinfo{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:1000px){.v2 .shell{grid-template-columns:17.5rem minmax(0,1fr)}.v2 .rail{padding:1.15rem 1rem}.v2 .rail .tabs button span,.v2 #langcur{display:inline}.v2 .rail .menufoot span{display:block}.v2 .rail .tabs button,.v2 #langbtn{justify-content:flex-start;padding:1.3rem 1.2rem}.v2 .view{padding:1rem}.v2 .cols,.v2 #home{grid-template-columns:minmax(0,1fr);height:auto}.v2 .view,.v2 .pages,.v2 .card{overflow-y:auto}.v2 #hspanel .hsinfo{grid-template-columns:1fr 1fr 1fr}}
 .v2 #hvnote{display:none}
 .v2 .qrow{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr)}
 .v2 .qrow .gline{font-size:1rem}
@@ -1014,13 +1030,16 @@ html,body{height:auto!important;overflow:auto!important}
 .v2 header{height:auto;min-height:3.6rem;padding:.6rem .9rem;flex-wrap:wrap;gap:.5rem}
 .v2 .brand p,.v2 .brand small{display:none}
 .v2 .live{font-size:.9rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.v2 .shell{display:block!important;height:auto!important}
-.v2 .rail{position:sticky;top:0;z-index:20;height:auto!important;display:flex!important;flex-direction:row!important;align-items:center;gap:.3rem;padding:.4rem!important;border-right:0;border-bottom:1px solid var(--edge);background:var(--deck)}
-.v2 .rail .tabs{display:flex!important;flex-direction:row!important;flex:1 1 auto;gap:.25rem;min-width:0}
-.v2 .rail .tabs button{flex:1 1 0;flex-direction:column;justify-content:center!important;gap:.2rem;min-height:3.4rem;padding:.4rem .1rem!important;font-size:.72rem;text-align:center;line-height:1.1}
-.v2 .rail .tabs button span{display:block!important}
-.v2 .rail .menufoot,.v2 #langcur{display:none!important}
-.v2 #langbtn{flex:0 0 auto;width:auto;padding:.6rem!important;margin:0}
+.v2 .shell{display:grid!important;grid-template-columns:17.5rem minmax(0,1fr)!important;height:auto!important}
+.v2 .rail{position:relative!important;top:auto;z-index:20;height:auto!important;min-height:100%;display:flex!important;flex-direction:column!important;align-items:stretch;gap:.55rem;padding:1.15rem 1rem!important;border-right:1px solid var(--edge);border-bottom:0!important;background:var(--deck);max-width:none!important;margin:0!important;width:auto!important}
+.v2 .rail .tabs{display:flex!important;flex-direction:column!important;flex:1 1 auto;gap:.65rem;min-width:0;justify-content:flex-start}
+.v2 .rail .tabs button{flex:0 0 auto;flex-direction:row!important;justify-content:flex-start!important;gap:1rem;min-height:3.7rem;padding:1.3rem 1.2rem!important;font-size:1.42rem!important;text-align:start;line-height:1.15;border-radius:.95rem}
+.v2 .rail .tabs button span{display:inline!important}
+.v2 #langcur{display:inline!important}
+.v2 .rail .menufoot{display:flex!important;flex:0 0 auto;flex-direction:column!important;align-items:stretch;margin-top:auto!important;padding:.75rem .4rem 0;gap:.45rem}
+.v2 .rail .menufoot span{display:block!important}
+.v2 .rail #stop{width:100%;min-height:3.3rem;padding:.95rem 1.05rem;font-size:1.18rem;line-height:1.15;white-space:normal}
+.v2 #langbtn{width:100%;padding:1.3rem 1.2rem!important;margin:0;font-size:1.42rem!important;min-height:3.7rem;flex-direction:row!important;justify-content:flex-start!important}
 .v2 .view{padding:.8rem!important;height:auto!important;overflow:visible!important}
 .v2 .pages,.v2 .pg,.v2 #home{height:auto!important;max-height:none!important;overflow:visible!important}
 .v2 .cols,.v2 #home{display:grid!important;grid-template-columns:minmax(0,1fr)!important;height:auto!important;gap:.8rem}
@@ -1037,14 +1056,322 @@ html,body{height:auto!important;overflow:auto!important}
 .v2 .pfoot{margin-top:.8rem}
 }
 @media(max-width:1000px),(max-aspect-ratio:4/3){
-.v2 .rail{position:fixed!important;top:auto!important;bottom:0!important;left:0;right:0;z-index:50;border-bottom:0!important;border-inline-end:0;border-top:1px solid var(--edge);padding:.4rem .4rem calc(.4rem + env(safe-area-inset-bottom))!important;box-shadow:0 -6px 18px rgba(0,0,0,.35);max-width:none!important;width:100%!important;margin:0!important;background:var(--deck)}
-.v2 .view{padding-bottom:calc(6.2rem + env(safe-area-inset-bottom))!important}
+.v2 .rail{position:relative!important;top:auto!important;bottom:auto!important;left:auto;right:auto;z-index:20;border-top:0!important;box-shadow:none!important;width:auto!important;margin:0!important}
+.v2 .view{padding-bottom:.8rem!important}
 .v2 #langlist{z-index:60;max-height:min(24rem,calc(100dvh - 7rem));overflow-y:auto}
 .v2 #langlist{left:auto;right:0;max-width:calc(100vw - 1rem)}
 [dir=rtl] .v2 #langlist{left:0;right:auto}
 .v2 .seg,.v2 #pg2 .seg,.v2 #pg3 .seg{grid-auto-flow:row!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
 .v2 .seg button,.v2 #pg2 .seg button,.v2 #pg3 .seg button{white-space:normal;overflow:visible;text-overflow:unset;line-height:1.15}
 }
+
+
+/* layout 1.4.3.11: no page title banners, stop in rail, stretch home sound */
+.v2 #pg1 .ph,.v2 #pg2 .ph,.v2 #pg3 .ph{display:none!important}
+.v2 #pg0 .ph h2,.v2 #pg0 .ph .note,.v2 .phint{display:none!important}
+.v2 #pg0 .ph{margin:0 0 .67rem;min-height:0}
+.v2 .pfoot{display:none!important}
+.v2 .rail .menufoot{display:flex;flex-direction:column;gap:.45rem;margin-top:auto;padding:.55rem;border:0}
+.v2 .rail .menufoot span{font-size:.85rem;line-height:1.25;color:var(--mute)}
+.v2 .rail #stop{width:100%;min-height:2.8rem;padding:.75rem .9rem;font-size:1.05rem;font-weight:800;border-radius:.67rem;background:#b91c1c;border:2px solid #b91c1c;color:#fff}
+.v2 .rail #stop:focus{box-shadow:0 0 0 3px #fff,0 0 0 7px rgba(185,28,28,.45)!important}
+.v2 #home{align-items:stretch}
+.v2 #home>.c2{height:100%;min-height:0;display:flex;flex-direction:column}
+.v2 #sndp,.v2 #home .mainctl{flex:1 1 auto;height:100%;min-height:0;display:flex;flex-direction:column}
+.v2 #sndp .quick{margin-top:auto}
+.v2 #hspanel{height:100%}
+.v2 .pg .cols{flex:1 1 0;min-height:0;align-items:stretch}
+.v2 #pg2 .cols>.card{height:100%}
+/* issue52 local polish: brighter secondary text, clearer focus, one volume slider */
+.v2 .k,.v2 .note,.v2 .sub,.v2 .cl,.v2 .label,.v2 .ver,.v2 .menufoot{color:var(--ink2)!important;opacity:1}
+.v2 .chip .k,.v2 .stat .k{color:var(--ink2)}
+.v2 input[type=range]{height:1.67rem}
+.v2 input[type=range]::-webkit-slider-runnable-track{height:1.67rem;background:#0e0d12;border-radius:.45rem}
+.v2 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:.45rem;height:1.67rem;border-radius:.45rem;background:#fff;border:0;box-shadow:-100vw 0 0 100vw var(--sl,var(--ember))}
+[dir=rtl] .v2 input[type=range]::-webkit-slider-thumb{box-shadow:100vw 0 0 100vw var(--sl,var(--ember))}
+.v2 input[type=range]::-moz-range-track{height:1.67rem;background:#0e0d12;border-radius:.45rem}
+.v2 input[type=range]::-moz-range-progress{height:1.67rem;background:var(--sl,var(--ember));border-radius:.45rem}
+.v2 input[type=range]::-moz-range-thumb{width:.45rem;height:1.67rem;border:0;border-radius:.45rem;background:#fff}
+.v2 input[type=range]:focus{outline:none;box-shadow:0 0 0 4px #fff,0 0 0 8px rgba(255,106,43,.45)}
+.v2 #gain{--sl:var(--ember)}
+.v2 .card:focus-within{box-shadow:0 0 0 3px #fff,0 0 1.2rem rgba(255,255,255,.18)}
+.v2 .rail .tabs button:focus,.v2 button:focus{box-shadow:0 0 0 3px #fff!important}
+.v2 #sndp .vrow.hsrow,.v2 #sndp .hsrow{display:none!important}
+.v2 #gvboost{color:var(--ember);font-weight:700;margin-inline-start:.4rem;font-size:.85em;letter-spacing:.04em;text-transform:uppercase}
+.v2 #pg2 .evlog{font-size:1.05rem;line-height:1.55}
+
+.usbrow{display:grid;grid-template-columns:1fr;grid-gap:var(--s1);margin:.2rem 0 .35rem}
+.usbtile{display:flex;align-items:center;justify-content:center;gap:.55rem;margin:0;padding:1.1rem .9rem;border-radius:.55rem;border:1px solid var(--edge2);background:var(--card);color:var(--ink2);font-weight:700;min-height:2.5rem;line-height:1.15}
+.usbtile .usbname{font-size:1.28rem}
+.usbtile .usbst{font-size:.95rem;font-weight:600;opacity:.75}
+.usbtile.on{background:#fff;color:#0b1220;border-color:rgba(255,255,255,.35)}
+.usbtile.on .usbst{color:#0e7490;opacity:1}
+.usbtile.off{background:var(--card);color:var(--mute);border-color:var(--edge)}
+.usbtile.off .usbst{display:none}
+.v2 #pg2 .usbtile{padding:.72rem .9rem;font-size:1.15rem}
+
+/* pg0 saved scan in-card + rail bigger 1.4.3.12; home bat/sig icons 1.4.3.13 */
+.v2 #pg0 .ph{display:none!important}
+.v2 #pg0 .shead{display:flex;align-items:center;gap:.8rem;margin:0 0 .67rem}
+.v2 #pg0 .shead .label{margin:0;flex:1}
+.v2 #pg0 #scan{flex:0 0 auto;padding:.85rem 1.35rem;font-size:1.15rem;font-weight:800;background:var(--lime);border-color:var(--lime);color:#121117;border-radius:.67rem;min-height:2.8rem}
+.v2 #pg0 .card > .note{margin:0 0 .67rem;font-size:.9rem}
+.v2 .shell{grid-template-columns:17.5rem minmax(0,1fr)!important}
+.v2 .rail{padding:1.15rem 1rem!important}
+.v2 .rail .tabs{gap:.75rem}
+.v2 .rail .tabs button{padding:1.3rem 1.2rem!important;font-size:1.42rem!important;border-radius:.95rem;min-height:3.7rem}
+.v2 .rail .tabs button svg{width:1.7rem!important;height:1.7rem!important}
+.v2 .rail #stop{min-height:3.3rem;font-size:1.18rem;padding:.95rem 1.05rem}
+.v2 .rail .menufoot{padding:.75rem .4rem 0}
+
+
+
+
+
+/* layout 1.4.3.28: Connection latency legend one row; Log not shortened */
+
+.v2 .rail #langbtn{
+  width:100%!important;margin:0!important;padding:1.3rem 1.2rem!important;font-size:1.42rem!important;
+  min-height:3.7rem!important;border-radius:.95rem!important;border:2px solid transparent!important;
+  background:none!important;color:var(--ink2)!important;font-weight:700!important;
+  display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start!important;gap:1rem;
+  text-transform:none!important;letter-spacing:normal!important
+}
+.v2 .rail #langbtn svg{width:1.7rem!important;height:1.7rem!important;color:inherit!important;flex:0 0 auto}
+.v2 .rail #langbtn.on,.v2 .rail #langbtn[aria-expanded="true"]{
+  background:var(--card)!important;color:var(--cyan)!important;border-color:var(--cyan)!important
+}
+.v2 #langbox{position:relative;width:100%}
+.v2 #langlist{left:0;right:auto;bottom:auto;top:.35rem}
+
+.v2 #pg1.on{height:100%!important;min-height:0;display:flex!important;flex-direction:column}
+.v2 #pg1 .cols{flex:1 1 auto;min-height:0;height:100%!important;align-items:stretch!important}
+.v2 #pg1 .cols>.card,.v2 #pg1 .eqp,.v2 #pg1 .games{height:100%!important;min-height:0}
+.v2 #pg1 .eqp{display:flex!important;flex-direction:column;overflow:hidden!important;justify-content:flex-start}
+.v2 #pg1 .eqbox{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.v2 #pg1 .eqp .curve{flex:0 0 auto;height:7.2rem!important;margin:0 0 .7rem!important}
+.v2 #pg1 .eqp .bands{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly;gap:.55rem;margin:0;overflow:hidden}
+.v2 #pg1 .eqp .band{margin:0!important}
+.v2 #pg1 .eqp .band .bn{font-size:1.28rem!important}
+.v2 #pg1 .eqp .band .bv{font-size:1.35rem!important}
+.v2 #pg1 .eqp .band input[type=range]{height:1.15rem!important}
+.v2 #pg1 .eqp .band input[type=range]::-webkit-slider-runnable-track{height:1.15rem!important}
+.v2 #pg1 .eqp .band input[type=range]::-webkit-slider-thumb{width:1.15rem!important;height:1.15rem!important}
+.v2 #pg1 .eqp .presets{
+  margin:1.15rem 0 0!important;padding-top:1.05rem!important;border-top:1px solid var(--edge);
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:.75rem!important;flex:0 0 auto
+}
+.v2 #pg1 .eqp .presets button{
+  width:100%!important;padding:1.15rem .85rem!important;font-size:1.28rem!important;font-weight:800!important;
+  min-height:3.5rem!important;border-radius:.9rem!important;line-height:1.15;white-space:normal
+}
+.v2 #pg1 .eqp .presets button.act{background:var(--violet)!important;border-color:var(--violet)!important;color:#121117!important}
+.v2 #pg1 .eqp .presets button.act:before,.v2 #pg1 .eqp .presets button.act:after{display:none!important;content:none!important}
+.v2 #pg1 .eqp .presets button.act>*{display:inline!important}
+.v2 #pg1 #game{
+  display:grid!important;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;
+  gap:.9rem 1.1rem;flex-wrap:nowrap!important;padding:1.2rem 1.35rem!important;min-height:4.4rem;
+  margin:0 0 1rem;background:var(--card);border:2px solid var(--rose);border-radius:.9rem
+}
+.v2 #pg1 #game.none{border-color:var(--edge)}
+.v2 #pg1 #gbtns{display:flex!important;flex-wrap:nowrap!important;gap:.65rem;margin:0}
+.v2 #pg1 #gbtns button{flex:0 0 auto;white-space:nowrap;padding:.85rem 1.15rem!important;font-size:1.12rem!important;min-height:3rem}
+.v2 #pg1 .grow{
+  display:grid!important;grid-template-columns:auto minmax(0,1fr) auto;
+  grid-template-areas:"ico name drop" "hs hs hs";
+  align-items:center;gap:.7rem 1rem;flex-wrap:nowrap!important;
+  padding:1.05rem 1.2rem!important;margin:0 0 .8rem;border-radius:.9rem
+}
+.v2 #pg1 .grow .gic{grid-area:ico}
+.v2 #pg1 .grow .gt{grid-area:name;min-width:0}
+.v2 #pg1 .grow > button{grid-area:drop}
+.v2 #pg1 .grow .ghs{grid-area:hs;padding-inline-start:0!important;flex:none!important;width:auto;display:flex;flex-wrap:wrap;gap:.55rem}
+.v2 #pg1 .games{display:flex;flex-direction:column;overflow:hidden}
+.v2 #pg1 .glist{flex:1 1 auto;min-height:0;overflow:auto}
+
+.v2 #pg3 .seg button.act,.v2 #pg3 #bkseg button.act{
+  background:var(--gold)!important;border-color:var(--gold)!important;color:#121117!important
+}
+.v2 #pg3 .seg button.act:before,.v2 #pg3 #bkseg button.act:before{display:none!important;content:none!important}
+.v2 #pg3 .bkgo button.act{background:var(--gold)!important;border-color:var(--gold)!important;color:#121117!important}
+.v2 #pg3 .bkgo button.act:before{display:none!important;content:none!important}
+.v2 #pg3 .bkrow{
+  display:flex!important;flex-direction:row!important;align-items:center;gap:.65rem;
+  padding:.95rem 1.1rem!important;min-height:3.6rem;margin:0 0 .65rem;
+  background:var(--card)!important;border:2px solid var(--edge)!important;border-radius:.85rem!important
+}
+.v2 #pg3 .bkrow .bkpick{flex:1 1 auto!important;width:auto!important;text-align:start;font-size:1.2rem!important;background:none!important;border:0!important}
+.v2 #pg3 .bkrow .bkdel{
+  flex:0 0 auto!important;width:auto!important;min-width:0!important;height:auto!important;min-height:2.8rem!important;
+  padding:.55rem 1rem!important;font-size:1.05rem!important;line-height:1.15;font-weight:800;white-space:nowrap;
+  background:#b91c1c!important;border:2px solid #b91c1c!important;color:#fff!important;border-radius:.55rem!important
+}
+.v2 #pg3 .bkrow.on,.v2 #pg3 .bkrow:has(.bkpick.act){background:var(--gold)!important;border-color:var(--gold)!important;color:#121117!important}
+
+.v2 #pglang .langpage{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:.85rem!important;margin-top:.6rem}
+.v2 #pglang .langopt{
+  width:100%!important;min-height:3.6rem!important;padding:1.15rem 1.2rem!important;
+  font-size:1.35rem!important;font-weight:800!important;text-align:center!important;
+  border-radius:.9rem!important;display:flex!important;align-items:center;justify-content:center
+}
+.v2 #pglang .langopt.on{background:var(--cyan)!important;border-color:var(--cyan)!important;color:#121117!important}
+
+.v2 #pg0 .cols{gap:1.1rem}
+.v2 #pg0 .card{padding:1.45rem 1.55rem!important}
+.v2 #pg0 .shead .label,.v2 #pg0 .label{font-size:1.15rem!important}
+.v2 #pg0 #scan{padding:1.05rem 1.6rem!important;font-size:1.32rem!important;min-height:3.4rem!important}
+.v2 #pg0 .note,.v2 #pg0 .k.note{font-size:1.18rem!important;line-height:1.4!important}
+.v2 #pg0 .list .dl{padding:1.2rem 1.25rem!important;min-height:4.2rem;margin:0 0 .75rem;border-radius:.9rem}
+.v2 #pg0 .list .dl b{font-size:1.4rem!important}
+.v2 #pg0 .list .btns button{padding:.85rem 1.15rem!important;font-size:1.15rem!important;min-height:3rem}
+
+
+/* Connection restore from 1.4.3.21 — do not change */
+.v2 #pg2 .conn>.note,.v2 #pg2 .conn .note,.v2 #pg2 #codecnote,.v2 #pg2 #admsg{
+  font-size:1.18rem!important;line-height:1.4!important;margin:.35rem 0 .75rem!important
+}
+.v2 #pg2 .seg{grid-gap:.75rem!important;margin:0 0 .7rem!important}
+.v2 #pg2 .seg button{
+  padding:1.2rem .85rem!important;font-size:1.28rem!important;min-height:3.5rem!important;border-radius:.85rem!important
+}
+.v2 #pg2 #codecs{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.v2 #pg2 .usbtile{padding:1.2rem 1rem!important;font-size:1.28rem!important;min-height:3.5rem!important;border-radius:.85rem!important}
+.v2 #pg2 .usbtile .usbname{font-size:1.35rem!important}
+
+
+
+/* height chain so #pg1 can fill (no visual change to other pages) */
+.v2 .view{min-height:0}
+.v2 .dmain.show{flex:1 1 auto!important;min-height:0!important;height:100%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+.v2 .dmain.show .pages{flex:1 1 auto!important;min-height:0!important;height:100%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+.v2 .dmain.show .pg:not(.on){display:none!important}
+.v2 .dmain.show .pg.on{flex:1 1 auto!important;min-height:0!important}
+
+/* Sound & games fill viewport — #pg1 only */
+.v2 .pages:has(#pg1.on),
+.v2 #pg1.on{
+  height:100%!important;min-height:0!important;flex:1 1 auto!important;
+  display:flex!important;flex-direction:column!important
+}
+.v2 #pg1.on > .cols{
+  flex:1 1 auto!important;min-height:0!important;height:100%!important;
+  display:grid!important;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;align-items:stretch!important;gap:var(--gap,1rem)!important
+}
+.v2 #pg1.on > .cols > .eqp,
+.v2 #pg1.on > .cols > .stack{
+  height:100%!important;max-height:none!important;min-height:0!important;flex:1 1 auto!important;align-self:stretch!important
+}
+.v2 #pg1.on .stack{
+  display:flex!important;flex-direction:column!important;gap:.9rem!important;overflow:hidden!important
+}
+.v2 #pg1.on .stack > .games{
+  flex:1 1 auto!important;min-height:0!important;height:auto!important;max-height:none!important;
+  display:flex!important;flex-direction:column!important;overflow:hidden!important
+}
+.v2 #pg1.on .stack > .more{flex:0 0 auto!important;height:auto!important}
+.v2 #pg1.on .games .gsec{flex:1 1 auto!important;min-height:0!important;display:flex!important;flex-direction:column!important}
+.v2 #pg1.on .games .glist{flex:1 1 auto!important;min-height:0!important;overflow:auto!important}
+.v2 #pg1.on .eqp{
+  display:flex!important;flex-direction:column!important;overflow:hidden!important;height:100%!important
+}
+.v2 #pg1.on .eqbox{
+  flex:1 1 auto!important;min-height:0!important;display:flex!important;flex-direction:column!important;
+  justify-content:space-between!important;overflow:hidden!important
+}
+.v2 #pg1.on .eqp .curve{flex:0 0 auto!important;height:7.5rem!important;margin:0 0 .85rem!important}
+.v2 #pg1.on .eqp .bands{
+  flex:1 1 auto!important;min-height:0!important;display:flex!important;flex-direction:column!important;
+  justify-content:space-evenly!important;gap:.65rem!important;overflow:hidden!important
+}
+.v2 #pg1.on .eqp .band{margin:0!important;flex:0 0 auto!important}
+.v2 #pg1.on .eqp .band input[type=range]{height:1.2rem!important}
+.v2 #pg1.on .eqp .band input[type=range]::-webkit-slider-runnable-track{height:1.2rem!important}
+.v2 #pg1.on .eqp .band input[type=range]::-webkit-slider-thumb{width:1.2rem!important;height:1.2rem!important}
+.v2 #pg1.on .eqp .presets{
+  flex:0 0 auto!important;margin:1.2rem 0 0!important;padding-top:1.1rem!important;border-top:1px solid var(--edge);
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.8rem!important
+}
+.v2 #pg1.on .eqp .presets button{
+  width:100%!important;padding:1.15rem .85rem!important;font-size:1.28rem!important;font-weight:800!important;
+  min-height:3.5rem!important;border-radius:.9rem!important;white-space:normal
+}
+@media (max-width:1000px),(max-aspect-ratio:4/3){
+.v2 #pg1.on > .cols{
+  display:grid!important;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;height:100%!important;align-items:stretch!important
+}
+.v2 #pg1.on > .cols > .eqp,
+.v2 #pg1.on > .cols > .stack,
+.v2 #pg1.on .stack > .games,
+.v2 #pg1.on .eqp{height:100%!important;max-height:none!important;min-height:0!important}
+.v2 #pg1.on .stack > .games,
+.v2 #pg1.on .stack > .more{flex:none; }
+.v2 #pg1.on .stack > .games{flex:1 1 auto!important}
+.v2 #pg1.on .stack > .more{flex:0 0 auto!important}
+}
+
+
+/* Headsets page fill + bigger spacing — #pg0 only */
+.v2 #pg0.on{
+  height:100%!important;min-height:0!important;flex:1 1 auto!important;
+  display:flex!important;flex-direction:column!important
+}
+.v2 #pg0.on > .cols{
+  flex:1 1 auto!important;min-height:0!important;height:100%!important;
+  display:grid!important;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;align-items:stretch!important;gap:1.15rem!important
+}
+.v2 #pg0.on > .cols > .card,
+.v2 #pg0.on > .cols > .stack{
+  height:100%!important;max-height:none!important;min-height:0!important;align-self:stretch!important
+}
+.v2 #pg0.on > .cols > .card:first-child{
+  display:flex!important;flex-direction:column!important;overflow:hidden!important
+}
+.v2 #pg0.on #savedlist{flex:1 1 auto!important;min-height:0!important}
+.v2 #pg0.on .stack{
+  display:flex!important;flex-direction:column!important;gap:1rem!important;height:100%!important;overflow:hidden!important
+}
+.v2 #pg0.on .stack > .card{min-height:0}
+.v2 #pg0.on .stack > .card:first-child{flex:1 1 auto!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+.v2 #pg0.on .stack > .card:last-child{flex:0 0 auto!important}
+.v2 #pg0.on .card{padding:1.55rem 1.65rem!important}
+.v2 #pg0.on .shead{margin:0 0 1rem!important;gap:1rem!important}
+.v2 #pg0.on .shead .label,.v2 #pg0.on .label{font-size:1.2rem!important;margin:0 0 .85rem!important}
+.v2 #pg0.on #scan{
+  padding:1.15rem 1.7rem!important;font-size:1.38rem!important;min-height:3.6rem!important;border-radius:.85rem!important
+}
+.v2 #pg0.on .note,.v2 #pg0.on .k.note{font-size:1.22rem!important;line-height:1.45!important;margin:0 0 1.1rem!important}
+.v2 #pg0.on .list{flex:1 1 auto!important;min-height:0!important;overflow:auto!important;display:flex;flex-direction:column;gap:.85rem}
+.v2 #pg0.on .list .dl,
+.v2 #pg0.on .list > .dl{
+  padding:1.35rem 1.4rem!important;min-height:4.8rem!important;margin:0!important;border-radius:1rem!important;
+  display:flex!important;align-items:center!important;gap:1rem!important
+}
+.v2 #pg0.on .list .dl b{font-size:1.5rem!important}
+.v2 #pg0.on .list .dl .st,.v2 #pg0.on .list .meta{font-size:1.15rem!important}
+.v2 #pg0.on .list .btns{gap:.7rem!important}
+.v2 #pg0.on .list .btns button{
+  padding:1rem 1.25rem!important;font-size:1.22rem!important;min-height:3.3rem!important;border-radius:.75rem!important
+}
+.v2 #pg0.on .list > p,.v2 #pg0.on .list .empty{
+  padding:1.6rem 1.3rem!important;font-size:1.22rem!important;border-radius:.95rem!important;min-height:5rem;
+  display:flex;align-items:center;justify-content:center
+}
+.v2 #pg0.on input#blkaddr{
+  min-height:3.3rem!important;font-size:1.22rem!important;padding:.85rem 1rem!important;border-radius:.75rem!important
+}
+.v2 #pg0.on .btns button{padding:1rem 1.25rem!important;font-size:1.22rem!important;min-height:3.3rem!important}
+@media (max-width:1000px),(max-aspect-ratio:4/3){
+.v2 #pg0.on > .cols{
+  display:grid!important;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;height:100%!important;align-items:stretch!important
+}
+.v2 #pg0.on > .cols > .card,.v2 #pg0.on > .cols > .stack{height:100%!important;max-height:none!important}
+}
+
 </style>
 </head>
 <body><div class="wrap v2">
@@ -1060,12 +1387,13 @@ html,body{height:auto!important;overflow:auto!important}
 <nav class="tabs" id="tabs">
 <button type="button" class="home on" id="tbhome" style="--c:var(--ink)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M6 10v10h4.5v-6h3v6H18V10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg><span data-i18n="home">Home</span></button>
 <button type="button" id="tb0" style="--c:var(--lime)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg><span data-i18n="tabHeadsets">Headsets</span></button>
-<button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="tabSound">Sound &amp; games</span></button>
 <button type="button" id="tb2" style="--c:var(--ember)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M6 16v-5M11 16V6M16 16v-8M21 16v-3" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="connection">Connection</span></button>
+<button type="button" id="tb1" style="--c:var(--violet)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="currentColor" stroke-width="1.6" opacity=".45"/><rect x="2.5" y="13" width="5" height="3" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" fill="currentColor"/><rect x="16.5" y="11" width="5" height="3" fill="currentColor"/></svg><span data-i18n="tabSound">Sound &amp; games</span></button>
 <button type="button" id="tb3" style="--c:var(--gold)"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11M7 9l5 5 5-5M4 17v4h16v-4" stroke="currentColor" stroke-width="2.4" fill="none"/></svg><span data-i18n="bkBtn">Backup</span></button>
+<button type="button" id="langbtn" style="--c:var(--cyan)" aria-haspopup="true" aria-label="Language"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="2"/></svg><span id="langcur">English</span></button>
 </nav>
-<div class="hdr"><div id="langbox"><button type="button" id="langbtn" aria-haspopup="true" aria-label="Language"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="2"/></svg><span id="langcur">English</span></button><div id="langlist" role="menu"></div></div></div>
-<div class="menufoot"><span data-i18n="footer">Closing this page leaves HearBridge running.</span></div>
+<div id="langbox"><div id="langlist" role="menu"></div></div>
+<div class="menufoot"><button type="button" id="stop" class="red" data-i18n="stop">Stop HearBridge</button><span data-i18n="footer">Closing this page leaves HearBridge running.</span></div>
 </aside>
 <div class="view">
 <main class="grid" id="home"><section class="hero card" id="hspanel" style="--acc:var(--lime)"><div class="hhead"><p class="label" data-i18n="headsetPanel">Headset</p></div><div class="now"><span class="nowico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v-3a7 7 0 0 1 14 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="3" y="14" width="5" height="7" rx="1.5" fill="currentColor"/><rect x="16" y="14" width="5" height="7" rx="1.5" fill="currentColor"/></svg></span><span class="nowt"><p class="dev" id="dev">-</p><p class="nows" id="nows"></p></span><button type="button" id="hsconn" data-i18n="disconnect">Disconnect</button></div>
@@ -1074,9 +1402,10 @@ html,body{height:auto!important;overflow:auto!important}
 <span class="k" data-i18n="format">Format</span><span class="chips" id="fmt">-</span>
 <span class="k" data-i18n="link">Link quality</span><span class="v" id="lqv">-</span>
 </div></div>
-<p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p><p class="sub" id="yourhs" data-i18n="yourHs">Your headsets</p><div class="qs" id="qs"></div><div class="btns hsb"><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div></section><div class="col c2"><section class="panel mainctl card" id="sndp" style="--acc:var(--ember)"><div class="phead"><p class="label" data-i18n="sound">Sound</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div><div class="vol volin"><div class="vrow"><div class="row"><span class="cl" data-i18n="boost">Boost (software gain)</span><span class="big" id="gv">-</span></div>
-<input type="range" id="gain" min="0" max="500" step="10"></div>
-<div class="vrow"><div class="row"><span class="cl"><span data-i18n="headset">Headset volume (AVRCP)</span><span class="sync" id="hsync" data-i18n="fromHeadset">from headset</span></span><span class="big" id="hv">-</span></div>
+<p class="k idle2" id="stidle" data-i18n="notConnected">Not connected</p><p class="sub" id="yourhs" data-i18n="yourHs">Your headsets</p><div class="qs" id="qs"></div><div class="btns hsb"><button type="button" id="addhs" data-i18n="addHs">Add headset</button></div></section><div class="col c2"><section class="panel mainctl card" id="sndp" style="--acc:var(--ember)"><div class="phead"><p class="label" data-i18n="sound">Sound</p><button id="mute" class="sm" data-i18n="mute">Mute</button></div><div class="vol volin"><div class="vrow"><div class="row"><span class="cl" data-i18n="volumeOne">Volume</span><span class="big" id="gv">-</span><span id="gvboost" hidden>boost</span></div>
+<input type="range" id="gain" min="0" max="200" step="5" title="0-100% volume, 100-200% software boost (200=max)">
+<small class="vnote" data-i18n="volumeOneHint">Up to 100% is volume. Past 100% is boost.</small></div>
+<div class="vrow hsrow" hidden aria-hidden="true"><div class="row"><span class="cl"><span data-i18n="headset">Headset volume (AVRCP)</span><span class="sync" id="hsync" data-i18n="fromHeadset">from headset</span></span><span class="big" id="hv">-</span></div>
 <input type="range" id="hs" min="0" max="127" step="1"><small class="vnote" id="hvnote"></small></div>
 </div>
 
@@ -1088,7 +1417,7 @@ html,body{height:auto!important;overflow:auto!important}
 <div class="dmain" id="dmain">
 <div class="dhead"><p class="label" id="pgtitle">-</p></div>
 <div class="pages">
-<div class="pg" id="pg0" style="--acc:var(--lime)"><div class="ph"><h2 data-i18n="tabHeadsets">Headsets</h2><span class="sp"></span><button id="scan" class="act xl" data-i18n="scan">Scan for devices</button></div><p class="k hint phint" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p><div class="cols"><section class="card" style="--acc:var(--lime)"><p class="label" data-i18n="saved">Saved headphones</p><div id="savedlist" class="list"></div></section><div class="stack"><section class="card" style="--acc:var(--cyan)"><p class="label"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div></section><section class="card" style="--acc:var(--bad)"><p class="label">Blocked devices</p><p class="k note">HearBridge never touches these. Game controllers are blocked automatically.</p><div class="btns"><input id="blkaddr" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" autocomplete="off"><button id="blkadd" class="act">Block</button></div><div id="blklist" class="list"></div></section></div></div></div>
+<div class="pg" id="pg0" style="--acc:var(--lime)"><div class="cols"><section class="card" style="--acc:var(--lime)"><div class="shead"><p class="label" data-i18n="saved">Saved headphones</p><span class="sp"></span><button type="button" id="scan" class="act" data-i18n="scan">Scan for devices</button></div><p class="k note" data-i18n="scanHint">Put the headphones in pairing mode, then press Scan.</p><div id="savedlist" class="list"></div></section><div class="stack"><section class="card" style="--acc:var(--cyan)"><p class="label"><span data-i18n="found">Found nearby</span><span id="scanning" class="spin" style="display:none"></span></p><div id="devlist" class="list"></div></section><section class="card" style="--acc:var(--bad)"><p class="label">Blocked devices</p><p class="k note">HearBridge never touches these. Game controllers are blocked automatically.</p><div class="btns"><input id="blkaddr" placeholder="AA:BB:CC:DD:EE:FF" maxlength="17" autocomplete="off"><button id="blkadd" class="act">Block</button></div><div id="blklist" class="list"></div></section></div></div></div>
 <div class="pg" id="pg1" style="--acc:var(--violet)"><div class="ph"><h2 data-i18n="tabSound">Sound &amp; games</h2><p class="k note" id="eqhint" data-i18n="eqHint">Saved for this headset.</p></div><div class="cols"><section class="card eqp" id="eqp" style="--acc:var(--violet)"><div class="eqhead" id="eqhead"><span class="cl" data-i18n="equalizer">Equalizer</span><button id="eqon" data-i18n="eqOff">Off</button></div>
 <div class="eqbox"><div class="curve"><svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="eqg" x1="0" x2="1" y1="0" y2="0">
 <stop offset="0" stop-color="#ff6a2b"/><stop offset=".3" stop-color="#ffb23d"/><stop offset=".5" stop-color="#c8ff3d"/><stop offset=".72" stop-color="#3dd8ff"/><stop offset="1" stop-color="#ff7ad9"/></linearGradient></defs>
@@ -1114,7 +1443,7 @@ html,body{height:auto!important;overflow:auto!important}
 <p class="bkmsg" id="bkmsg"></p>
 <input type="file" id="bkfile" accept=".json,application/json" style="display:none">
 </section><section class="card bkr" style="--acc:var(--edge2)"><p class="label" data-i18n="bkHere">Backups</p><div class="bklist" id="bklist"></div><p class="k note" data-i18n="rsNote">Restore replaces the saved headsets and settings on this console.</p></section></div></div>
-<div class="pg" id="pg2" style="--acc:var(--ember)"><div class="ph"><h2 data-i18n="connection">Connection</h2><p class="k note" data-i18n="connSub">Adapter, codec and live numbers</p></div><div class="cols"><section class="card conn" style="--acc:var(--ember)"><p class="label" data-i18n="adapterPick">Bluetooth adapter</p><p class="k note" data-i18n="adapterHint">Auto prefers a USB stick when one is plugged in. Changing this restarts Bluetooth.</p><div class="seg" id="adseg"><button type="button" id="adauto" data-i18n="adapterAuto">Auto</button><button type="button" id="adint" data-i18n="adapterInternal">Console chip</button><button type="button" id="adusb" data-i18n="adapterUsb">USB adapter</button></div><div class="seg" id="adnodes"></div><p class="k note" id="admsg"></p><div class="chiprow"><span class="k" data-i18n="current">In use</span><span class="v" id="chipv">-</span></div><p class="label lbl2" data-i18n="codec">Codec</p><div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div><p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p><p class="k note cno" id="codecno"></p><p class="k note cno" id="xqnote"></p></section><section class="card status" style="--acc:var(--cyan)"><div class="shead"><p class="label" data-i18n="liveStatus">Live status</p><span class="sp"></span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div><div class="kv">
+<div class="pg" id="pg2" style="--acc:var(--ember)"><div class="ph"><h2 data-i18n="connection">Connection</h2><p class="k note" data-i18n="connSub">Adapter, codec and live numbers</p></div><div class="cols"><section class="card conn" style="--acc:var(--ember)"><p class="label" data-i18n="adapterPick">Bluetooth adapter</p><p class="k note" data-i18n="adapterHint">Auto prefers a Realtek USB stick when one is plugged in. Changing this restarts Bluetooth.</p><div class="seg" id="adseg"><button type="button" id="adauto" data-i18n="adapterAuto">Auto</button><button type="button" id="adint" data-i18n="adapterInternal">Console chip</button><button type="button" id="adusb" data-i18n="adapterUsb">USB adapter</button></div><div class="seg" id="adnodes"></div><p class="k note" id="admsg"></p><div class="chiprow"><span class="k" data-i18n="current">In use</span><span class="v" id="chipv">-</span></div><p class="label lbl2" data-i18n="usbAudio">USB Headphones</p><div class="usbrow" id="usbrow" aria-live="polite"><div class="usbtile off" id="usbtile-esp"><span class="usbname" data-i18n="usbEsp">ESP</span><span class="usbst" id="usbst-esp" hidden data-i18n="usbConnected">Connected</span></div></div><p class="k note" data-i18n="usbHint">Plug in an ESP32-S3, then set Sound → Output to USB Headphones. For Tempest 3D stereo mix.</p><p class="label lbl2" data-i18n="codec">Codec</p><div class="seg" id="codecs"><button id="cd0" data-i18n="codecAuto">Auto</button><button id="cd1">SBC</button><button id="cd2">SBC HQ</button><button id="cd3">SBC-XQ</button></div><p class="k note" id="codecnote" data-i18n="codecHint">Auto is plain SBC. SBC HQ and SBC-XQ only if you pick them, and only when this headset supports them.</p><p class="k note cno" id="codecno"></p><p class="k note cno" id="xqnote"></p></section><section class="card status" style="--acc:var(--cyan)"><div class="shead"><p class="label" data-i18n="liveStatus">Live status</p><span class="sp"></span><a class="diag" href="/api/diag" title="/api/diag">diag.txt</a></div><div class="kv">
 <span class="k" data-i18n="format">Format</span><span class="chips" id="fmtd">-</span>
 <span class="k" data-i18n="battery">Battery</span><span class="v" id="batv">-</span>
 <span class="k" data-i18n="packets">Packets / SBC frames</span><span class="v" id="pk">-</span>
@@ -1128,7 +1457,9 @@ html,body{height:auto!important;overflow:auto!important}
 <p class="k note" id="latnote" data-i18n="latHint">Lower: less delay. Higher: fewer dropouts when the radio is busy. Saved for this headset.</p>
 <div class="latd"><div class="lbar" id="lbar"><i id="lb0" style="background:var(--b0)"></i><i id="lb1" style="background:var(--b1)"></i><i id="lb2" style="background:var(--b3)"></i><i id="lb3" style="background:var(--b4)"></i></div>
 <div class="lkeys" id="lkeys"></div></div>
-<div class="card logp" style="--acc:var(--cyan)"><p class="label" data-i18n="log">Log</p><div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></div></section></div><div class="pfoot"><span class="sp"></span><button id="stop" class="red sm" data-i18n="stop">Stop HearBridge</button></div></div>
+<div class="card logp" style="--acc:var(--cyan)"><p class="label" data-i18n="log">Log</p><div class="evlog" id="evlog"><div class="k" data-i18n="logEmpty">Nothing yet</div></div></div></section></div></div>
+
+<div class="pg" id="pglang" style="--acc:var(--cyan)"><div class="cols onecol"><section class="card" style="--acc:var(--cyan)"><p class="label" data-i18n="language">Language</p><p class="k note" data-i18n="langHint">Pick a language for this page.</p><div id="langpage" class="langpage"></div></section></div></div>
 </div>
 </div>
 </div>
@@ -1140,15 +1471,21 @@ var S=null,busyG=0,busyH=0,LANG='en',TOKEN='HBTOKENxxxxxxxxxxxxxxxxxxxxxxxxx';
 function $(i){return document.getElementById(i)}
 function t(k){var d=I18N.strings[LANG]||I18N.strings.en;return d[k]||I18N.strings.en[k]||k}
 function info(c){for(var i=0;i<I18N.langs.length;i++)if(I18N.langs[i].code==c)return I18N.langs[i];return I18N.langs[0]}
-function setLang(c){var L=info(c);LANG=L.code;try{localStorage.setItem('hb_lang',LANG)}catch(e){}
+function setLang(c){var L=info(c);LANG=L.code;var lb=$('langlist'),bb=$('langbtn');if(lb)lb.className='';if(bb){bb.className='';bb.setAttribute('aria-expanded','false')}try{localStorage.setItem('hb_lang',LANG)}catch(e){}
 document.documentElement.lang=LANG;if($('langcur'))$('langcur').textContent=L.name;document.documentElement.dir=L.rtl?'rtl':'ltr';
 var n=document.querySelectorAll('[data-i18n]');for(var i=0;i<n.length;i++)n[i].textContent=t(n[i].getAttribute('data-i18n'));
-var o=$('langlist').getElementsByTagName('button');for(var i2=0;i2<o.length;i2++)o[i2].className='langopt'+(o[i2].getAttribute('data-code')==LANG?' on':'');$('langlist').className='';if(typeof TAB=='number'&&setIsOpen())setTab(TAB);if(S)draw()}
-function buildLangs(){var h='',i,L;for(i=0;i<I18N.langs.length;i++){L=I18N.langs[i];
-h+='<button type="button" class="langopt" role="menuitem" data-code="'+L.code+'"'+(L.rtl?' dir="rtl"':'')+'><span>'+L.name+'</span></button>'}
-$('langlist').innerHTML=h;var b=$('langlist').getElementsByTagName('button');
-for(i=0;i<b.length;i++)b[i].onclick=function(){setLang(this.getAttribute('data-code'))};
-$('langbtn').onclick=function(){$('langlist').className=$('langlist').className?'':'show'}}
+var box=$('langpage')||$('langlist');if(box){var o=box.getElementsByTagName('button');for(var i2=0;i2<o.length;i2++)if(o[i2].getAttribute('data-code'))o[i2].className='langopt'+(o[i2].getAttribute('data-code')==LANG?' on':'')}if($('langlist'))$('langlist').className='';if($('pglang')&&$('pglang').className.indexOf('on')>=0){if($('pgtitle'))$('pgtitle').textContent=t('language')}else if(typeof TAB=='number'&&setIsOpen())setTab(TAB);if(S)draw()}
+function buildLangs(){var h='',i,L,box=$('langpage')||$('langlist');for(i=0;i<I18N.langs.length;i++){L=I18N.langs[i];
+h+='<button type="button" class="langopt'+(L.code==LANG?' on':'')+'" data-code="'+L.code+'"'+(L.rtl?' dir="rtl"':'')+'><span>'+L.name+'</span></button>'}
+if(box)box.innerHTML=h;var b=(box||document).getElementsByTagName('button');
+for(i=0;i<b.length;i++)if(b[i].getAttribute&&b[i].getAttribute('data-code'))b[i].onclick=function(){setLang(this.getAttribute('data-code'))};
+$('langbtn').onclick=function(){setOpenLang()}}
+function setOpenLang(){$('setm').className='rail show';$('home').className='grid hid';$('dmain').className='dmain show';
+for(var i=0;i<NTAB;i++){if($('tb'+i))$('tb'+i).className='';if($('pg'+i))$('pg'+i).className='pg'}
+if($('tbhome'))$('tbhome').className='home';if($('langbtn')){$('langbtn').className='on';$('langbtn').setAttribute('aria-expanded','true')}
+if($('pglang'))$('pglang').className='pg on';if($('pgtitle'))$('pgtitle').textContent=t('language');
+if($('setm')&&$('setm').style.setProperty)$('setm').style.setProperty('--pgc','var(--cyan)');
+if($('langlist'))$('langlist').className=''}
 
 /* POST token: the page carries it, /api/status repeats it. A page left open
  * over a restart of HearBridge holds the old one: a 403 takes the new token
@@ -1196,7 +1533,7 @@ car:'<path d="M3 15l2-6h14l2 6v4H3z" fill="currentColor"/><circle cx="7" cy="19"
 mic:'<rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4" fill="none" stroke="currentColor" stroke-width="2"/>',
 note:'<path d="M9 17V5l11-2v12" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="6.5" cy="17.5" r="3" fill="currentColor"/><circle cx="17.5" cy="15.5" r="3" fill="currentColor"/>'};
 var KIND={headphones:'head',headset:'head',speaker:'spk',portable:'spk',hifi:'spk',car:'car',handsfree:'mic',tv:'tv',av:'tv',audio:'note'};
-function icon(k){return '<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">'+ICON[KIND[k]||'note']+'</svg>'}
+function icon(k){return '<svg viewBox="0 0 24 24" width="42" height="42" aria-hidden="true">'+ICON[KIND[k]||'note']+'</svg>'}
 function kindOf(cod){var c=parseInt(cod,16)||0,maj=(c>>8)&31,min=(c>>2)&63;if(maj!=4)return 'audio';
 return {6:'headphones',1:'headset',5:'speaker',7:'portable',10:'hifi',8:'car',2:'handsfree',9:'tv',14:'tv',15:'tv'}[min]||'av'}
 function bars(r){if(r==null)return '';var n=r>-60?4:r>-70?3:r>-80?2:1,h='<span class="bars b'+n+'" title="'+esc(t('signal'))+': '+r+' dBm">';
@@ -1239,7 +1576,7 @@ if(st=='connecting'||st=='pairing')return '<span class="badge warn">'+esc(t('con
 return '<span class="badge off">'+esc(t('notConnected'))+'</span>'}
 function drawSaved(){if(!SAVL)return;var rows=[],i,d,on=linked(),st=stOf(),busy=st=='connecting'||st=='pairing';
 for(i=0;i<SAVL.length;i++){d=SAVL[i];
-rows.push({k:d.addr,h:row(icon(d.kind),d.name||d.addr,badge(d.current)+'<span class="addr">'+esc(d.addr)+'</span>',
+rows.push({k:d.addr,h:row(icon(d.kind||kindOf(d.cod)),d.name||d.addr,badge(d.current)+'<span class="addr">'+esc(d.addr)+'</span>',
 (d.current&&on?'<button type="button" data-disc="1">'+esc(t('disconnect'))+'</button>'
 :d.current&&busy?'':'<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('reconnect'))+'</button>')
 +'<button type="button" class="red" data-forget="1" data-addr="'+esc(d.addr)+'">'+esc(t('forget'))+'</button>',
@@ -1271,6 +1608,10 @@ for(i=0;i<j.devices.length;i++){d=j.devices[i];if(SAV[d.addr])continue;k=d.kind|
 rows.push({k:d.addr,h:row(icon(k),d.name||d.addr,'<span class="addr">'+esc(d.addr)+'</span>','<button type="button" class="act" data-addr="'+esc(d.addr)+'">'+esc(t('connectTo'))+'</button>',''),s:bars(d.rssi)})}
 patchList('devlist',rows,'<p class="k">'+esc(t('noDevices'))+'</p>')})}
 function pct(v){return Math.round(v)+'%'}
+function uiFromGain(p){p=+p||0;return p<=100?p:Math.round(100+(p-100)/4)}
+function gainFromUi(u){u=+u||0;return u<=100?100:Math.round(100+(u-100)*4)}
+function uiFromStatus(S){paintUsbTile(S);/*usb*/if(!S)return 0;if(S.gain_pct>100)return uiFromGain(S.gain_pct);if(S.gain_pct>=0)return S.gain_pct;if(S.headset_volume>=0)return Math.round(S.headset_volume*100/127);return 0}
+function paintGainUi(u){$('gv').textContent=pct(u);var b=$('gvboost');if(b){var on=+u>100;b.hidden=!on;b.textContent=on?'BOOST':''}}
 function chips(a){var h='',i;for(i=0;i<a.length;i++)h+='<span class="chip'+(a[i][1]?' '+a[i][1]:'')+'">'+esc(a[i][0])+'</span>';return h}
 /* log line colour: problems soft red, success lime, presses cyan, the rest white */
 function evKind(s){return /could not|did not|didn't|busy|hung up|lost|not an audio|unstable|out of range|stopped the audio|weak signal|battery at/i.test(s)?'bad':
@@ -1330,15 +1671,18 @@ var cname=ch.family||ch.vendor||'';
 var ci=ch.vid?(cname?cname+' ('+ch.vid+':'+ch.pid+')':ch.vid+':'+ch.pid):'';
 $('chipv').textContent=(ct?(ci?ct+' · '+ci:ct):ci)||'-';$('adm').textContent=cname||ct||'-';
 drawAd();
-var ev=S.events||[],eh='';
+var ev=S.events||[],eh='',prevEv='';
 if(!ev.length)eh='<div class="k">'+esc(t('logEmpty'))+'</div>';
-else for(var ei=0;ei<ev.length;ei++)eh+='<div class="'+evKind(ev[ei])+'">'+esc(ev[ei])+'</div>';
+else for(var ei=0;ei<ev.length;ei++){var es=ev[ei];
+if(!es||es===prevEv)continue;
+if(/bitpool|AVDTP|L2CAP|HCI |ACL |SDP |MTU|seq=|rtp |a2dp cfg|set_configuration|reconfigure|write_q|backlog=|sample_rate=|frames=|pkts=|0x[0-9a-f]{4,}|adapter selection saved|Dropouts come from the link|Audio keeps dropping|resetting the audio queue|restarting the stream|Bluetooth adapter/i.test(es))continue;
+prevEv=es;eh+='<div class="'+evKind(es)+'">'+esc(es)+'</div>';}
 /* newest at the bottom; follow it unless the user scrolled up to read */
 var lg=$('evlog');if(!lg.onscroll){lg.hbFollow=1;lg.onscroll=function(){this.hbFollow=this.scrollTop+this.clientHeight>=this.scrollHeight-6}}
 setHtml('evlog',eh);if(lg.hbFollow)lg.scrollTop=lg.scrollHeight;
 $('pkv').textContent=S.peak.toFixed(3);$('m1').style.width=Math.min(100,S.peak*100)+'%';
 $('opv').textContent=S.out_peak.toFixed(3);$('m2').style.width=Math.min(100,S.out_peak*100)+'%';
-if(!busyG)$('gain').value=S.gain_pct;$('gv').textContent=pct(S.gain_pct);
+if(!busyG){var uu=uiFromStatus(S);$('gain').value=uu;paintGainUi(uu)}
 if(!busyH&&S.headset_volume>=0)$('hs').value=S.headset_volume;
 $('hv').textContent=S.headset_volume<0?'-':pct(S.headset_volume*100/127);
 /* moved on the headset itself: the slider follows and says so for a moment;
@@ -1399,8 +1743,8 @@ for(var qi=0;qi<5;qi++)$('qp'+qi).onclick=(function(n){return function(){$('pr'+
 $('keyvol').onclick=function(){act('/api/keyvol?on='+(S&&S.key_vol===0?1:0))};
 /* settings overlay */
 var TAB=0,NTAB=4,PGC=['var(--lime)','var(--violet)','var(--ember)','var(--gold)'];function setTab(n){TAB=n;for(var i=0;i<NTAB;i++){$('tb'+i).className=i==n?'on':'';$('pg'+i).className='pg'+(i==n?' on':'')}$('tbhome').className='home';var ts=$('tb'+n).getElementsByTagName?$('tb'+n).getElementsByTagName('span'):[];$('pgtitle').textContent=ts.length?ts[0].textContent:'';$('setm').style.setProperty&&$('setm').style.setProperty('--pgc',PGC[n])}
-function setOpen(n){$('setm').className='rail show';$('home').className='grid hid';$('dmain').className='dmain show';setTab(n==null?TAB:n);$('tb'+TAB).focus();if(TAB==3)bkCheck()}
-function setClose(){$('setm').className='rail';$('home').className='grid';$('dmain').className='dmain';for(var i=0;i<NTAB;i++)$('tb'+i).className='';$('tbhome').className='home on';$('tbhome').focus()}
+function setOpen(n){$('setm').className='rail show';$('home').className='grid hid';$('dmain').className='dmain show';if($('pglang'))$('pglang').className='pg';if($('langbtn')){$('langbtn').className='';$('langbtn').setAttribute('aria-expanded','false')}setTab(n==null?TAB:n);$('tb'+TAB).focus();if(TAB==3)bkCheck()}
+function setClose(){$('setm').className='rail';$('home').className='grid';$('dmain').className='dmain';for(var i=0;i<NTAB;i++)$('tb'+i).className='';if($('pglang'))$('pglang').className='pg';if($('langbtn')){$('langbtn').className='';$('langbtn').setAttribute('aria-expanded','false')}$('tbhome').className='home on';$('tbhome').focus()}
 for(var ti=0;ti<NTAB;ti++)$('tb'+ti).onclick=(function(n){return function(){setOpen(n)}})(ti);
 $('tbhome').onclick=setClose;
 function setIsOpen(){return $('setm').className.indexOf('show')>0}
@@ -1420,33 +1764,40 @@ $('prc').onclick=function(){setOpen(1)};
 function scanBlocked(){if(!S||S.paused||S.state!='streaming')return 0;
 toast(t('scanBusy').replace('%s',S.device||t('theHeadset')));return 1}
 function scanPress(){if(scanBlocked())return;act('/api/scan?user=1');armScan()}
-$('addhs').onclick=function(){setOpen(0);scanPress()};
+$('addhs').onclick=function(){setOpen(0);setTimeout(function(){scanPress()},0)};
 $('gdrop').onclick=function(){if(confirm(t('gameRemoveConfirm')))act('/api/game?do=2')};
 /* backup / restore: USB drive (default), the console, or this device (download / upload) */
-var BKW='usb',bkUsb=1;
 function postj(p,body,cb,again){var x=new XMLHttpRequest();x.open('POST',p,true);x.timeout=15000;x.setRequestHeader('X-HB-Token',TOKEN);
 x.onload=function(){var j=null;if(x.status==403&&!again){xhr('GET','/api/status',function(){postj(p,body,cb,1)});return}
 if(x.status==403){MSGK='reload';$('msg').textContent=t('reload')}try{j=JSON.parse(x.responseText)}catch(e){}cb(x.status,j,x.responseText)};x.onerror=x.ontimeout=function(){cb(0,null,'')};x.send(body||null)}
+var BKW='usb',bkUsb=1,bkMode='backup';
 function bkMsg(s,c){$('bkmsg').textContent=s;$('bkmsg').className='bkmsg'+(c?' '+c:'')}
 function bkSeg(){var ids={usb:'bkusb',internal:'bkint',device:'bkdev'};for(var k in ids){var b=$(ids[k]);b.className=k==BKW?'act':(k=='usb'&&!bkUsb?'no':'')}
 $('bkusb').textContent=bkUsb?t('bkUsb'):t('bkNoUsb')}
-function bkCheck(){bkMsg('');setHtml('bklist','');getj('/api/backups?where=usb',function(j){bkUsb=j.avail?1:0;if(!bkUsb&&BKW=='usb')BKW='internal';bkSeg()});bkSeg()}
-function bkOpen(){setOpen(3)}
-function bkPick(w){if(w=='usb'&&!bkUsb){bkMsg(t('bkNoUsb'),'bad');return}BKW=w;bkSeg();bkMsg('');setHtml('bklist','')}
+function bkModeUI(){$('bkdo').className=bkMode=='backup'?'act':'';$('rsdo').className=bkMode=='restore'?'act':''}
+function bkBindRows(){var rows=$('bklist').querySelectorAll('.bkrow'),i;
+for(i=0;i<rows.length;i++){(function(row){var n=row.getAttribute('data-n');
+var pick=row.querySelector('.bkpick'),del=row.querySelector('.bkdel');
+if(pick)pick.onclick=function(){if(!confirm(t('restoreConfirm')))return;bkMsg('\u2026');postj('/api/restore?where='+BKW+'&name='+n,null,bkRestored)};
+if(del)del.onclick=function(){if(!confirm(t('bkDeleteConfirm')))return;bkMsg('\u2026');postj('/api/backup-delete?where='+BKW+'&name='+n,null,function(st,j){if(st==200&&j&&j.ok){bkMsg(t('bkDeleted'),'good');bkLoadList()}else bkMsg(t('bkFail'),'bad')})}}(rows[i]))}}
+function bkRenderList(f){var h='',i;if(!f||!f.length){setHtml('bklist','<p class="k note">'+esc(t('bkNone'))+'</p>');return}
+for(i=0;i<f.length;i++)h+='<div class="bkrow" data-n="'+esc(f[i].name)+'"><button type="button" class="bkpick"><span>'+esc(f[i].when||f[i].name)+'</span><span class="when">'+esc(f[i].name)+'</span></button><button type="button" class="bkdel">'+esc(t('bkDelete'))+'</button></div>';
+setHtml('bklist',h);bkBindRows()}
+function bkLoadList(){if(BKW=='device'){setHtml('bklist','<p class="k note">'+esc(t('bkDeviceList'))+'</p>');return}
+getj('/api/backups?where='+BKW,function(j){if(!j.avail){if(BKW=='usb')bkMsg(t('bkNoUsb'),'bad');setHtml('bklist','');return}
+bkRenderList(j.files||[])})}
+function bkCheck(){bkMsg('');setHtml('bklist','');getj('/api/backups?where=usb',function(j){bkUsb=j.avail?1:0;if(!bkUsb&&BKW=='usb')BKW='internal';bkSeg();bkLoadList()});bkSeg();bkModeUI()}
+function bkPick(w){if(w=='usb'&&!bkUsb){bkMsg(t('bkNoUsb'),'bad');return}BKW=w;bkSeg();bkMsg('');bkLoadList()}
 $('bkusb').onclick=function(){bkPick('usb')};$('bkint').onclick=function(){bkPick('internal')};$('bkdev').onclick=function(){bkPick('device')};
-$('bkdo').onclick=function(){setHtml('bklist','');bkMsg('…');
+$('bkdo').onclick=function(){bkMode='backup';bkModeUI();setHtml('bklist','');bkMsg('\u2026');
 if(BKW=='device'){postj('/api/backup?where=download',null,function(st,j,txt){if(st!=200){bkMsg(t('bkFail'),'bad');return}
-try{var a=document.createElement('a'),u=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.href=u;a.download='hearbridge-backup.json';document.body.appendChild(a);a.click();
+try{var blob=new Blob([txt||JSON.stringify(j)],{type:'application/json'}),a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download='hearbridge-backup.json';document.body.appendChild(a);a.click();
 setTimeout(function(){URL.revokeObjectURL(u);a.parentNode.removeChild(a)},1000);bkMsg(t('bkDownloaded'),'good')}catch(e){bkMsg(t('bkFail'),'bad')}});return}
-postj('/api/backup?where='+BKW,null,function(st,j){if(st==200&&j&&j.ok)bkMsg(t('bkSaved').replace('%s',j.name),'good');else if(st==409)bkMsg(t('bkNoUsb'),'bad');else bkMsg(t('bkFail'),'bad')})};
-function bkRestored(st,j){if(st==200&&j&&j.ok){bkMsg(t('bkRestored'),'good');setHtml('bklist','');saved()}else bkMsg(t('bkFail'),'bad')}
-$('rsdo').onclick=function(){bkMsg('');setHtml('bklist','');
+postj('/api/backup?where='+BKW,null,function(st,j){if(st==200&&j&&j.ok){bkMsg(t('bkSaved').replace('%s',j.name),'good');bkLoadList()}else if(st==409)bkMsg(t('bkNoUsb'),'bad');else bkMsg(t('bkFail'),'bad')})};
+function bkRestored(st,j){if(st==200&&j&&j.ok){bkMsg(t('bkRestored'),'good');bkLoadList();saved()}else bkMsg(t('bkFail'),'bad')}
+$('rsdo').onclick=function(){bkMode='restore';bkModeUI();bkMsg('');
 if(BKW=='device'){$('bkfile').value='';$('bkfile').click();return}
-getj('/api/backups?where='+BKW,function(j){var f=j.files||[],h='',i;if(!j.avail){bkMsg(t('bkNoUsb'),'bad');return}
-if(!f.length){bkMsg(t('bkNone'));return}bkMsg(t('bkPick'));
-for(i=0;i<f.length;i++)h+='<button type="button" data-n="'+esc(f[i].name)+'">'+esc(f[i].when||t('bkLatest'))+'</button>';
-setHtml('bklist',h);var b=$('bklist').getElementsByTagName('button');
-for(i=0;i<b.length;i++)b[i].onclick=function(){if(!confirm(t('restoreConfirm')))return;bkMsg('…');postj('/api/restore?where='+BKW+'&name='+this.getAttribute('data-n'),null,bkRestored)};b.length&&b[0].focus()})};
+bkLoadList();bkMsg(t('bkPick'))};
 $('bkfile').onchange=function(){var f=this.files&&this.files[0];if(!f)return;if(!confirm(t('restoreConfirm')))return;
 var r=new FileReader();r.onload=function(){bkMsg('…');postj('/api/restore?where=upload',r.result,bkRestored)};r.readAsText(f)};
 /* latency: estimate from the stream loop (see hb_latency_estimate) */
@@ -1495,8 +1846,17 @@ $('eq'+ei).onchange=function(){eqSend(eqVals(),1)}}
 for(var pi=0;pi<5;pi++)$('pr'+pi).onclick=(function(p){return function(){var i;for(i=0;i<5;i++)$('eq'+i).value=PRESETS[p][i];
 busyE=1;eqPaint(PRESETS[p],1);eqSend(PRESETS[p],1)}})(pi);
 $('eqon').onclick=function(){var on=!(S&&S.eq&&S.eq.on);eqSend(eqVals(),on)};
-$('gain').oninput=function(){busyG=1;$('gv').textContent=pct(this.value)};
-$('gain').onchange=function(){act('/api/volume?pct='+this.value,function(){busyG=0})};
+var gainSent=-1,gainPushing=0;
+function gainPush(){
+if(gainPushing)return;
+var el=$('gain'),u=+el.value||0,g=gainFromUi(u),hs=u<=100?Math.round(u*127/100):127;
+gainPushing=1;busyG=1;gainSent=u;paintGainUi(u);
+var left=2;function fin(){if(--left<=0){gainPushing=0;busyG=0}}
+if(u<=100){act('/api/volume?pct=100',fin);act('/api/headset?vol='+hs,fin)}
+else{act('/api/volume?pct='+g,fin);act('/api/headset?vol=127',fin)}
+}
+$('gain').oninput=function(){busyG=1;paintGainUi(this.value)};
+$('gain').onchange=$('gain').onmouseup=$('gain').ontouchend=$('gain').onpointerup=function(){gainPush()};
 /* headset volume: send on release (any of these events; the PS5 browser may skip change),
    and never keep the slider frozen: after 1.5 s without input it follows the headset again */
 var hsT=0,hsSent=-1;
@@ -1525,4 +1885,14 @@ if(document.addEventListener)document.addEventListener('visibilitychange',functi
 setInterval(function(){if(scanLive&&Date.now()<scanLive)devices()},300);
 setInterval(function(){var v=parseInt($('lat').value,10);if(latAck>=0&&v!==latAck){latTouch=1;pushLat(v)}},200);
 hbTest={req:req,draw:function(){draw()},badge:badge};
+
+/* USB Headphones tile: white+Connected only when a real USB Audio device is plugged. */
+function paintUsbOne(id,stId,on){
+  var el=$(id),st=$(stId); if(!el)return;
+  el.classList.toggle('on',!!on); el.classList.toggle('off',!on);
+  if(st){ if(on){st.hidden=false;st.textContent=(typeof I!=='undefined'&&I&&I.usbConnected)||'Connected'} else {st.hidden=true} }
+}
+function paintUsbTile(S){
+  paintUsbOne('usbtile-esp','usbst-esp', !!(S&&S.usb_esp));
+}
 </script></body></html>

@@ -60,4 +60,10 @@ int hci_usb_list_adapters(struct hci_usb_adapter *out, int max);
 
 int hci_usb_survey(void);
 
+/* Read-only ugen scan: classify plugged USB Audio as Sony and/or ESP.
+ * usb_audio_present stays as OR of both (compat). */
+void hci_usb_audio_scan(int *sony, char *sony_name, int sony_cap,
+                        int *esp, char *esp_name, int esp_cap);
+int hci_usb_audio_present(char *name, int name_cap);
+
 #endif

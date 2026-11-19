@@ -60,6 +60,8 @@ int  hb_backup_list(const char *dest_dir, char (*names)[HB_BACKUP_NAME], int max
 /* Writes the files of dest_dir/name into state_dir (each atomically).
  * Returns files written, -1 not readable / not a backup. */
 int  hb_backup_restore(const char *state_dir, const char *dest_dir, const char *name);
+/* Remove dest_dir/name and drop it from index.txt. 1 ok, 0 failed. */
+int  hb_backup_delete(const char *dest_dir, const char *name);
 /* Same from a backup JSON already in memory (uploaded from the page). */
 int  hb_backup_restore_text(const char *state_dir, const char *json);
 /* The backup JSON of state_dir into out (for a browser download). Length or -1. */

@@ -908,7 +908,7 @@ int hci_usb_open(hci_t *out)
     u->fd = -1;
     log_line("hci_usb: controller selection: %s%s%s",
              sel == SEL_INTERNAL ? "internal" : sel == SEL_USB ? "usb" : sel == SEL_NODE ? "node " : "auto",
-             sel == SEL_NODE ? choice : "", sel == SEL_AUTO ? " (adapter first)" : "");
+             sel == SEL_NODE ? choice : "", sel == SEL_AUTO ? " (Realtek USB first)" : "");
     for (;;) {
         int busy = 0, found = 0;
 
@@ -935,6 +935,22 @@ int hci_usb_open(hci_t *out)
              * Auto must open Realtek or CSR when one is present, not fall through
              * to the console chip after wasting tries on non-BT ugen nodes. */
             na = hci_usb_list_adapters(ads, HCI_MAX_NODES);
+            /* Auto: Realtek first, then other USB sticks, CSR last. */
+            for (i = 0; i < na; i++) {
+                int j, best = i, ri, rj;
+                for (j = i + 1; j < na; j++) {
+                    ri = ads[best].internal ? 100 : ((ads[best].vid & 0xffff) == 0x0bda ? 0 :
+                         (ads[best].vid & 0xffff) == 0x0a12 ? 50 : 10);
+                    rj = ads[j].internal ? 100 : ((ads[j].vid & 0xffff) == 0x0bda ? 0 :
+                         (ads[j].vid & 0xffff) == 0x0a12 ? 50 : 10);
+                    if (rj < ri) best = j;
+                }
+                if (best != i) {
+                    struct hci_usb_adapter tmp = ads[i];
+                    ads[i] = ads[best];
+                    ads[best] = tmp;
+                }
+            }
             for (i = 0; i < na; i++) {
                 int r;
                 if (ads[i].internal) continue;
@@ -1236,6 +1252,99 @@ int hci_usb_list_adapters(struct hci_usb_adapter *out, int max)
     }
     adapter_dedupe_labels(out, outn);
     return outn;
+}
+
+
+/* USB Audio Class interface = 0x01. Also accept known sinks by VID/PID. */
+static int cfg_has_audio(const uint8_t *d, int len)
+{
+    int pos = 0;
+    while (pos + 9 <= len) {
+        int blen = d[pos];
+        int type = d[pos + 1];
+        if (blen < 2 || pos + blen > len) break;
+        if (type == 4 && blen >= 9) {
+            /* bInterfaceClass */
+            if (d[pos + 5] == 0x01) return 1;
+        }
+        pos += blen;
+    }
+    return 0;
+}
+
+/* DualSense / Edge controllers — never treat as USB headphones. */
+static int is_dualsense(int vid, int pid)
+{
+    return vid == 0x054c && (pid == 0x0ce6 || pid == 0x0df2 || pid == 0x0ecc);
+}
+
+void hci_usb_audio_scan(int *sony, char *sony_name, int sony_cap,
+                        int *esp, char *esp_name, int esp_cap)
+{
+    char names[24][32];
+    int n, i;
+
+    if (sony) *sony = 0;
+    if (esp) *esp = 0;
+    if (sony_name && sony_cap > 0) sony_name[0] = 0;
+    if (esp_name && esp_cap > 0) esp_name[0] = 0;
+
+    n = list_ugen(names, 24);
+    for (i = 0; i < n; i++) {
+        static uint8_t cfg[1024];
+        char id[128], prod[80];
+        struct usb_device_info di;
+        int fd, vid = -1, pid = -1, nc, audio, is_esp, is_sony;
+        if (is_root_hub(names[i])) continue;
+        fd = open(names[i], O_RDONLY);
+        if (fd < 0) fd = open(names[i], O_RDWR);
+        if (fd < 0) continue;
+        device_id(fd, id, sizeof id, &vid, &pid);
+        if (is_usb_hub_fd(fd)) { close(fd); continue; }
+        if (is_dualsense(vid, pid)) { close(fd); continue; }
+        nc = read_config(fd, cfg, (int)sizeof cfg);
+        is_esp = (vid == 0x303A);
+        audio = (nc > 0 && cfg_has_audio(cfg, nc)) || is_esp;
+        is_sony = (!is_esp && vid == 0x054c && audio);
+        if (!audio) { close(fd); continue; }
+        prod[0] = 0;
+        memset(&di, 0, sizeof di);
+        if (ioctl(fd, USB_GET_DEVICEINFO, &di) == 0 && di.udi_product[0])
+            snprintf(prod, sizeof prod, "%.40s", di.udi_product);
+        else if (is_esp)
+            snprintf(prod, sizeof prod, "PS5 Audio Sink");
+        else if (is_sony)
+            snprintf(prod, sizeof prod, "Sony USB Headphones");
+        else
+            snprintf(prod, sizeof prod, "%04x:%04x", vid & 0xffff, pid & 0xffff);
+        log_line("usb-audio: %s is %s (%s)", names[i], prod,
+                 is_esp ? "esp" : is_sony ? "sony" : "other");
+        if (is_esp && esp) {
+            *esp = 1;
+            if (esp_name && esp_cap > 0 && !esp_name[0])
+                snprintf(esp_name, (size_t)esp_cap, "%s", prod);
+        } else if (is_sony && sony) {
+            *sony = 1;
+            if (sony_name && sony_cap > 0 && !sony_name[0])
+                snprintf(sony_name, (size_t)sony_cap, "%s", prod);
+        }
+        close(fd);
+    }
+}
+
+int hci_usb_audio_present(char *name, int name_cap)
+{
+    int sony = 0, esp = 0;
+    char sn[48], en[48];
+    sn[0] = en[0] = 0;
+    hci_usb_audio_scan(&sony, sn, (int)sizeof sn, &esp, en, (int)sizeof en);
+    if (name && name_cap > 0) {
+        name[0] = 0;
+        if (sony && sn[0]) snprintf(name, (size_t)name_cap, "%s", sn);
+        else if (esp && en[0]) snprintf(name, (size_t)name_cap, "%s", en);
+        else if (sony || esp) snprintf(name, (size_t)name_cap, "USB Headphones");
+    }
+    return sony || esp;
 }
 
 int hci_usb_survey(void)

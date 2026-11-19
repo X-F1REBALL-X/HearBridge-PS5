@@ -128,6 +128,8 @@ int  btlink_hfp_battery(const btlink *l);
 /* Where that value came from: 0 none, 1 HF indicator (exact 0-100),
  * 2 Apple AT+IPHONEACCEV (10 % steps). */
 int  btlink_hfp_battery_src(const btlink *l);
+/* 1 = headset reports charging/docked over HFP, 0 not, -1 unknown. */
+int  btlink_hfp_battery_chg(const btlink *l);
 /* Bumped each time the headset itself changed the volume (its buttons/app). */
 int  btlink_avrcp_headset_moves(const btlink *l);
 /* Earbud next / previous track keys step the volume (setting, default on). */

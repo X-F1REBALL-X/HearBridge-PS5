@@ -81,6 +81,7 @@ void hfp_init(hfp_state *h, hfp_send_fn send, void *ud, hfp_log_fn log)
     h->ud = ud;
     h->log = log;
     h->battery = -1;
+    h->battery_chg = -1;
     h->mtu = RFC_MAX_FRAME;
 }
 
@@ -216,16 +217,19 @@ int hfp_at(hfp_state *h, const char *in, char *out, int max)
         if (num(&a, &k) && num(&a, &v) && k == 2) set_battery(h, v, 1);
         return snprintf(out, (size_t)max, OK_);
     }
-    if (starts(c, "AT+XAPL="))   /* Apple accessory: features bit 1 = battery */
-        return snprintf(out, (size_t)max, "\r\n+XAPL=iPhone,2\r\n" OK_);
+    if (starts(c, "AT+XAPL="))   /* Apple accessory: bit1 battery, bit2 docked/charging */
+        return snprintf(out, (size_t)max, "\r\n+XAPL=iPhone,6\r\n" OK_);
     if (starts(c, "AT+IPHONEACCEV=")) {
         int n;
         a = c + 15;
         if (num(&a, &n))
-            for (i = 0; i < n && num(&a, &k) && num(&a, &v); i++)
-                /* 0-9 = 10 % steps: only while no exact HF indicator
+            for (i = 0; i < n && num(&a, &k) && num(&a, &v); i++) {
+                /* key 1: 0-9 = 10 % steps; only while no exact HF indicator
                  * (AT+BIEV, 0-100) has come from this headset. */
                 if (k == 1 && v >= 0 && v <= 9 && h->battery_src != 1) set_battery(h, (v + 1) * 10, 2);
+                /* key 2: docked / charging (Apple accessory protocol). */
+                else if (k == 2) h->battery_chg = v ? 1 : 0;
+            }
         return snprintf(out, (size_t)max, OK_);
     }
     if (!strcmp(c, "AT+COPS?"))

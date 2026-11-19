@@ -73,6 +73,7 @@ void ctl_init(hb_ctl *c, const char *version)
     c->battery = -1;
     c->batt_pct = -1;
     c->batt_src = 0;
+    c->batt_chg = -1;
     c->batt_none = 0;
     c->link_rssi = 127;
     c->link_lq = -1;
@@ -119,6 +120,7 @@ void ctl_clear_link(hb_ctl *c, int drop_device)
     c->battery = -1;
     c->batt_pct = -1;
     c->batt_src = 0;
+    c->batt_chg = -1;
     c->batt_none = 0;
     c->link_rssi = 127;
     c->link_lq = -1;
@@ -136,6 +138,8 @@ void ctl_clear_link(hb_ctl *c, int drop_device)
 void ctl_event_locked(hb_ctl *c, const char *line)
 {
     if (!c || !line || !line[0]) return;
+    /* skip an exact repeat of the last line (noisy reconnect / status spam) */
+    if (c->event_n > 0 && !strcmp(c->events[c->event_n - 1], line)) return;
     if (c->event_n >= HB_EVENT_N) {
         memmove(c->events[0], c->events[1], sizeof c->events[0] * (HB_EVENT_N - 1));
         c->event_n = HB_EVENT_N - 1;

@@ -587,6 +587,32 @@ static unsigned char g_hold_man[PAIRED_MAX];   /* 1: Disconnect pressed for it *
 static int g_nhold;
 
 static long g_hold_ms;     /* when the last hold was set */
+/* After a case / power-off: ignore bounce reconnects from the same headset
+ * for a few seconds, then listen again so taking it out of the case connects. */
+static unsigned char g_case_addr[6];
+static long g_case_until;
+static int g_case_on;
+
+static int case_settling(const unsigned char a[6])
+{
+    return g_case_on && now_ms() < g_case_until && a && !memcmp(a, g_case_addr, 6);
+}
+
+static void case_settle_begin(const unsigned char a[6])
+{
+    if (!a) return;
+    memcpy(g_case_addr, a, 6);
+    g_case_until = now_ms() + 2500;
+    g_case_on = 1;
+    log_line("case: settle 2.5 s (no auto-accept bounce)");
+}
+
+static void case_settle_clear(void)
+{
+    g_case_on = 0;
+    g_case_until = 0;
+}
+
 static int hold_idx(const unsigned char a[6])
 {
     int i;
@@ -1072,6 +1098,7 @@ static int listen_any_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigne
     headset_ini cand;
     for (i = 0; i < g_npaired && n < 8; i++) {
         if (held_now(g_paired[i].addr, now_ms())) continue;
+        if (case_settling(g_paired[i].addr)) continue;
         memcpy(a[n], g_paired[i].addr, 6);
         memcpy(k[n], g_paired[i].link_key, 16);
         kt[n] = g_paired[i].key_type;
@@ -1102,6 +1129,7 @@ static int listen_any_saved(hci_t hci, headset_ini *ini, btlink **linkp, unsigne
         g_ctl.paused = 0;
         CTL_UNLOCK(&g_ctl);
     }
+    case_settle_clear();
     note_event("%s turned on, connecting", cand.name[0] ? cand.name : "Headset");
     pr = probe_link(link, &cand, linkp, psm);
     if (pr != 1) return 0;
@@ -1157,6 +1185,13 @@ static void conn_req_hook(hci_t hci, const unsigned char *ev, int n)
     long now = now_ms();
     if (ev && n >= 12) {
         const unsigned char *a = ev + 2;
+        if (case_settling(a)) {
+            /* Case bounce right after lid close: turn down without hanging up
+             * as 0x13 (that can stop some headsets answering when taken out). */
+            btlink_reject_request(hci, a, 0x0D);
+            log_line("case: rejected bounce call during settle");
+            return;
+        }
         unsigned cod = (unsigned)ev[8] | ((unsigned)ev[9] << 8) | ((unsigned)ev[10] << 16);
         int si = paired_find(g_paired, g_npaired, a), d;
         hb_cr_in in;
@@ -1261,6 +1296,10 @@ static int answer_saved_calls(hci_t hci, headset_ini *ini, btlink **linkp, unsig
     for (i = 0; i < g_npaired; i++) {
         long age = acl_track_request_age(g_paired[i].addr, now);
         if (age < 0 || age >= ACL_REQ_PENDING_MS || acl_track_handle(g_paired[i].addr)) continue;
+        if (case_settling(g_paired[i].addr)) {
+            btlink_reject_request(hci, g_paired[i].addr, 0x0D);
+            continue;
+        }
         if (hb_dropped_recent(&g_dropped, g_paired[i].addr, now, HB_DROPPED_MS)) {
             accept_drop(hci, g_paired[i].addr);
             continue;
@@ -2714,16 +2753,59 @@ stream_setup:
             }
             break;
         }
-        if (av.remote_closed) {
-            note_event("Headset stopped the audio");
-            set_why("closed");
-            rc = RUN_DROPPED;
-            break;
-        }
-        if (!btlink_chan_is_open(link, av.media_scid)) {
-            note_event("Headset stopped the audio");
-            set_why("closed");
-            rc = RUN_DROPPED;
+        if (av.remote_closed || !btlink_chan_is_open(link, av.media_scid)) {
+            /* Placing a bud in the case often closes AVDTP while ACL is still
+             * up. Wait for a real HCI hang-up (lid close / power-off). If the
+             * media channel comes back, keep streaming. */
+            long media_t0 = now_ms();
+            int decided = 0;
+            log_line("stream: media closed, waiting for HCI hang-up or media back");
+            note_event("Headset pausing");
+            while (now_ms() - media_t0 < 3500) {
+                if (hb_stop_requested()) { rc = RUN_STOP; decided = 1; break; }
+                if (btlink_pump(link, 20) < 0 || !btlink_is_up(link)) {
+                    int dr = btlink_last_disc_reason();
+                    if (hb_drop_is_away(dr)) {
+                        note_event("Headset turned off");
+                        set_why("away");
+                        rc = RUN_AWAY;
+                    } else {
+                        note_event("Connection lost");
+                        set_why("dropped");
+                        rc = RUN_DROPPED;
+                    }
+                    decided = 1;
+                    break;
+                }
+                if (!av.remote_closed && btlink_chan_is_open(link, av.media_scid)) {
+                    log_line("stream: media back, continuing");
+                    note_event("Headset is back");
+                    decided = 2; /* continue outer for */
+                    break;
+                }
+                /* Apply disconnect / pause while we wait. */
+                {
+                    int req_disc = 0;
+                    CTL_LOCK(&g_ctl);
+                    req_disc = g_ctl.req_disconnect;
+                    if (req_disc) g_ctl.req_disconnect = 0;
+                    CTL_UNLOCK(&g_ctl);
+                    if (req_disc) {
+                        note_event("Disconnected");
+                        set_why("off");
+                        rc = RUN_PAUSED;
+                        decided = 1;
+                        break;
+                    }
+                }
+            }
+            if (decided == 2) continue;
+            if (!decided) {
+                /* Lid closed without a clean 0x13, or media stayed down. */
+                note_event("Headset turned off");
+                set_why("away");
+                rc = RUN_AWAY;
+            }
             break;
         }
         if (btlink_media_rebind_due(link, av.media_scid))
@@ -2873,23 +2955,31 @@ stream_setup:
         if (cs_want >= 0) {
             /* New codec = new AVDTP configuration. Done on the open link
              * (no disconnect: some headsets, the Xbox one included, do not
-             * answer pages for minutes after we drop them). */
-            int ok;
-            persist_gain_if_dirty();
-            ok = codec_switch_in_place(&av, link, cs_want, cs_no_xq);
+             * answer pages for minutes after we drop them). Auto is plain
+             * SBC, so SBC <-> Auto with the same live codec is a no-op
+             * (no toast / no stream restart). */
+            int resolved = cs_want == HB_CODEC_AUTO ? HB_CODEC_SBC : cs_want;
             want_codec = cs_want;
-            cs_want = -1;
-            if (ok) {
-                sbc_encoder_close(enc);
-                enc = NULL;
-                switched = 1;
-                goto stream_setup;
+            if (av.codec.codec == resolved) {
+                log_line("stream: codec %s already live, skip switch", hb_codec_key(cs_want));
+                cs_want = -1;
+            } else {
+                int ok;
+                persist_gain_if_dirty();
+                ok = codec_switch_in_place(&av, link, cs_want, cs_no_xq);
+                cs_want = -1;
+                if (ok) {
+                    sbc_encoder_close(enc);
+                    enc = NULL;
+                    switched = 1;
+                    goto stream_setup;
+                }
+                note_event("Lost the headset while changing quality, reconnecting");
+                memset(&g_pending, 0, sizeof g_pending);
+                g_pending.kind = CMD_RECONNECT;
+                rc = RUN_SWITCH;
+                break;
             }
-            note_event("Lost the headset while changing quality, reconnecting");
-            memset(&g_pending, 0, sizeof g_pending);
-            g_pending.kind = CMD_RECONNECT;
-            rc = RUN_SWITCH;
-            break;
         }
         if (g_switch_req) {
             int bi = paired_find(g_paired, g_npaired, g_switch_addr);
@@ -3011,6 +3101,7 @@ stream_setup:
                 g_ctl.battery = btlink_avrcp_battery(link);
                 g_ctl.batt_pct = btlink_hfp_battery(link);
                 g_ctl.batt_src = btlink_hfp_battery_src(link);
+                g_ctl.batt_chg = btlink_hfp_battery_chg(link);
                 {
                     /* Volume fallback: while the page is open (it polls
                      * /api/status) and the headset has sent no volume report
@@ -3615,6 +3706,23 @@ static void note_adapter(void)
         g_ctl.chip_vid = -1;
         g_ctl.chip_pid = -1;
     }
+    {
+        int sony = 0, esp = 0;
+        char sn[48], en[48];
+        sn[0] = en[0] = 0;
+        hci_usb_audio_scan(&sony, sn, (int)sizeof sn, &esp, en, (int)sizeof en);
+        g_ctl.usb_sony = sony;
+        g_ctl.usb_esp = esp;
+        g_ctl.usb_audio = sony || esp;
+        snprintf(g_ctl.usb_sony_name, sizeof g_ctl.usb_sony_name, "%s", sony ? sn : "");
+        snprintf(g_ctl.usb_esp_name, sizeof g_ctl.usb_esp_name, "%s", esp ? en : "");
+        snprintf(g_ctl.usb_audio_name, sizeof g_ctl.usb_audio_name, "%s",
+                 sony && sn[0] ? sn : esp && en[0] ? en : "");
+        if (sony || esp)
+            log_line("usb-audio: sony=%d (%s) esp=%d (%s)",
+                     sony, sn[0] ? sn : "-", esp, en[0] ? en : "-");
+        else log_line("usb-audio: none");
+    }
     CTL_UNLOCK(&g_ctl);
     log_line("adapter: using %s (%s), pref=%s, %d Bluetooth adapter(s) listed", hci_usb_node(),
              hci_usb_is_external() ? "USB adapter, the console chip is untouched" : "the console's own chip",
@@ -4016,7 +4124,14 @@ int main(void)
         if ((r == RUN_PAUSED || paused) && ini.ok && !g_rest_resume) hold_add(ini.addr, 1);
         if (r == RUN_DROPPED) {
             g_want_until = 0;
-            notify("HearBridge: connection lost");
+            notify("HearBridge: connection lost\n%s",
+                   ini.ok && ini.name[0] ? ini.name : "headphones");
+        }
+        if (r == RUN_AWAY) {
+            g_want_until = 0;
+            notify("HearBridge: disconnected\n%s",
+                   ini.ok && ini.name[0] ? ini.name : "headphones");
+            if (ini.ok) case_settle_begin(ini.addr);
         }
         /* Case / power-off (RUN_AWAY): stay disconnected and listen.
          * Don't page a headset that just went away. */
@@ -4049,7 +4164,16 @@ int main(void)
              * never after a manual Disconnect or a case close (it pages us
              * itself when it comes out), never while a page command waits. */
             long idle_t0 = now_ms(), next_auto = now_ms() + hb_auto_gap_ms(g_bg_pages), window = 600000;
+            /* Case close: no page during settle (bounce). After settle, page
+             * again so buds taken out of the case are found (XM often waits). */
             int auto_ok = r != RUN_AWAY;
+            int away_armed = (r == RUN_AWAY);
+            long away_page_until = 0;
+            long last_page_seen = 0;
+            if (away_armed && ini.ok) {
+                next_auto = g_case_until > 0 ? g_case_until + 200 : now_ms() + 2700;
+                away_page_until = now_ms() + 180000; /* keep looking for 3 min after case */
+            }
             if (g_bg_pages && !hb_auto_page_ok(g_bg_pages))
                 log_line("auto: background pages used up (%d), only listening until Connect or a wake", g_bg_pages);
             (void)woke_up();
@@ -4058,6 +4182,35 @@ int main(void)
                 int go;
                 if (hb_stop_requested()) break;
                 if (transport_dead(hci)) break;          /* reopened at the top */
+                if (away_armed && !auto_ok) {
+                    if (!g_case_on || now_ms() >= g_case_until) {
+                        case_settle_clear();
+                        auto_ok = 1;
+                        away_armed = 0;
+                        g_bg_pages = 0;
+                        next_auto = now_ms() + 200;
+                        away_page_until = now_ms() + 180000;
+                        log_line("case: settle done, paging for headset out of case");
+                        note_event("Looking for headset");
+                        set_why("");
+                    }
+                }
+                /* Opening the HearBridge page after a case close: page now
+                 * (listen-window used to arm reads with no paging). */
+                {
+                    long seen;
+                    CTL_LOCK(&g_ctl);
+                    seen = g_ctl.page_seen_ms;
+                    CTL_UNLOCK(&g_ctl);
+                    if (away_page_until && now_ms() < away_page_until && ini.ok && !paused &&
+                        seen && seen != last_page_seen && now_ms() - seen < HB_LW_SEEN_MS) {
+                        last_page_seen = seen;
+                        next_auto = now_ms();
+                        if (g_bg_pages > 0) g_bg_pages--; /* don't burn the budget on a kick */
+                        if (!hb_auto_page_ok(g_bg_pages)) g_bg_pages = 0;
+                        log_line("case: page open, kick page for headset");
+                    }
+                }
                 {
                     int ad = 0;
                     CTL_LOCK(&g_ctl);
@@ -4163,6 +4316,7 @@ int main(void)
                     if (!got && !hb_auto_page_ok(g_bg_pages))
                         log_line("auto: %d background pages done, now only listening", g_bg_pages);
                     if (got) {
+                        case_settle_clear();
                         note_event("%s turned on, connecting", ini.name[0] ? ini.name : "Headset");
                         g_ready = back;
                         g_ready_psm = bpsm;
@@ -4173,7 +4327,13 @@ int main(void)
                     set_why("");
                     write_status("disconnected");
                     ctl_set_state("disconnected", NULL);
-                    next_auto = now_ms() + hb_auto_gap_ms(g_bg_pages);   /* backoff after this attempt */
+                    if (away_page_until && now_ms() < away_page_until) {
+                        /* Case reopen: page every ~3 s, reset budget if empty. */
+                        if (!hb_auto_page_ok(g_bg_pages)) g_bg_pages = 0;
+                        next_auto = now_ms() + 3000;
+                    } else {
+                        next_auto = now_ms() + hb_auto_gap_ms(g_bg_pages);   /* backoff after this attempt */
+                    }
                 }
             }
         }

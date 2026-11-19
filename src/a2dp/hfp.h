@@ -57,6 +57,7 @@ typedef struct {
     int battery;                  /* 0..100, -1 unknown */
     int battery_seq;              /* bumped on every new value */
     int battery_src;              /* 0 none, 1 BIEV, 2 IPHONEACCEV */
+    int battery_chg;              /* -1 unknown, 0 not, 1 charging (IPHONEACCEV key 2) */
     int closing;                  /* our close: 1 DISC on the DLC sent, 2 DISC on DLCI 0 sent */
 } hfp_state;
 
