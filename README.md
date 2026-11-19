@@ -46,6 +46,8 @@ Everything else, from features to troubleshooting, is in the **[guide](https://x
 
 The PS5 only fills its USB audio path while a USB headset is selected. A small ESP32-S3 board can act as that headset: plug it into the PS5 over USB, pick **USB Headphones (PS5 Audio Sink)** in Sound settings, and Tempest 3D Audio can turn on. HearBridge still streams the mix to your real Bluetooth headphones.
 
+Board tested: **ESP32-S3 DevKitC-1** (N16R8).
+
 1. Download **esp32-ps5-uac-sink-merged.bin** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
 2. Flash it to the ESP32-S3 UART port at offset `0x0` (esptool, or [esptool-js](https://espressif.github.io/esptool-js/) in a browser).
 3. Plug the board's USB-OTG port into the PS5, select **USB Headphones (PS5 Audio Sink)** as the output, and in HearBridge set capture to USB audio.
