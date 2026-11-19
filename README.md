@@ -48,7 +48,7 @@ The PS5 only fills its USB audio path while a USB headset is selected. A small E
 
 Board tested: **ESP32-S3 DevKitC-1** (N16R8).
 
-1. Download **esp32-ps5-uac-sink-merged.bin** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
+1. Download **ESP32-S3-PS5-Audio-Sink.bin** from the [latest release](https://github.com/X-F1REBALL-X/HearBridge-PS5/releases/latest).
 2. Flash it to the ESP32-S3 UART port at offset `0x0` (esptool, or [esptool-js](https://espressif.github.io/esptool-js/) in a browser).
 3. Plug the board's USB-OTG port into the PS5, select **USB Headphones (PS5 Audio Sink)** as the output, and in HearBridge set capture to USB audio.
 
