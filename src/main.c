@@ -87,6 +87,7 @@
 #define DIAG_PATH STATE_DIR "/diag.txt"        /* diagnostics report, also at /api/diag */
 #define HCI_DEBUG_PATH STATE_DIR "/hci_debug"  /* exists → /api/hcilog trace + /api/hci raw commands */
 #define CHIP_PATH STATE_DIR "/chip"            /* optional: "mediatek" or "marvell" forces the chip profile */
+#define KTAP_PATH STATE_DIR "/ktap"            /* exists → experimental kernel-tap capture (see avcap2.c/ktap.c) */
 #define DUMP_PKTS 200
 
 #define PCM_CAP_FRAMES  1024  /* matches Avcap2 READ_BYTES / (2*sizeof float) */
@@ -2577,11 +2578,22 @@ stream_setup:
         log_line("stream: latency target %d ms, media queue %d packets (~%d ms)",
                  pk.queue_ms, btlink_media_cap(link), btlink_media_cap(link) * pkt_ms);
     }
-    hb_rate_init(&pk.rate, av.bitpool_lo ? av.bitpool_lo : av.bitpool,
-                 av.bitpool_hi ? av.bitpool_hi : av.bitpool, sbc_encoder_bitpool(enc), now_ms());
-    /* SBC HQ may climb above 53 (to the sink's maximum); SBC-XQ (dual
-     * channel) stops at its own ceiling. */
-    hb_rate_set_ceiling(&pk.rate, av.bitpool_hi ? av.bitpool_hi : av.bitpool, av.codec.ceil);
+    {
+        int bp_hi = av.bitpool_hi ? av.bitpool_hi : av.bitpool;
+        /* Kernel tap only: the internal Bluetooth chip is shared with the
+         * controller, so cap SBC well below the sink maximum or the link
+         * congests (crackle / one-earbud dropouts at bitpool 50+). The
+         * default stereo backend keeps the normal adaptive ceiling. */
+        if (avcap2_backend_is_ktap() && bp_hi > 35) {
+            bp_hi = 35;
+            log_line("stream: kernel tap active, capping bitpool at %d", bp_hi);
+        }
+        hb_rate_init(&pk.rate, av.bitpool_lo ? av.bitpool_lo : av.bitpool,
+                     bp_hi, sbc_encoder_bitpool(enc), now_ms());
+        /* SBC HQ may climb above 53 (to the sink's maximum); SBC-XQ (dual
+         * channel) stops at its own ceiling. */
+        hb_rate_set_ceiling(&pk.rate, bp_hi, av.codec.ceil);
+    }
     log_line("stream: media MTU %u, SBC frame %d bytes, %d frames/packet, bitpool %d "
              "(adapts %d-%d)", mtu, pk.fsz, pk.per_pkt, sbc_encoder_bitpool(enc),
              pk.rate.lo, pk.rate.hi);

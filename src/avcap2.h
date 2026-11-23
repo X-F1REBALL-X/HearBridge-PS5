@@ -1,6 +1,8 @@
-/* libSceAvcap2 audio capture (Remote Play–style mix) for HearBridge.
+/* Audio capture for HearBridge (A2DP encode path, 48 kHz stereo).
  *
- * OpenAudio ABI + 0x38 param layout.
+ * This is the stable capture interface. It dispatches to one of two
+ * backends (see avcap2.c): the default libSceAvcap2 stereo mix
+ * (avcap2_stereo.h) or, opt-in, the experimental kernel tap (ktap.h).
  */
 #ifndef HEARBRIDGE_AVCAP2_H
 #define HEARBRIDGE_AVCAP2_H
@@ -13,6 +15,10 @@ typedef struct avcap2_session avcap2_session;
 
 avcap2_session *avcap2_session_open(void);
 void            avcap2_session_close(avcap2_session *s);
+
+/* 1 if the experimental kernel tap backend is active for this run, else 0
+ * (the default stereo mix). Decided once, at the first capture call. */
+int avcap2_backend_is_ktap(void);
 
 /* Diagnostics only: load libSceIpmi/libSceAvcap2 and check that the Avcap2
  * functions resolve (no capture is started). Results go to diag.h.
